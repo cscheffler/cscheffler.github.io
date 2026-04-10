@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rhomb Decagon</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="control-panel">
+        <h1>Rhomb Decagon</h1>
+        <p class="lede">
+          Tile a regular decagon of integer side length <span class="mono">n</span> with unit Penrose rhombs.
+          Placement is free-form: rotate a rhomb, move it anywhere inside the boundary, and snap to existing vertices when useful.
+        </p>
+
+        <form id="game-form" class="controls">
+          <label class="field">
+            <span>Side Length n</span>
+            <input id="side-length-input" name="sideLength" type="number" min="1" max="10" step="1" value="2">
+          </label>
+
+          <div class="field">
+            <span>Tile Type</span>
+            <div id="tile-palette" class="tile-palette" role="radiogroup" aria-label="Tile type"></div>
+          </div>
+
+          <div class="field">
+            <span>Rotation</span>
+            <div class="button-row compact-row">
+              <button type="button" id="rotate-left-button" class="rotation-icon-button" aria-label="Rotate counterclockwise">↻</button>
+              <div id="rotation-readout" class="readout">0°</div>
+              <button type="button" id="rotate-right-button" class="rotation-icon-button" aria-label="Rotate clockwise">↺</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span>Board Rotation</span>
+            <div class="button-row compact-row">
+              <button type="button" id="board-rotate-left-button" class="rotation-icon-button" aria-label="Rotate board counterclockwise">↻</button>
+              <button type="button" id="board-rotate-right-button" class="rotation-icon-button" aria-label="Rotate board clockwise">↺</button>
+            </div>
+          </div>
+
+          <label class="field checkbox-field">
+            <input id="snap-toggle" type="checkbox" checked>
+            <span>Snap to boundary and placed vertices</span>
+          </label>
+
+          <label class="field checkbox-field">
+            <input id="points-toggle" type="checkbox" checked>
+            <span>Show snap points</span>
+          </label>
+
+          <div class="button-row">
+            <button type="submit">Clear Board</button>
+            <button type="button" id="save-button">Save Board</button>
+            <button type="button" id="fork-button">Fork Board</button>
+          </div>
+        </form>
+
+        <section class="rules-card">
+          <h2>Controls</h2>
+          <ul>
+            <li>Move the mouse or touch inside the board to position the current rhomb.</li>
+            <li>Click or tap to place when the preview is highlighted as valid.</li>
+            <li>Click any placed rhomb to delete it.</li>
+            <li>Rotate in 36° steps with <span class="mono">Q</span> and <span class="mono">E</span>.</li>
+            <li>Cycle through all 8 tile types with <span class="mono">T</span>.</li>
+            <li>Snapping uses decagon unit points and vertices of already placed rhombs, but free placement is still allowed.</li>
+          </ul>
+        </section>
+      </aside>
+
+      <main class="board-panel">
+        <div class="board-frame">
+          <svg id="board" viewBox="0 0 1000 1000" aria-label="Rhomb decagon board"></svg>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

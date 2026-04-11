@@ -964,6 +964,8 @@ function rotateBoard(delta) {
   syncUrlToBoardState();
 }
 
+let touchActive = false;
+
 svg.addEventListener("pointermove", (event) => {
   state.pointerWorld = pointerPositionFromEvent(event);
   refreshPreview();
@@ -974,18 +976,39 @@ svg.addEventListener("pointerdown", (event) => {
     return;
   }
 
+  touchActive = true;
   state.pointerWorld = pointerPositionFromEvent(event);
   refreshPreview();
 });
 
-svg.addEventListener("pointerleave", (event) => {
-  if (event.pointerType === "touch") {
+svg.addEventListener("pointerleave", () => {
+  if (touchActive) {
     return;
   }
   state.pointerWorld = null;
   state.preview = null;
   renderBoard();
   setStatus("Move the pointer into the decagon to position the current rhomb.");
+});
+
+svg.addEventListener("touchend", () => {
+  touchActive = false;
+  if (state.suppressPlacementClick) {
+    state.suppressPlacementClick = false;
+  } else {
+    placePreview();
+  }
+  state.pointerWorld = null;
+  state.preview = null;
+  renderBoard();
+});
+
+svg.addEventListener("touchcancel", () => {
+  touchActive = false;
+  state.pointerWorld = null;
+  state.preview = null;
+  state.suppressPlacementClick = false;
+  renderBoard();
 });
 
 svg.addEventListener("click", () => {
@@ -995,33 +1018,6 @@ svg.addEventListener("click", () => {
   }
 
   placePreview();
-});
-
-svg.addEventListener("pointerup", (event) => {
-  if (event.pointerType !== "touch") {
-    return;
-  }
-
-  if (state.suppressPlacementClick) {
-    state.suppressPlacementClick = false;
-  } else {
-    placePreview();
-  }
-
-  state.pointerWorld = null;
-  state.preview = null;
-  renderBoard();
-});
-
-svg.addEventListener("pointercancel", (event) => {
-  if (event.pointerType !== "touch") {
-    return;
-  }
-
-  state.pointerWorld = null;
-  state.preview = null;
-  state.suppressPlacementClick = false;
-  renderBoard();
 });
 
 svg.addEventListener("contextmenu", (event) => {

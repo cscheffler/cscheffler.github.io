@@ -978,7 +978,10 @@ svg.addEventListener("pointerdown", (event) => {
   refreshPreview();
 });
 
-svg.addEventListener("pointerleave", () => {
+svg.addEventListener("pointerleave", (event) => {
+  if (event.pointerType === "touch") {
+    return;
+  }
   state.pointerWorld = null;
   state.preview = null;
   renderBoard();
@@ -992,6 +995,33 @@ svg.addEventListener("click", () => {
   }
 
   placePreview();
+});
+
+svg.addEventListener("pointerup", (event) => {
+  if (event.pointerType !== "touch") {
+    return;
+  }
+
+  if (state.suppressPlacementClick) {
+    state.suppressPlacementClick = false;
+  } else {
+    placePreview();
+  }
+
+  state.pointerWorld = null;
+  state.preview = null;
+  renderBoard();
+});
+
+svg.addEventListener("pointercancel", (event) => {
+  if (event.pointerType !== "touch") {
+    return;
+  }
+
+  state.pointerWorld = null;
+  state.preview = null;
+  state.suppressPlacementClick = false;
+  renderBoard();
 });
 
 svg.addEventListener("contextmenu", (event) => {

@@ -6,65 +6,65 @@
       <description>Last 10 notes on Digital Garden</description>
       <generator>Quartz -- quartz.jzhao.xyz</generator>
       <item>
-    <title>AI Safety North Star 1</title>
-    <link>https://example.com/notes/ai-safety-north-star-1</link>
-    <guid>https://example.com/notes/ai-safety-north-star-1</guid>
-    <description><![CDATA[ AI Safety North Star 1 What is a North Star? Most of this note borrows heavily from Nanda, et al. 2025. A Pragmatic Vision for Interpretability. ]]></description>
-    <pubDate>Thu, 14 May 2026 23:00:00 GMT</pubDate>
+    <title>BlueDot Technical AI Safety Project, Test: Ask a Model For Its Beliefs</title>
+    <link>https://example.com/notes/bluedot-technical-ai-safety-project-test-ask-model-for-beliefs</link>
+    <guid>https://example.com/notes/bluedot-technical-ai-safety-project-test-ask-model-for-beliefs</guid>
+    <description><![CDATA[ Test: Ask a Model for its Beliefs This test is part of the BlueDot Technical AI Safety Project. ]]></description>
+    <pubDate>Tue, 26 May 2026 07:00:00 GMT</pubDate>
+  </item><item>
+    <title>BlueDot Technical AI Safety Project, Test: Hallucination Detection With Self-labelled Data</title>
+    <link>https://example.com/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</link>
+    <guid>https://example.com/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</guid>
+    <description><![CDATA[ Test: Hallucination Detection With Self-labelled Data This test is part of the BlueDot Technical AI Safety Project. ]]></description>
+    <pubDate>Tue, 26 May 2026 07:00:00 GMT</pubDate>
   </item><item>
     <title>BlueDot Technical AI Safety Project</title>
     <link>https://example.com/projects/bluedot-technical-ai-safety-project</link>
     <guid>https://example.com/projects/bluedot-technical-ai-safety-project</guid>
-    <description><![CDATA[ BlueDot Technical AI Safety Project This is the first step on my journey for producing technical AI safety research output. ]]></description>
-    <pubDate>Thu, 14 May 2026 23:00:00 GMT</pubDate>
+    <description><![CDATA[ White-box Honesty Probes I’m doing a BlueDot Technical AI Safety Project. ]]></description>
+    <pubDate>Mon, 25 May 2026 07:00:00 GMT</pubDate>
+  </item><item>
+    <title>AI Safety North Star 1</title>
+    <link>https://example.com/notes/ai-safety-north-star-1</link>
+    <guid>https://example.com/notes/ai-safety-north-star-1</guid>
+    <description><![CDATA[ AI Safety North Star 1 What is a North Star? Most of this note borrows heavily from Nanda, et al. 2025. A Pragmatic Vision for Interpretability. ]]></description>
+    <pubDate>Fri, 15 May 2026 07:00:00 GMT</pubDate>
   </item><item>
     <title>Can we remove honesty like we can remove refusal?</title>
     <link>https://example.com/notes/can-we-remove-honesty-like-we-can-remove-refusal</link>
     <guid>https://example.com/notes/can-we-remove-honesty-like-we-can-remove-refusal</guid>
     <description><![CDATA[ Can we remove honesty like we can remove refusal? There is this cool paper about removing RHLF trained refusal for model misuse from Llama. ]]></description>
-    <pubDate>Sun, 03 May 2026 23:00:00 GMT</pubDate>
+    <pubDate>Mon, 04 May 2026 07:00:00 GMT</pubDate>
   </item><item>
     <title>Claude chat about AI driven research replication</title>
     <link>https://example.com/logs/claude-chat-about-ai-driven-research-replication</link>
     <guid>https://example.com/logs/claude-chat-about-ai-driven-research-replication</guid>
     <description><![CDATA[ Claude chat about AI driven research replication You said: A different angle on this: I want to track how good AIs are getting at doing computational research, especially AI capability and safety research. ]]></description>
-    <pubDate>Thu, 30 Apr 2026 23:00:00 GMT</pubDate>
+    <pubDate>Fri, 01 May 2026 07:00:00 GMT</pubDate>
   </item><item>
     <title>Personal AI Research Evals</title>
     <link>https://example.com/notes/personal-ai-research-evals</link>
     <guid>https://example.com/notes/personal-ai-research-evals</guid>
     <description><![CDATA[ Personal AI Research Evals I want to track how good AIs are getting at doing computational research, especially AI capability and safety research. ]]></description>
-    <pubDate>Thu, 30 Apr 2026 23:00:00 GMT</pubDate>
+    <pubDate>Fri, 01 May 2026 07:00:00 GMT</pubDate>
   </item><item>
     <title>What is Decentralised AI Good For?</title>
     <link>https://example.com/notes/what-is-decentralised-ai-good-for</link>
     <guid>https://example.com/notes/what-is-decentralised-ai-good-for</guid>
     <description><![CDATA[ What is Decentralised AI Good For? Starting from the NVIDIA DGX Spark, it seems that we’re on a path to having capable local AIs since inference is relatively cheap. ]]></description>
-    <pubDate>Thu, 30 Apr 2026 23:00:00 GMT</pubDate>
+    <pubDate>Fri, 01 May 2026 07:00:00 GMT</pubDate>
   </item><item>
     <title>Claude chat about Honest AI</title>
     <link>https://example.com/logs/claude-chat-about-honest-ai</link>
     <guid>https://example.com/logs/claude-chat-about-honest-ai</guid>
     <description><![CDATA[ Claude chat about Honest AI You said: I’m just exploring it as a potentially interesting model for training honest AIs. ]]></description>
-    <pubDate>Wed, 29 Apr 2026 23:00:00 GMT</pubDate>
+    <pubDate>Thu, 30 Apr 2026 07:00:00 GMT</pubDate>
   </item><item>
     <title>Reproduce _The Obfuscation Atlas_ Paper</title>
     <link>https://example.com/notes/reproduce-the-obfuscation-atlas-paper</link>
     <guid>https://example.com/notes/reproduce-the-obfuscation-atlas-paper</guid>
     <description><![CDATA[ Reproduce The Obfuscation Atlas Paper Motivation Training more honest LLMs by using an honesty signal coming from the LLM itself via mechanistic interpretability seems like a nice idea. ]]></description>
-    <pubDate>Wed, 29 Apr 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>Journalism for AI Safety</title>
-    <link>https://example.com/notes/journalism-for-ai-safety</link>
-    <guid>https://example.com/notes/journalism-for-ai-safety</guid>
-    <description><![CDATA[ Journalism for AI Safety Journalists stopped the Guptas in South Africa by exposing them. ]]></description>
-    <pubDate>Tue, 28 Apr 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>Home</title>
-    <link>https://example.com/</link>
-    <guid>https://example.com/</guid>
-    <description><![CDATA[ Digital Garden This is a working garden of notes on software, AI safety research, systems, and projects. ]]></description>
-    <pubDate>Mon, 27 Apr 2026 23:00:00 GMT</pubDate>
+    <pubDate>Thu, 30 Apr 2026 07:00:00 GMT</pubDate>
   </item>
     </channel>
   </rss>

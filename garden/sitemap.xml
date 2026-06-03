@@ -1,49 +1,52 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"><url>
     <loc>https://example.com/</loc>
-    <lastmod>2026-04-28T07:00:00.000Z</lastmod>
+    <lastmod>2026-06-02T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/logs/claude-chat-about-ai-driven-research-replication</loc>
-    <lastmod>2026-05-01T07:00:00.000Z</lastmod>
+    <lastmod>2026-04-30T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/logs/claude-chat-about-honest-ai</loc>
-    <lastmod>2026-04-30T07:00:00.000Z</lastmod>
+    <lastmod>2026-04-29T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/maps/ai-safety-map</loc>
-    <lastmod>2026-04-28T07:00:00.000Z</lastmod>
+    <lastmod>2026-04-27T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/maps/projects-map</loc>
-    <lastmod>2026-04-28T07:00:00.000Z</lastmod>
+    <lastmod>2026-04-27T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/maps/software-map</loc>
-    <lastmod>2026-04-28T07:00:00.000Z</lastmod>
+    <lastmod>2026-04-27T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/notes/ai-safety-north-star-1</loc>
-    <lastmod>2026-05-15T07:00:00.000Z</lastmod>
-  </url><url>
-    <loc>https://example.com/notes/bluedot-technical-ai-safety-project-test-ask-model-for-beliefs</loc>
-    <lastmod>2026-05-26T07:00:00.000Z</lastmod>
+    <lastmod>2026-05-14T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</loc>
-    <lastmod>2026-05-26T07:00:00.000Z</lastmod>
+    <lastmod>2026-05-25T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/notes/can-we-remove-honesty-like-we-can-remove-refusal</loc>
-    <lastmod>2026-05-04T07:00:00.000Z</lastmod>
+    <lastmod>2026-05-03T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/notes/evals-for-ai-safety-research</loc>
-    <lastmod>2026-04-28T07:00:00.000Z</lastmod>
+    <lastmod>2026-04-27T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/notes/journalism-for-ai-safety</loc>
-    <lastmod>2026-04-29T07:00:00.000Z</lastmod>
+    <lastmod>2026-04-28T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/notes/personal-ai-research-evals</loc>
-    <lastmod>2026-05-01T07:00:00.000Z</lastmod>
+    <lastmod>2026-04-30T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/notes/reproduce-the-obfuscation-atlas-paper</loc>
-    <lastmod>2026-04-30T07:00:00.000Z</lastmod>
+    <lastmod>2026-04-29T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/notes/what-is-decentralised-ai-good-for</loc>
-    <lastmod>2026-05-01T07:00:00.000Z</lastmod>
+    <lastmod>2026-04-30T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://example.com/projects/bluedot-technical-ai-safety-project</loc>
-    <lastmod>2026-05-25T07:00:00.000Z</lastmod>
+    <lastmod>2026-05-31T23:00:00.000Z</lastmod>
+  </url><url>
+    <loc>https://example.com/projects/eliciting-llm-beliefs</loc>
+    <lastmod>2026-06-01T23:00:00.000Z</lastmod>
+  </url><url>
+    <loc>https://example.com/projects/obeso-et-al-with-internal-labels</loc>
+    <lastmod>2026-05-31T23:00:00.000Z</lastmod>
   </url></urlset>

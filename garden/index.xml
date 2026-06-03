@@ -1,70 +1,70 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0">
     <channel>
-      <title>Digital Garden</title>
+      <title>Carl’s Digital Garden</title>
       <link>https://example.com</link>
-      <description>Last 10 notes on Digital Garden</description>
+      <description>Last 10 notes on Carl’s Digital Garden</description>
       <generator>Quartz -- quartz.jzhao.xyz</generator>
       <item>
-    <title>BlueDot Technical AI Safety Project, Test: Ask a Model For Its Beliefs</title>
-    <link>https://example.com/notes/bluedot-technical-ai-safety-project-test-ask-model-for-beliefs</link>
-    <guid>https://example.com/notes/bluedot-technical-ai-safety-project-test-ask-model-for-beliefs</guid>
-    <description><![CDATA[ Test: Ask a Model for its Beliefs This test is part of the BlueDot Technical AI Safety Project. ]]></description>
-    <pubDate>Tue, 26 May 2026 07:00:00 GMT</pubDate>
+    <title>Home</title>
+    <link>https://example.com/</link>
+    <guid>https://example.com/</guid>
+    <description><![CDATA[ This is a working, growing garden of notes on mathematics, software, AI safety research, and other projects. ]]></description>
+    <pubDate>Tue, 02 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
-    <title>BlueDot Technical AI Safety Project, Test: Hallucination Detection With Self-labelled Data</title>
-    <link>https://example.com/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</link>
-    <guid>https://example.com/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</guid>
-    <description><![CDATA[ Test: Hallucination Detection With Self-labelled Data This test is part of the BlueDot Technical AI Safety Project. ]]></description>
-    <pubDate>Tue, 26 May 2026 07:00:00 GMT</pubDate>
+    <title>Eliciting LLM Beliefs</title>
+    <link>https://example.com/projects/eliciting-llm-beliefs</link>
+    <guid>https://example.com/projects/eliciting-llm-beliefs</guid>
+    <description><![CDATA[ This project is a derisking step in my larger white-box honesty probes work. tl;dr: To do honesty research, we need to know what models believe. ]]></description>
+    <pubDate>Mon, 01 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>BlueDot Technical AI Safety Project</title>
     <link>https://example.com/projects/bluedot-technical-ai-safety-project</link>
     <guid>https://example.com/projects/bluedot-technical-ai-safety-project</guid>
     <description><![CDATA[ White-box Honesty Probes I’m doing a BlueDot Technical AI Safety Project. ]]></description>
-    <pubDate>Mon, 25 May 2026 07:00:00 GMT</pubDate>
+    <pubDate>Sun, 31 May 2026 23:00:00 GMT</pubDate>
+  </item><item>
+    <title>Bullshit Detection With Self-Labelled Data</title>
+    <link>https://example.com/projects/obeso-et-al-with-internal-labels</link>
+    <guid>https://example.com/projects/obeso-et-al-with-internal-labels</guid>
+    <description><![CDATA[ This project is a derisking step in my larger white-box honesty probes work. Main paper this work is based on: Obeso, et al. (2025). ]]></description>
+    <pubDate>Sun, 31 May 2026 23:00:00 GMT</pubDate>
+  </item><item>
+    <title>BlueDot Technical AI Safety Project, Test: Hallucination Detection With Self-labelled Data</title>
+    <link>https://example.com/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</link>
+    <guid>https://example.com/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</guid>
+    <description><![CDATA[ Test: Hallucination Detection With Self-labelled Data This test is part of the BlueDot Technical AI Safety Project. ]]></description>
+    <pubDate>Mon, 25 May 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>AI Safety North Star 1</title>
     <link>https://example.com/notes/ai-safety-north-star-1</link>
     <guid>https://example.com/notes/ai-safety-north-star-1</guid>
     <description><![CDATA[ AI Safety North Star 1 What is a North Star? Most of this note borrows heavily from Nanda, et al. 2025. A Pragmatic Vision for Interpretability. ]]></description>
-    <pubDate>Fri, 15 May 2026 07:00:00 GMT</pubDate>
+    <pubDate>Thu, 14 May 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>Can we remove honesty like we can remove refusal?</title>
     <link>https://example.com/notes/can-we-remove-honesty-like-we-can-remove-refusal</link>
     <guid>https://example.com/notes/can-we-remove-honesty-like-we-can-remove-refusal</guid>
     <description><![CDATA[ Can we remove honesty like we can remove refusal? There is this cool paper about removing RHLF trained refusal for model misuse from Llama. ]]></description>
-    <pubDate>Mon, 04 May 2026 07:00:00 GMT</pubDate>
+    <pubDate>Sun, 03 May 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>Claude chat about AI driven research replication</title>
     <link>https://example.com/logs/claude-chat-about-ai-driven-research-replication</link>
     <guid>https://example.com/logs/claude-chat-about-ai-driven-research-replication</guid>
     <description><![CDATA[ Claude chat about AI driven research replication You said: A different angle on this: I want to track how good AIs are getting at doing computational research, especially AI capability and safety research. ]]></description>
-    <pubDate>Fri, 01 May 2026 07:00:00 GMT</pubDate>
+    <pubDate>Thu, 30 Apr 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>Personal AI Research Evals</title>
     <link>https://example.com/notes/personal-ai-research-evals</link>
     <guid>https://example.com/notes/personal-ai-research-evals</guid>
     <description><![CDATA[ Personal AI Research Evals I want to track how good AIs are getting at doing computational research, especially AI capability and safety research. ]]></description>
-    <pubDate>Fri, 01 May 2026 07:00:00 GMT</pubDate>
+    <pubDate>Thu, 30 Apr 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>What is Decentralised AI Good For?</title>
     <link>https://example.com/notes/what-is-decentralised-ai-good-for</link>
     <guid>https://example.com/notes/what-is-decentralised-ai-good-for</guid>
     <description><![CDATA[ What is Decentralised AI Good For? Starting from the NVIDIA DGX Spark, it seems that we’re on a path to having capable local AIs since inference is relatively cheap. ]]></description>
-    <pubDate>Fri, 01 May 2026 07:00:00 GMT</pubDate>
-  </item><item>
-    <title>Claude chat about Honest AI</title>
-    <link>https://example.com/logs/claude-chat-about-honest-ai</link>
-    <guid>https://example.com/logs/claude-chat-about-honest-ai</guid>
-    <description><![CDATA[ Claude chat about Honest AI You said: I’m just exploring it as a potentially interesting model for training honest AIs. ]]></description>
-    <pubDate>Thu, 30 Apr 2026 07:00:00 GMT</pubDate>
-  </item><item>
-    <title>Reproduce _The Obfuscation Atlas_ Paper</title>
-    <link>https://example.com/notes/reproduce-the-obfuscation-atlas-paper</link>
-    <guid>https://example.com/notes/reproduce-the-obfuscation-atlas-paper</guid>
-    <description><![CDATA[ Reproduce The Obfuscation Atlas Paper Motivation Training more honest LLMs by using an honesty signal coming from the LLM itself via mechanistic interpretability seems like a nice idea. ]]></description>
-    <pubDate>Thu, 30 Apr 2026 07:00:00 GMT</pubDate>
+    <pubDate>Thu, 30 Apr 2026 23:00:00 GMT</pubDate>
   </item>
     </channel>
   </rss>

@@ -6,6 +6,18 @@
       <description>Last 10 notes on Carl’s Digital Garden</description>
       <generator>Quartz -- quartz.jzhao.xyz</generator>
       <item>
+    <title>LLMs Can Tell You What They Believe — But Size Matters</title>
+    <link>https://example.com/projects/eliciting-llm-beliefs-writeup</link>
+    <guid>https://example.com/projects/eliciting-llm-beliefs-writeup</guid>
+    <description><![CDATA[ In which we show that small models (&lt; 3B parameters) are either too uncertain or to inconsistent in their token probabilities to tell us anything useful about what they believe, but medium to large models (&gt; 7B parameters) are fine. ]]></description>
+    <pubDate>Sun, 07 Jun 2026 23:00:00 GMT</pubDate>
+  </item><item>
+    <title>Eliciting LLM Beliefs</title>
+    <link>https://example.com/projects/eliciting-llm-beliefs</link>
+    <guid>https://example.com/projects/eliciting-llm-beliefs</guid>
+    <description><![CDATA[ This project is a derisking step in my larger white-box honesty probes work. tl;dr: To do honesty research, we need to know what models believe. ]]></description>
+    <pubDate>Sun, 07 Jun 2026 23:00:00 GMT</pubDate>
+  </item><item>
     <title>Open-Weight Instruction-Tuned LLM Sizes and Costs</title>
     <link>https://example.com/notes/open-weight-llm-sizes-and-costs</link>
     <guid>https://example.com/notes/open-weight-llm-sizes-and-costs</guid>
@@ -17,12 +29,6 @@
     <guid>https://example.com/</guid>
     <description><![CDATA[ This is a working, growing garden of notes on mathematics, software, AI safety research, and other projects. ]]></description>
     <pubDate>Tue, 02 Jun 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>Eliciting LLM Beliefs</title>
-    <link>https://example.com/projects/eliciting-llm-beliefs</link>
-    <guid>https://example.com/projects/eliciting-llm-beliefs</guid>
-    <description><![CDATA[ This project is a derisking step in my larger white-box honesty probes work. tl;dr: To do honesty research, we need to know what models believe. ]]></description>
-    <pubDate>Mon, 01 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>BlueDot Technical AI Safety Project</title>
     <link>https://example.com/projects/bluedot-technical-ai-safety-project</link>
@@ -58,12 +64,6 @@
     <link>https://example.com/logs/claude-chat-about-ai-driven-research-replication</link>
     <guid>https://example.com/logs/claude-chat-about-ai-driven-research-replication</guid>
     <description><![CDATA[ Claude chat about AI driven research replication You said: A different angle on this: I want to track how good AIs are getting at doing computational research, especially AI capability and safety research. ]]></description>
-    <pubDate>Thu, 30 Apr 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>Personal AI Research Evals</title>
-    <link>https://example.com/notes/personal-ai-research-evals</link>
-    <guid>https://example.com/notes/personal-ai-research-evals</guid>
-    <description><![CDATA[ Personal AI Research Evals I want to track how good AIs are getting at doing computational research, especially AI capability and safety research. ]]></description>
     <pubDate>Thu, 30 Apr 2026 23:00:00 GMT</pubDate>
   </item>
     </channel>

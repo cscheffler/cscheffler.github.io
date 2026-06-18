@@ -149,7 +149,7 @@
 
   <div class="row">
     <div class="lbl">Brush size <span class="val" id="brushVal">mid</span></div>
-    <input type="range" id="brush" min="0" max="1" step="0.01" value="0.5">
+    <input type="range" id="brush" min="0" max="1" step="0.01" value="0.25">
   </div>
 
   <div class="row">
@@ -194,7 +194,7 @@ const state = {
   persistent: true,   // toggle; when false we're in "fading" mode
   fade: 0.10,         // 0..1 fade rate (effective only when !persistent)
   spin: 0.10,         // -1..+1 signed speed
-  brush: 0.5,         // 0..1 -> base width in px
+  brush: 0.25,        // 0..1 -> base width in px
   colorMode: "palette", // "palette" | "speed" | "audio"
   palette: "aurora",
   blend: "lighter",     // "lighter" (additive glow) | "screen" (softer)
@@ -248,6 +248,10 @@ let hasDrawn = false, firstDrawT = 0;
 let ripples = [];
 let clearing = null;  // timestamp when the clear animation began
 let globalAngle = 0;
+
+let autopilot = false;    // idle "screensaver" drawing on its own
+let emptySince = null;    // when the canvas last became empty in fade mode, else null
+const IDLE_DELAY = 15000; // ms the pattern must be gone before autopilot kicks in
 
 const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
 const now = () => performance.now();
@@ -353,6 +357,7 @@ function getPos(e){
 }
 
 cv.addEventListener("pointerdown", e => {
+  autopilot = false;          // any real interaction stops the screensaver
   cv.setPointerCapture(e.pointerId);
   lastPt = getPos(e);
   drawing = true;
@@ -371,6 +376,29 @@ cv.addEventListener("pointermove", e => {
 function endStroke(){ drawing = false; lastPt = null; }
 window.addEventListener("pointerup", endStroke);
 window.addEventListener("pointercancel", endStroke);
+
+// ---------------------------------------------------------------------------
+// Idle autopilot ("screensaver")
+// ---------------------------------------------------------------------------
+// In fade mode only, once the canvas has stayed empty for IDLE_DELAY, a
+// synthetic drifting pointer starts drawing on its own. Any real draw stops it,
+// and whatever it made is left on screen for the user to keep adding to, clear,
+// or let fade. It never runs in persist mode (so the user's lasting work is
+// untouched) or under reduced-motion.
+function autoPoint(t){
+  // Two incommensurate Lissajous frequencies per axis give a non-repeating,
+  // space-filling wander with natural speed variation.
+  const R = Math.min(W, H) * 0.42;
+  const x = cx + (Math.sin(t * 0.00061) * 0.7 + Math.sin(t * 0.00103 + 2.0) * 0.3) * R;
+  const y = cy + (Math.sin(t * 0.00083 + 1.0) * 0.7 + Math.cos(t * 0.00047 + 0.5) * 0.3) * R;
+  return { x, y, t };
+}
+function startAutopilot(t){
+  autopilot = true;
+  speedSmoothed = 0;
+  lastPt = autoPoint(t - 16);   // seed slightly back so the first segment has length
+  hint.style.opacity = "0";
+}
 
 // ---------------------------------------------------------------------------
 // Render
@@ -492,6 +520,17 @@ function frame(t){
     if (drop) segs.splice(0, drop);
   }
   if (segs.length > MAX_SEGMENTS) segs.splice(0, segs.length - MAX_SEGMENTS);
+
+  // Idle autopilot: fade mode only, after the canvas has been empty IDLE_DELAY.
+  if (state.persistent || drawing || reduceMotion){
+    emptySince = null;
+    autopilot = false;
+  } else {
+    if (segs.length > 0) emptySince = null;          // a pattern is still showing
+    else if (emptySince === null) emptySince = t;    // it just disappeared
+    if (!autopilot && emptySince !== null && t - emptySince >= IDLE_DELAY) startAutopilot(t);
+  }
+  if (autopilot) addPoint(autoPoint(t));
 
   render(t);
   requestAnimationFrame(frame);

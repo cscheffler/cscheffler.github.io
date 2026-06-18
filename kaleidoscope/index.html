@@ -138,13 +138,13 @@
   </div>
 
   <div class="row">
-    <div class="lbl">Decay rate <span class="val" id="decayVal">0.00</span></div>
-    <input type="range" id="decay" min="0" max="1" step="0.01" value="0">
+    <div class="lbl">Fade rate <span class="val" id="fadeVal">0.10</span></div>
+    <input type="range" id="fade" min="0" max="1" step="0.01" value="0.10">
   </div>
 
   <div class="row">
-    <div class="lbl">Global spin <span class="val" id="spinVal">+0.15</span></div>
-    <input type="range" id="spin" min="-1" max="1" step="0.01" value="0.15">
+    <div class="lbl">Global spin <span class="val" id="spinVal">+0.10</span></div>
+    <input type="range" id="spin" min="-1" max="1" step="0.01" value="0.10">
   </div>
 
   <div class="row">
@@ -167,6 +167,14 @@
     <div id="palette"></div>
   </div>
 
+  <div class="row">
+    <div class="lbl">Blend mode</div>
+    <div class="seg" id="blend">
+      <button data-blend="lighter" class="active">Glow</button>
+      <button data-blend="screen">Soft</button>
+    </div>
+  </div>
+
   <div class="row btns">
     <button id="clear">Clear</button>
     <button id="save">Save PNG</button>
@@ -184,11 +192,12 @@ const state = {
   folds: 6,
   mirror: true,
   persistent: true,   // toggle; when false we're in "fading" mode
-  decay: 0,           // 0..1 (effective only when !persistent)
-  spin: 0.15,         // -1..+1 signed speed
+  fade: 0.10,         // 0..1 fade rate (effective only when !persistent)
+  spin: 0.10,         // -1..+1 signed speed
   brush: 0.5,         // 0..1 -> base width in px
   colorMode: "palette", // "palette" | "speed" | "audio"
   palette: "aurora",
+  blend: "lighter",     // "lighter" (additive glow) | "screen" (softer)
 };
 
 // Hue ranges per palette: hue lerps h0->h1 over time so a single drag still
@@ -419,7 +428,7 @@ function render(t){
     if (state.mirror) copies.push(ca, sa, -1);
   }
 
-  const fade = state.persistent ? 0 : state.decay;
+  const fade = state.persistent ? 0 : state.fade;
   const rate = fade * 1.5;                                // alpha lost per second
 
   let clearMul = 1;
@@ -429,7 +438,7 @@ function render(t){
     if (p >= 1){ segs.length = 0; clearing = null; }
   }
 
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = state.blend;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
@@ -475,7 +484,7 @@ function frame(t){
   pending.length = 0;
 
   // Expire fully-faded segments, then enforce the ring-buffer cap.
-  const fade = state.persistent ? 0 : state.decay;
+  const fade = state.persistent ? 0 : state.fade;
   if (fade > 0){
     const rate = fade * 1.5;
     let drop = 0;
@@ -496,6 +505,22 @@ const $ = id => document.getElementById(id);
 const panel = $("panel"), gear = $("gear"), hint = $("hint"), micNote = $("micNote");
 
 function doClear(){ if (!clearing) clearing = now(); }
+
+function setPersistent(val){
+  val = !!val;
+  if (state.persistent && !val && segs.length){
+    // Entering fade mode: rebase the fade clock so the *oldest* stroke is only
+    // now starting to fade, instead of being aged retroactively from when it
+    // was first drawn (which would make old strokes vanish instantly). A single
+    // fixed offset is added to every stroke's birth time, so they still fade in
+    // the order they were drawn — oldest first.
+    let oldest = segs[0].born;
+    for (let i = 1; i < segs.length; i++) if (segs[i].born < oldest) oldest = segs[i].born;
+    const delta = now() - oldest;
+    for (let i = 0; i < segs.length; i++) segs[i].born += delta;
+  }
+  state.persistent = val;
+}
 
 function savePNG(){
   cv.toBlob(blob => {
@@ -530,26 +555,30 @@ function syncControls(){
   $("mirror").checked = state.mirror;
   $("persist").checked = state.persistent;
   $("persistSub").textContent = state.persistent ? "building up" : "fading";
-  $("decay").value = state.decay;       $("decayVal").textContent = state.decay.toFixed(2);
-  $("decay").disabled = state.persistent;
+  $("fade").value = state.fade;         $("fadeVal").textContent = state.fade.toFixed(2);
+  $("fade").disabled = state.persistent;
   $("spin").value = state.spin;
   $("spinVal").textContent = (state.spin >= 0 ? "+" : "") + state.spin.toFixed(2);
   $("spin").disabled = reduceMotion;
   $("brush").value = state.brush;
   $("brushVal").textContent = state.brush < 0.33 ? "thin" : state.brush > 0.66 ? "thick" : "mid";
   for (const b of $("mode").children) b.classList.toggle("active", b.dataset.mode === state.colorMode);
+  for (const b of $("blend").children) b.classList.toggle("active", b.dataset.blend === state.blend);
   for (const b of paletteEl.children) b.classList.toggle("active", b.dataset.pal === state.palette);
   $("paletteRow").style.display = state.colorMode === "palette" ? "" : "none";
 }
 
 $("fold").addEventListener("input", e => { state.folds = +e.target.value; syncControls(); });
 $("mirror").addEventListener("change", e => { state.mirror = e.target.checked; });
-$("persist").addEventListener("change", e => { state.persistent = e.target.checked; syncControls(); });
-$("decay").addEventListener("input", e => { state.decay = +e.target.value; syncControls(); });
+$("persist").addEventListener("change", e => { setPersistent(e.target.checked); syncControls(); });
+$("fade").addEventListener("input", e => { state.fade = +e.target.value; syncControls(); });
 $("spin").addEventListener("input", e => { state.spin = +e.target.value; syncControls(); });
 $("brush").addEventListener("input", e => { state.brush = +e.target.value; syncControls(); });
 for (const b of $("mode").children){
   b.addEventListener("click", () => setColorMode(b.dataset.mode));
+}
+for (const b of $("blend").children){
+  b.addEventListener("click", () => { state.blend = b.dataset.blend; syncControls(); });
 }
 $("clear").addEventListener("click", doClear);
 $("save").addEventListener("click", savePNG);
@@ -565,11 +594,12 @@ window.UI = {
   set(o){
     if (o.folds != null)      state.folds = clamp(Math.round(o.folds), 3, 16);
     if (o.mirror != null)     state.mirror = !!o.mirror;
-    if (o.persistent != null) state.persistent = !!o.persistent;
-    if (o.decay != null)      state.decay = clamp(+o.decay, 0, 1);
+    if (o.persistent != null) setPersistent(o.persistent);
+    if (o.fade != null)       state.fade = clamp(+o.fade, 0, 1);
     if (o.spin != null)       state.spin = clamp(+o.spin, -1, 1);
     if (o.brush != null)      state.brush = clamp(+o.brush, 0, 1);
     if (o.palette != null && PALETTES[o.palette]) state.palette = o.palette;
+    if (o.blend === "lighter" || o.blend === "screen") state.blend = o.blend;
     if (o.colorMode != null)  setColorMode(o.colorMode);
     syncControls();
     return this.get();

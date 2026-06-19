@@ -6,16 +6,16 @@
       <description>Last 10 notes on Carl’s Digital Garden</description>
       <generator>Quartz -- quartz.jzhao.xyz</generator>
       <item>
+    <title>LLMs Can Reliably Tell You What They Believe — But Size Matters</title>
+    <link>https://example.com/projects/eliciting-llm-beliefs-writeup</link>
+    <guid>https://example.com/projects/eliciting-llm-beliefs-writeup</guid>
+    <description><![CDATA[  In which we show that small models (&lt;3B parameters) are typically too inconsistent in their token probabilities to tell us anything useful about what they believe, but medium to large models (&gt;7B parameters) are fine. ]]></description>
+    <pubDate>Tue, 16 Jun 2026 23:00:00 GMT</pubDate>
+  </item><item>
     <title>BlueDot Technical AI Safety Project</title>
     <link>https://example.com/projects/bluedot-technical-ai-safety-project</link>
     <guid>https://example.com/projects/bluedot-technical-ai-safety-project</guid>
     <description><![CDATA[ White-box Honesty Probes I’m doing a BlueDot Technical AI Safety Project. ]]></description>
-    <pubDate>Sun, 14 Jun 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>LLMs Can Tell You What They Believe — But Size Matters</title>
-    <link>https://example.com/projects/eliciting-llm-beliefs-writeup</link>
-    <guid>https://example.com/projects/eliciting-llm-beliefs-writeup</guid>
-    <description><![CDATA[ LLMs Can Tell You What They Believe — But Size Matters In which we show that small models (&lt; 3B parameters) are either too uncertain or to inconsistent in their token probabilities to tell us anything useful about what they believe, but medium to large models (&gt; 7B parameters) are fine. ]]></description>
     <pubDate>Sun, 14 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>Eliciting LLM Beliefs</title>

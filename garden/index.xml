@@ -6,6 +6,12 @@
       <description>Last 10 notes on Carl’s Digital Garden</description>
       <generator>Quartz -- quartz.jzhao.xyz</generator>
       <item>
+    <title>Whorl: Draw Luminous Symmetric Spirals</title>
+    <link>https://example.com/concepts/whorl-toy</link>
+    <guid>https://example.com/concepts/whorl-toy</guid>
+    <description><![CDATA[  Code on GitHub. ]]></description>
+    <pubDate>Thu, 18 Jun 2026 23:00:00 GMT</pubDate>
+  </item><item>
     <title>LLMs Can Reliably Tell You What They Believe — But Size Matters</title>
     <link>https://example.com/projects/eliciting-llm-beliefs-writeup</link>
     <guid>https://example.com/projects/eliciting-llm-beliefs-writeup</guid>
@@ -59,12 +65,6 @@
     <guid>https://example.com/notes/can-we-remove-honesty-like-we-can-remove-refusal</guid>
     <description><![CDATA[ Can we remove honesty like we can remove refusal? There is this cool paper about removing RHLF trained refusal for model misuse from Llama. ]]></description>
     <pubDate>Sun, 03 May 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>Claude chat about AI driven research replication</title>
-    <link>https://example.com/logs/claude-chat-about-ai-driven-research-replication</link>
-    <guid>https://example.com/logs/claude-chat-about-ai-driven-research-replication</guid>
-    <description><![CDATA[ Claude chat about AI driven research replication You said: A different angle on this: I want to track how good AIs are getting at doing computational research, especially AI capability and safety research. ]]></description>
-    <pubDate>Thu, 30 Apr 2026 23:00:00 GMT</pubDate>
   </item>
     </channel>
   </rss>

@@ -380,7 +380,7 @@ The complete list of models is available <a href="#appendix-complete-results" cl
 <div id="figure-stability-vs-size" class="figure">
 <p><img src="../figures/eliciting-llm-beliefs/plot-stability.png" alt="Plot of models' belief stability versus model size"/></p>
 <div class="figure-caption">
-<p><strong>Figure 2: Stability vs model size.</strong>
+<p><strong>Figure 4: Stability vs model size.</strong>
 We ask the model the same factual yes/no question with different prompts and compute the probability of a “Yes” response for all prompts.
 Stability is defined in terms of the correlation of <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7167em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal">p</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">yes</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span></span></span></span> across all prompts for each factual question.
 Larger models tend to have more stable “Yes” response probabilities.
@@ -390,7 +390,7 @@ For AI honesty research, we recommend targeting <span class="katex"><span class=
 <div id="figure-certainty-vs-size" class="figure">
 <p><img src="../figures/eliciting-llm-beliefs/plot-certainty.png" alt="Plot of mean certainty versus model size"/></p>
 <div class="figure-caption">
-<p><strong>Figure 3: Mean certainty vs model size.</strong>
+<p><strong>Figure 5: Mean certainty vs model size.</strong>
 Certainty is defined as the maximum of the “Yes” and “No” probabilities, indicating how confident the model is about its response.
 Larger models tend to have more confidence in their responses.
 We don’t require or expect models to be perfectly certain since the model might not know the true answer and some claims are ambiguous.</p>
@@ -399,7 +399,7 @@ We don’t require or expect models to be perfectly certain since the model migh
 <div id="figure-stability-vs-certainty" class="figure">
 <p><img src="../figures/eliciting-llm-beliefs/plot-stability-vs-certainty.png" alt="Plot of stability versus mean certainty"/></p>
 <div class="figure-caption">
-<p><strong>Figure 4: Stability vs mean certainty.</strong>
+<p><strong>Figure 6: Stability vs mean certainty.</strong>
 As models become more certain, the also tend to become more stable in their beliefs.
 There are some notable exceptions with particularly low certainty or stability even when the other metric is high.
 We generally favour models in the top-right corner of this plot — models that are reasonably certain about what they believe and stable in those beliefs across prompt templates.</p>
@@ -408,7 +408,7 @@ We generally favour models in the top-right corner of this plot — models that 
 <div class="figure">
 <p><img src="../figures/eliciting-llm-beliefs/plot-leakage.png" alt="Plot of token probability leakage versus model size"/></p>
 <div class="figure-caption">
-<p><strong>Figure 5: Token probability leakage vs model size.</strong>
+<p><strong>Figure 7: Token probability leakage vs model size.</strong>
 Leakage is defined as the amount of probability mass that is <em>not</em> assigned to the “Yes”/“True” and “No”/“False” tokens.
 Leakage is mostly used as a sanity check to ensure that models are in fact responding with the one-word answers we want them to.</p>
 </div>

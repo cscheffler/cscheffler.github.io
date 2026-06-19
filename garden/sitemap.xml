@@ -1,61 +1,61 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"><url>
-    <loc>https://example.com/concepts/whorl-toy</loc>
+    <loc>https://cscheffler.github.io/garden/concepts/whorl-toy</loc>
     <lastmod>2026-06-18T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/</loc>
+    <loc>https://cscheffler.github.io/garden/</loc>
     <lastmod>2026-06-02T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/logs/claude-chat-about-ai-driven-research-replication</loc>
+    <loc>https://cscheffler.github.io/garden/logs/claude-chat-about-ai-driven-research-replication</loc>
     <lastmod>2026-04-30T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/logs/claude-chat-about-honest-ai</loc>
+    <loc>https://cscheffler.github.io/garden/logs/claude-chat-about-honest-ai</loc>
     <lastmod>2026-04-29T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/maps/ai-safety-map</loc>
+    <loc>https://cscheffler.github.io/garden/maps/ai-safety-map</loc>
     <lastmod>2026-04-27T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/maps/projects-map</loc>
+    <loc>https://cscheffler.github.io/garden/maps/projects-map</loc>
     <lastmod>2026-04-27T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/maps/software-map</loc>
+    <loc>https://cscheffler.github.io/garden/maps/software-map</loc>
     <lastmod>2026-04-27T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/notes/ai-safety-north-star-1</loc>
+    <loc>https://cscheffler.github.io/garden/notes/ai-safety-north-star-1</loc>
     <lastmod>2026-05-14T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</loc>
+    <loc>https://cscheffler.github.io/garden/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</loc>
     <lastmod>2026-05-25T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/notes/can-we-remove-honesty-like-we-can-remove-refusal</loc>
+    <loc>https://cscheffler.github.io/garden/notes/can-we-remove-honesty-like-we-can-remove-refusal</loc>
     <lastmod>2026-05-03T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/notes/evals-for-ai-safety-research</loc>
+    <loc>https://cscheffler.github.io/garden/notes/evals-for-ai-safety-research</loc>
     <lastmod>2026-04-27T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/notes/journalism-for-ai-safety</loc>
+    <loc>https://cscheffler.github.io/garden/notes/journalism-for-ai-safety</loc>
     <lastmod>2026-04-28T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/notes/open-weight-llm-sizes-and-costs</loc>
+    <loc>https://cscheffler.github.io/garden/notes/open-weight-llm-sizes-and-costs</loc>
     <lastmod>2026-06-03T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/notes/personal-ai-research-evals</loc>
+    <loc>https://cscheffler.github.io/garden/notes/personal-ai-research-evals</loc>
     <lastmod>2026-04-30T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/notes/reproduce-the-obfuscation-atlas-paper</loc>
+    <loc>https://cscheffler.github.io/garden/notes/reproduce-the-obfuscation-atlas-paper</loc>
     <lastmod>2026-04-29T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/notes/what-is-decentralised-ai-good-for</loc>
+    <loc>https://cscheffler.github.io/garden/notes/what-is-decentralised-ai-good-for</loc>
     <lastmod>2026-04-30T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/projects/bluedot-technical-ai-safety-project</loc>
+    <loc>https://cscheffler.github.io/garden/projects/bluedot-technical-ai-safety-project</loc>
     <lastmod>2026-06-14T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/projects/eliciting-llm-beliefs-writeup</loc>
-    <lastmod>2026-06-16T23:00:00.000Z</lastmod>
+    <loc>https://cscheffler.github.io/garden/projects/eliciting-llm-beliefs-writeup</loc>
+    <lastmod>2026-06-18T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/projects/eliciting-llm-beliefs</loc>
+    <loc>https://cscheffler.github.io/garden/projects/eliciting-llm-beliefs</loc>
     <lastmod>2026-06-07T23:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://example.com/projects/obeso-et-al-with-internal-labels</loc>
+    <loc>https://cscheffler.github.io/garden/projects/obeso-et-al-with-internal-labels</loc>
     <lastmod>2026-05-31T23:00:00.000Z</lastmod>
   </url></urlset>

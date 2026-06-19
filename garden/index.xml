@@ -2,67 +2,67 @@
 <rss version="2.0">
     <channel>
       <title>Carl’s Digital Garden</title>
-      <link>https://example.com</link>
+      <link>https://cscheffler.github.io/garden</link>
       <description>Last 10 notes on Carl’s Digital Garden</description>
       <generator>Quartz -- quartz.jzhao.xyz</generator>
       <item>
     <title>Whorl: Draw Luminous Symmetric Spirals</title>
-    <link>https://example.com/concepts/whorl-toy</link>
-    <guid>https://example.com/concepts/whorl-toy</guid>
+    <link>https://cscheffler.github.io/garden/concepts/whorl-toy</link>
+    <guid>https://cscheffler.github.io/garden/concepts/whorl-toy</guid>
     <description><![CDATA[  Code on GitHub. ]]></description>
     <pubDate>Thu, 18 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>LLMs Can Reliably Tell You What They Believe — But Size Matters</title>
-    <link>https://example.com/projects/eliciting-llm-beliefs-writeup</link>
-    <guid>https://example.com/projects/eliciting-llm-beliefs-writeup</guid>
+    <link>https://cscheffler.github.io/garden/projects/eliciting-llm-beliefs-writeup</link>
+    <guid>https://cscheffler.github.io/garden/projects/eliciting-llm-beliefs-writeup</guid>
     <description><![CDATA[  In which we show that small models (&lt;3B parameters) are typically too inconsistent in their token probabilities to tell us anything useful about what they believe, but medium to large models (&gt;7B parameters) are fine. ]]></description>
-    <pubDate>Tue, 16 Jun 2026 23:00:00 GMT</pubDate>
+    <pubDate>Thu, 18 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>BlueDot Technical AI Safety Project</title>
-    <link>https://example.com/projects/bluedot-technical-ai-safety-project</link>
-    <guid>https://example.com/projects/bluedot-technical-ai-safety-project</guid>
+    <link>https://cscheffler.github.io/garden/projects/bluedot-technical-ai-safety-project</link>
+    <guid>https://cscheffler.github.io/garden/projects/bluedot-technical-ai-safety-project</guid>
     <description><![CDATA[ White-box Honesty Probes I’m doing a BlueDot Technical AI Safety Project. ]]></description>
     <pubDate>Sun, 14 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>Eliciting LLM Beliefs</title>
-    <link>https://example.com/projects/eliciting-llm-beliefs</link>
-    <guid>https://example.com/projects/eliciting-llm-beliefs</guid>
+    <link>https://cscheffler.github.io/garden/projects/eliciting-llm-beliefs</link>
+    <guid>https://cscheffler.github.io/garden/projects/eliciting-llm-beliefs</guid>
     <description><![CDATA[ This project is a derisking step in my larger white-box honesty probes work. tl;dr: To do honesty research, we need to know what models believe. ]]></description>
     <pubDate>Sun, 07 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>Open-Weight Instruction-Tuned LLM Sizes and Costs</title>
-    <link>https://example.com/notes/open-weight-llm-sizes-and-costs</link>
-    <guid>https://example.com/notes/open-weight-llm-sizes-and-costs</guid>
+    <link>https://cscheffler.github.io/garden/notes/open-weight-llm-sizes-and-costs</link>
+    <guid>https://cscheffler.github.io/garden/notes/open-weight-llm-sizes-and-costs</guid>
     <description><![CDATA[ A list of open-weight LLMs, how many parameters they have, and how much it would cost to use them on RunPod. ]]></description>
     <pubDate>Wed, 03 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>Home</title>
-    <link>https://example.com/</link>
-    <guid>https://example.com/</guid>
+    <link>https://cscheffler.github.io/garden/</link>
+    <guid>https://cscheffler.github.io/garden/</guid>
     <description><![CDATA[ This is a working, growing garden of notes on mathematics, software, AI safety research, and other projects. ]]></description>
     <pubDate>Tue, 02 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>Bullshit Detection With Self-Labelled Data</title>
-    <link>https://example.com/projects/obeso-et-al-with-internal-labels</link>
-    <guid>https://example.com/projects/obeso-et-al-with-internal-labels</guid>
+    <link>https://cscheffler.github.io/garden/projects/obeso-et-al-with-internal-labels</link>
+    <guid>https://cscheffler.github.io/garden/projects/obeso-et-al-with-internal-labels</guid>
     <description><![CDATA[ This project is a derisking step in my larger white-box honesty probes work. Main paper this work is based on: Obeso, et al. (2025). ]]></description>
     <pubDate>Sun, 31 May 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>BlueDot Technical AI Safety Project, Test: Hallucination Detection With Self-labelled Data</title>
-    <link>https://example.com/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</link>
-    <guid>https://example.com/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</guid>
+    <link>https://cscheffler.github.io/garden/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</link>
+    <guid>https://cscheffler.github.io/garden/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</guid>
     <description><![CDATA[ Test: Hallucination Detection With Self-labelled Data This test is part of the BlueDot Technical AI Safety Project. ]]></description>
     <pubDate>Mon, 25 May 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>AI Safety North Star 1</title>
-    <link>https://example.com/notes/ai-safety-north-star-1</link>
-    <guid>https://example.com/notes/ai-safety-north-star-1</guid>
+    <link>https://cscheffler.github.io/garden/notes/ai-safety-north-star-1</link>
+    <guid>https://cscheffler.github.io/garden/notes/ai-safety-north-star-1</guid>
     <description><![CDATA[ AI Safety North Star 1 What is a North Star? Most of this note borrows heavily from Nanda, et al. 2025. A Pragmatic Vision for Interpretability. ]]></description>
     <pubDate>Thu, 14 May 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>Can we remove honesty like we can remove refusal?</title>
-    <link>https://example.com/notes/can-we-remove-honesty-like-we-can-remove-refusal</link>
-    <guid>https://example.com/notes/can-we-remove-honesty-like-we-can-remove-refusal</guid>
+    <link>https://cscheffler.github.io/garden/notes/can-we-remove-honesty-like-we-can-remove-refusal</link>
+    <guid>https://cscheffler.github.io/garden/notes/can-we-remove-honesty-like-we-can-remove-refusal</guid>
     <description><![CDATA[ Can we remove honesty like we can remove refusal? There is this cool paper about removing RHLF trained refusal for model misuse from Llama. ]]></description>
     <pubDate>Sun, 03 May 2026 23:00:00 GMT</pubDate>
   </item>

@@ -12,6 +12,12 @@
     <description><![CDATA[ This is a working, growing garden of notes on mathematics, software, AI safety research, and other projects. ]]></description>
     <pubDate>Thu, 25 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
+    <title>BlueDot Technical AI Safety Project</title>
+    <link>https://cscheffler.github.io/garden/projects/bluedot-technical-ai-safety-project</link>
+    <guid>https://cscheffler.github.io/garden/projects/bluedot-technical-ai-safety-project</guid>
+    <description><![CDATA[ White-box Honesty Probes I’m doing a BlueDot Technical AI Safety Project. ]]></description>
+    <pubDate>Thu, 25 Jun 2026 23:00:00 GMT</pubDate>
+  </item><item>
     <title>Whorl: Draw Luminous Symmetric Spirals</title>
     <link>https://cscheffler.github.io/garden/concepts/whorl-toy</link>
     <guid>https://cscheffler.github.io/garden/concepts/whorl-toy</guid>
@@ -23,12 +29,6 @@
     <guid>https://cscheffler.github.io/garden/projects/eliciting-llm-beliefs-writeup</guid>
     <description><![CDATA[  In which we show that small models (&lt;3B parameters) are typically too inconsistent in their token probabilities to tell us anything useful about what they believe, but medium to large models (&gt;7B parameters) are fine. ]]></description>
     <pubDate>Thu, 18 Jun 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>BlueDot Technical AI Safety Project</title>
-    <link>https://cscheffler.github.io/garden/projects/bluedot-technical-ai-safety-project</link>
-    <guid>https://cscheffler.github.io/garden/projects/bluedot-technical-ai-safety-project</guid>
-    <description><![CDATA[ White-box Honesty Probes I’m doing a BlueDot Technical AI Safety Project. ]]></description>
-    <pubDate>Sun, 14 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>Eliciting LLM Beliefs</title>
     <link>https://cscheffler.github.io/garden/projects/eliciting-llm-beliefs</link>

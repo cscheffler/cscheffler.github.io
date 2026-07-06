@@ -2372,7 +2372,7 @@ window.UI = {
    ============================================================ */
 #scr-arcade .wrap{max-width:900px;gap:10px;flex:1}
 #arcade-stage{position:relative;flex:1;min-height:330px;border-radius:22px;overflow:hidden;
-  border:3px solid var(--line);box-shadow:var(--shadow);
+  border:3px solid var(--line);box-shadow:var(--shadow);touch-action:none;
   background:radial-gradient(120% 100% at 50% 0%, #171d3f 0%, #0d1128 70%)}
 #arcade-cv{position:absolute;inset:0;width:100%;height:100%}
 #arcade-dom{position:absolute;inset:0;pointer-events:none}
@@ -2926,7 +2926,7 @@ GAMES.skates = {
    ============================================================ */
 GAMES.robodog = {
   title: 'Fetch!',
-  how: 'Drag back from the bone like a catapult, let go to throw! Land it near the number on the flag and Robo-Dog will fetch it. 8 throws!',
+  how: 'Pull BACKWARDS from the bone like a catapult — the dots show where it will fly! The further you pull, the further it flies. Land it near the flag number. 8 throws!',
   get art(){ return invArt(5); },
   start(e){
     this.throwsLeft = 8; this.phase = 'aim'; this.drag = null; this.msg = '';
@@ -2937,13 +2937,23 @@ GAMES.robodog = {
   newTarget(e){ this.target = ri(8, 48); e.info(`🦴 ${this.throwsLeft} throws left`); },
   down(x, y){ if (this.phase === 'aim') this.drag = { x0: x, y0: y, x, y }; },
   move(x, y){ if (this.drag){ this.drag.x = x; this.drag.y = y; } },
+  /* slingshot: pull magnitude → power, pull angle → loft (clamped 17°–70°).
+     Only arms when pulling BACKWARDS, so the throw always goes forwards. */
+  pull(){
+    const p = this.drag;
+    if (!p) return null;
+    const pdx = p.x0 - p.x, pdy = p.y0 - p.y, mag = Math.hypot(pdx, pdy);
+    if (pdx < 14 || mag < 22) return null;
+    const power = clamp(mag * 2.6, 220, 780);
+    const ang = clamp(Math.atan2(-pdy, pdx), .3, 1.22);
+    return { vx: Math.cos(ang) * power, vy: -Math.sin(ang) * power };
+  },
   up(){
-    if (!this.drag || this.phase !== 'aim') return void (this.drag = null);
-    const dx = this.drag.x0 - this.drag.x, dy = this.drag.y0 - this.drag.y;
+    if (this.phase !== 'aim') return void (this.drag = null);
+    const v = this.pull();
     this.drag = null;
-    if (dx < 12 && Math.abs(dy) < 12) return;
-    this.bone.vx = clamp(dx * 3.4, 90, 640);
-    this.bone.vy = clamp(dy * 3.4 - 120, -720, -60);
+    if (!v) return;
+    this.bone.vx = v.vx; this.bone.vy = v.vy;
     this.phase = 'fly'; this.bounced = false; sfx.whoosh();
   },
   tick(dt, e){
@@ -3000,10 +3010,19 @@ GAMES.robodog = {
     c.fillStyle = '#f4f6ff'; c.font = `900 17px ${CFONT}`; c.textBaseline = 'alphabetic';
     c.fillText(this.phase === 'aim' ? `Land the bone near ${this.target}!` : this.msg || '…', e.W / 2, 30);
     if (this.drag){
-      c.strokeStyle = '#3fe0ff'; c.lineWidth = 3; c.setLineDash([7, 7]);
-      c.beginPath(); c.moveTo(b.x, b.y);
-      c.lineTo(b.x + (this.drag.x0 - this.drag.x) * 1.15, b.y + (this.drag.y0 - this.drag.y) * 1.15 - 30);
-      c.stroke(); c.setLineDash([]);
+      const v = this.pull();
+      if (v){ /* dotted trajectory preview, in front of the dog */
+        let x = b.x, y = b.y, vx = v.vx, vy = v.vy;
+        c.fillStyle = 'rgba(63,224,255,.9)';
+        for (let i = 0; i < 26; i++){
+          vy += 760 * .06; x += vx * .06; y += vy * .06;
+          if (y > this.gy - 6 || x > e.W) break;
+          c.beginPath(); c.arc(x, y, 3.6 - i * .08, 0, 7); c.fill();
+        }
+      } else {
+        c.fillStyle = '#ff8a5c'; c.font = `900 16px ${CFONT}`; c.textAlign = 'center';
+        c.fillText('Pull backwards, like a catapult! ⬅', e.W / 2, 56);
+      }
     }
     const dx2 = this.dogX;
     c.fillStyle = '#8f9bd9'; c.strokeStyle = '#3d468c'; c.lineWidth = 2.5;
@@ -3201,35 +3220,40 @@ GAMES.shrink = {
    ============================================================ */
 GAMES.piano = {
   title: 'Moon Melody',
-  how: 'Space notes drift down four moon-piano keys. Tap the key (or press D F J K) exactly when a note reaches the line — and you’ll play a real tune!',
+  how: 'Space notes drift down four moon-piano keys. Tap the key (or press D F J K) exactly when a note reaches the line — and you’ll play a real tune! It starts gently and speeds up as you score.',
   get art(){ return invArt(8); },
   freqs: [262, 294, 330, 349, 392, 440],
   melody: [0,0,4,4,5,5,4, 3,3,2,2,1,1,0, 4,4,3,3,2,2,1, 4,4,3,3,2,2,1, 0,0,4,4,5,5,4, 3,3,2,2,1,1,0],
+  /* A music playhead (this.pos) advances at this.rate — one knob that speeds
+     both the tempo and the note fall together. Starts gentle (0.75×), and
+     every hit nudges it up toward 1.25×, so difficulty follows the score. */
   start(e){
     this.notes = [];
-    let t = 2.2;
+    let t = 2.4;
     for (let loop = 0; loop < 2; loop++){
-      const beat = loop ? .42 : .52;
       this.melody.forEach((p, i) => {
         this.notes.push({ t, p, lane: p % 4, hit: false, missed: false });
-        t += (i % 7 === 6) ? beat * 2 : beat;
+        t += (i % 7 === 6) ? 1.1 : .55;
       });
-      t += 1.2;
+      t += 1.5;
     }
-    this.endT = t + 1; this.combo = 0; this.flash = [0, 0, 0, 0];
+    this.endT = t + 1;
+    this.pos = 0; this.rate = .75; this.hits = 0;
+    this.combo = 0; this.flash = [0, 0, 0, 0];
   },
   laneX(e, l){ return e.W * (l + .5) / 4; },
   press(l, e){
     this.flash[l] = 1;
-    const hitY = e.H - 78, speed = (e.H - 110) / 2.1;
+    const speed = (e.H - 110) / 3;
     let best = null, bd = 1e9;
     for (const n of this.notes){
       if (n.hit || n.missed || n.lane !== l) continue;
-      const d = Math.abs((n.t - e.t) * speed);
+      const d = Math.abs((n.t - this.pos) * speed);
       if (d < bd){ bd = d; best = n; }
     }
     if (best && bd < 34){
-      best.hit = true; this.combo++;
+      best.hit = true; this.combo++; this.hits++;
+      this.rate = Math.min(1.25, .75 + this.hits * .012);
       e.add(10 + Math.min(this.combo, 10));
       sfx.note(this.freqs[best.p], .3);
     } else { this.combo = 0; sfx.note(110, .12); }
@@ -3242,11 +3266,12 @@ GAMES.piano = {
     if (i >= 0) this.press(i, e); else if (j >= 0) this.press(j, e);
   },
   tick(dt, e){
-    if (e.t > this.endT) return e.over('The moon applauds silently. Beautiful playing!');
-    const c = e.cx, hitY = e.H - 78, speed = (e.H - 110) / 2.1;
+    this.pos += dt * this.rate;
+    if (this.pos > this.endT) return e.over('The moon applauds silently. Beautiful playing!');
+    const c = e.cx, hitY = e.H - 78, speed = (e.H - 110) / 3;
     const cols = ['#ffd23f', '#3fe0ff', '#ff5d73', '#b3ef3d'];
     for (const n of this.notes)
-      if (!n.hit && !n.missed && (e.t - n.t) * speed > 30){ n.missed = true; this.combo = 0; }
+      if (!n.hit && !n.missed && (this.pos - n.t) * speed > 30){ n.missed = true; this.combo = 0; }
     e.info(`🔥 combo ${this.combo}`);
     c.clearRect(0, 0, e.W, e.H);
     c.fillStyle = '#39415f';
@@ -3266,7 +3291,7 @@ GAMES.piano = {
     c.beginPath(); c.moveTo(0, hitY); c.lineTo(e.W, hitY); c.stroke(); c.setLineDash([]);
     for (const n of this.notes){
       if (n.hit) continue;
-      const y = hitY - (n.t - e.t) * speed;
+      const y = hitY - (n.t - this.pos) * speed;
       if (y < -20 || y > e.H) continue;
       c.fillStyle = n.missed ? 'rgba(122,132,184,.4)' : cols[n.lane];
       c.beginPath(); c.roundRect(this.laneX(e, n.lane) - 24, y - 11, 48, 22, 11); c.fill();
@@ -3277,60 +3302,182 @@ GAMES.piano = {
 };
 
 /* ============================================================
-   10. TIME WARP — Time-Machine Alarm Clock
+   10. TIME TWINS — Time-Machine Alarm Clock
    ============================================================ */
 GAMES.clock = {
-  title: 'Time Warp',
-  how: 'The time machine’s hand is spinning out of control! Tap to freeze it exactly on the time it asks for. It spins faster every round — 8 rounds!',
+  title: 'Time Twins',
+  how: 'Fly your time-machine clock around and scoop up number stars before the timer runs out! Each day, time rewinds and yesterday-you flies the exact same path again, hoovering up ITS stars — so plot a fresh route every day (or race your ghost there first). Watch out for snoozy clouds — bumping one makes you sleepy and slow!',
   get art(){ return invArt(9); },
   start(e){
-    this.round = 0; this.w = 2.4; this.msg = ''; this.msgT = 0;
-    this.nextRound(e);
+    this.dayLen = 16; this.day = 1; this.ghosts = [];
+    this.startX = 80; this.startY = e.H / 2;
+    this.genLayout(e); this.genClouds(e);
+    this.resetDay(e);
   },
-  nextRound(e){
-    this.round++;
-    if (this.round > 8) return e.over('Time itself says thank you.');
-    this.hour = ri(1, 12);
-    this.half = this.round > 2 && rng() < .45;
-    this.ang = rng() * Math.PI * 2;
-    this.spinning = true;
-    this.w += .55;
-    e.info(`Round ${this.round}/8`);
+  genLayout(e){
+    const base = [1, 1, 1, 2, 2, 2, 5, 5, 10];
+    const vals = shuffle(base.concat(base, base)).slice(0, 24);
+    this.layout = [];
+    for (let i = 0; i < 24; i++){
+      let x, y, tries = 0;
+      do {
+        x = 40 + rng() * (e.W - 80); y = 40 + rng() * (e.H - 80); tries++;
+      } while (tries < 40 && (Math.hypot(x - this.startX, y - this.startY) < 90 ||
+        this.layout.some(s => Math.hypot(x - s.x, y - s.y) < 34)));
+      this.layout.push({ x, y, v: vals[i] });
+    }
   },
-  targetAng(){ return ((this.hour % 12) + (this.half ? .5 : 0)) / 12 * Math.PI * 2; },
-  down(x, y, e){
-    if (!this.spinning) return;
-    this.spinning = false;
-    let d = Math.abs(this.ang % (Math.PI * 2) - this.targetAng());
-    d = Math.min(d, Math.PI * 2 - d) * 180 / Math.PI;
-    const pts = d <= 9 ? 50 : d <= 22 ? 25 : d <= 45 ? 10 : 0;
-    e.add(pts);
-    this.msg = pts === 50 ? 'SPOT ON! +50' : pts === 25 ? 'So close! +25' : pts ? 'Not bad! +10' : 'Whoosh — time flew by!';
-    this.msgT = 1.4;
-    if (pts >= 25) sfx.correct(2); else if (pts) sfx.pop(); else sfx.wrong();
-    e.timeout(() => this.nextRound(e), 1300);
+  genClouds(e){
+    this.clouds = [0, 1, 2].map(() => ({
+      x: 100 + rng() * (e.W - 200), baseY: 60 + rng() * (e.H - 160),
+      vx: pick([-1, 1]) * (24 + rng() * 12), ph: rng() * 7,
+    }));
+  },
+  resetDay(e){
+    this.stars = this.layout.map(s => ({ x: s.x, y: s.y, v: s.v, got: false }));
+    this.remaining = this.stars.length;
+    this.px = this.startX; this.py = this.startY; this.tx = this.startX; this.ty = this.startY;
+    this.kL = this.kR = this.kU = this.kD = false;
+    this.sleepy = 0; this.cloudImmune = 0;
+    this.rec = []; this.frame = 0; this.dayT = 0; this.rewinding = false; this.dayDone = false;
+    e.info(`Day ${this.day}/3 · ⏱ ${this.dayLen}s`);
+  },
+  startRewind(e){ this.rewinding = true; this.rewindT = 1.4; sfx.whoosh(); e.info('⏪ Rewinding…'); },
+  finishRewind(e){
+    this.ghosts.push(this.rec); this.day++; this.rewinding = false;
+    if (this.day > 3) return e.over(`You, yesterday-you and the-day-before-you scored ${e.score} together!`);
+    this.resetDay(e);
+  },
+  key(k, d, e){
+    if (k === 'ArrowLeft') this.kL = d; else if (k === 'ArrowRight') this.kR = d;
+    else if (k === 'ArrowUp') this.kU = d; else if (k === 'ArrowDown') this.kD = d;
+  },
+  down(x, y, e){ this.tx = clamp(x, 20, e.W - 20); this.ty = clamp(y, 20, e.H - 20); },
+  move(x, y, e){ this.tx = clamp(x, 20, e.W - 20); this.ty = clamp(y, 20, e.H - 20); },
+  drawClock(c, x, y, ghost){
+    const r = 18, edge = ghost ? '#0b7d97' : '#3d468c', face = ghost ? '#bdf3ff' : '#f4f6ff', bell = ghost ? '#3fe0ff' : '#ffd23f';
+    c.save(); if (ghost) c.globalAlpha = 0.45;
+    c.fillStyle = edge;
+    c.beginPath(); c.arc(x - 8, y + r + 2, 4, 0, 7); c.arc(x + 8, y + r + 2, 4, 0, 7); c.fill();
+    c.fillStyle = bell; c.strokeStyle = edge; c.lineWidth = 2;
+    c.beginPath(); c.arc(x - 12, y - r - 2, 7, 0, 7); c.fill(); c.stroke();
+    c.beginPath(); c.arc(x + 12, y - r - 2, 7, 0, 7); c.fill(); c.stroke();
+    c.lineWidth = 2.5;
+    c.beginPath(); c.moveTo(x - 12, y - r - 2); c.lineTo(x - 5, y - r + 2); c.stroke();
+    c.beginPath(); c.moveTo(x + 12, y - r - 2); c.lineTo(x + 5, y - r + 2); c.stroke();
+    c.fillStyle = face; c.strokeStyle = edge; c.lineWidth = 3;
+    c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = edge;
+    for (let h = 0; h < 12; h++){
+      const a = h / 12 * Math.PI * 2;
+      c.beginPath(); c.arc(x + Math.sin(a) * r * .78, y - Math.cos(a) * r * .78, 1.3, 0, 7); c.fill();
+    }
+    const t = performance.now() / 1000;
+    c.strokeStyle = ghost ? '#0b7d97' : '#e03a52'; c.lineCap = 'round';
+    c.lineWidth = 2.2;
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.sin(t * 1.3) * r * .5, y - Math.cos(t * 1.3) * r * .5); c.stroke();
+    c.lineWidth = 1.8;
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.sin(t * 3.1) * r * .7, y - Math.cos(t * 3.1) * r * .7); c.stroke();
+    c.fillStyle = edge; c.beginPath(); c.arc(x, y, 2, 0, 7); c.fill();
+    c.restore();
+  },
+  drawCloud(c, x, y){
+    c.fillStyle = '#8a93c4';
+    c.beginPath();
+    c.arc(x, y - 6, 16, 0, 7); c.arc(x - 18, y + 3, 13, 0, 7); c.arc(x + 18, y + 3, 13, 0, 7);
+    c.arc(x - 32, y + 8, 9, 0, 7); c.arc(x + 32, y + 8, 9, 0, 7);
+    c.fill();
+    c.fillStyle = '#5a638f'; c.font = `900 12px ${CFONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('Zzz', x, y - 22);
+  },
+  drawScene(e){
+    const c = e.cx; c.clearRect(0, 0, e.W, e.H);
+    for (const cl of this.clouds) this.drawCloud(c, cl.x, cl.baseY + Math.sin(e.t * 1.4 + cl.ph) * 10);
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    for (const s of this.stars){
+      if (s.got) continue;
+      c.font = `900 26px ${CFONT}`; c.fillStyle = '#ffd23f'; c.fillText('★', s.x, s.y);
+      c.font = `900 13px ${CFONT}`; c.fillStyle = '#5c4600'; c.fillText(s.v, s.x, s.y + 1);
+    }
+    for (const g of this.ghosts){
+      const idx = Math.min(this.frame, g.length - 1);
+      if (idx < 0) continue;
+      for (let k = 6; k >= 1; k--){
+        const pi = idx - k * 3; if (pi < 0) continue;
+        c.globalAlpha = .25 * (1 - k / 7); c.fillStyle = '#3fe0ff';
+        c.beginPath(); c.arc(g[pi].x, g[pi].y, 3, 0, 7); c.fill();
+      }
+      c.globalAlpha = 1;
+      const gp = g[idx]; if (gp) this.drawClock(c, gp.x, gp.y, true);
+    }
+    this.drawClock(c, this.px, this.py, false);
+    if (this.sleepy > 0){
+      c.fillStyle = '#c9d3ff'; c.font = `900 16px ${CFONT}`;
+      c.fillText('Zzz…', this.px, this.py - 34);
+    }
+  },
+  drawRewind(e){
+    const c = e.cx;
+    c.fillStyle = 'rgba(9,12,28,.55)'; c.fillRect(0, 0, e.W, e.H);
+    c.strokeStyle = 'rgba(63,224,255,.12)'; c.lineWidth = 2;
+    for (let ly = (performance.now() / 6) % 14; ly < e.H; ly += 14){
+      c.beginPath(); c.moveTo(0, ly); c.lineTo(e.W, ly); c.stroke();
+    }
+    c.fillStyle = '#3fe0ff'; c.font = `900 30px ${CFONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('⏪ REWIND!', e.W / 2, e.H / 2 - 14);
+    c.fillStyle = '#f4f6ff'; c.font = `800 15px ${CFONT}`;
+    c.fillText('Yesterday-you joins the team!', e.W / 2, e.H / 2 + 18);
   },
   tick(dt, e){
-    if (this.spinning) this.ang += this.w * dt;
-    this.msgT = Math.max(0, this.msgT - dt);
-    const c = e.cx, cx0 = e.W / 2, cy0 = e.H / 2 + 16, R = Math.min(e.W, e.H) * .3;
-    c.clearRect(0, 0, e.W, e.H);
-    c.fillStyle = '#f4f6ff'; c.font = `900 20px ${CFONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillText(this.half ? `Stop at HALF PAST ${this.hour}!` : `Stop at ${this.hour} O'CLOCK!`, e.W / 2, 30);
-    if (this.msgT > 0){ c.fillStyle = '#b3ef3d'; c.fillText(this.msg, e.W / 2, 58); }
-    c.fillStyle = '#dfe6ff'; c.strokeStyle = '#3d468c'; c.lineWidth = 6;
-    c.beginPath(); c.arc(cx0, cy0, R, 0, 7); c.fill(); c.stroke();
-    c.fillStyle = '#12162e'; c.font = `900 ${R * .17}px ${CFONT}`;
-    for (let h = 1; h <= 12; h++){
-      const a = h / 12 * Math.PI * 2;
-      c.fillText(h, cx0 + Math.sin(a) * R * .8, cy0 - Math.cos(a) * R * .8);
+    if (this.rewinding){
+      this.rewindT -= dt;
+      this.drawScene(e); this.drawRewind(e);
+      if (this.rewindT <= 0) this.finishRewind(e);
+      return;
     }
-    const ta = this.targetAng();
-    c.strokeStyle = 'rgba(255,210,63,.5)'; c.lineWidth = 7; c.lineCap = 'round';
-    c.beginPath(); c.moveTo(cx0, cy0); c.lineTo(cx0 + Math.sin(ta) * R * .6, cy0 - Math.cos(ta) * R * .6); c.stroke();
-    c.strokeStyle = '#e03a52'; c.lineWidth = 5;
-    c.beginPath(); c.moveTo(cx0, cy0); c.lineTo(cx0 + Math.sin(this.ang) * R * .66, cy0 - Math.cos(this.ang) * R * .66); c.stroke();
-    c.fillStyle = '#3d468c'; c.beginPath(); c.arc(cx0, cy0, 7, 0, 7); c.fill();
+    this.dayT += dt; this.frame++;
+    this.cloudImmune = Math.max(0, this.cloudImmune - dt);
+    this.sleepy = Math.max(0, this.sleepy - dt);
+    const kx = (this.kR ? 1 : 0) - (this.kL ? 1 : 0), ky = (this.kD ? 1 : 0) - (this.kU ? 1 : 0);
+    if (kx || ky){
+      const m = Math.hypot(kx, ky) || 1;
+      this.tx = clamp(this.tx + kx / m * 340 * dt, 20, e.W - 20);
+      this.ty = clamp(this.ty + ky / m * 340 * dt, 20, e.H - 20);
+    }
+    const sf = this.sleepy > 0 ? .4 : 1;
+    this.px += (this.tx - this.px) * Math.min(1, dt * 6 * sf);
+    this.py += (this.ty - this.py) * Math.min(1, dt * 6 * sf);
+    this.rec.push({ x: this.px, y: this.py });
+    for (const cl of this.clouds){
+      cl.x += cl.vx * dt;
+      if (cl.x < 60){ cl.x = 60; cl.vx *= -1; }
+      if (cl.x > e.W - 60){ cl.x = e.W - 60; cl.vx *= -1; }
+    }
+    if (this.cloudImmune <= 0){
+      for (const cl of this.clouds){
+        const cy = cl.baseY + Math.sin(e.t * 1.4 + cl.ph) * 10;
+        if (Math.hypot(this.px - cl.x, this.py - cy) < 40){
+          this.sleepy = 1.3; this.cloudImmune = 2.3; sfx.note(140, .3, .3); break;
+        }
+      }
+    }
+    for (const g of this.ghosts){
+      const idx = Math.min(this.frame, g.length - 1);
+      const gp = g[idx]; if (!gp) continue;
+      for (const s of this.stars)
+        if (!s.got && Math.hypot(gp.x - s.x, gp.y - s.y) < 28){ s.got = true; this.remaining--; sfx.click(); }
+    }
+    for (const s of this.stars)
+      if (!s.got && Math.hypot(this.px - s.x, this.py - s.y) < 28){
+        s.got = true; this.remaining--; e.add(s.v); sfx.note(500 + s.v * 40, .12);
+      }
+    if (this.remaining <= 0 && !this.dayDone){ this.dayDone = true; e.add(25); sfx.fanfare(); this.startRewind(e); }
+    else {
+      const left = Math.max(0, this.dayLen - this.dayT);
+      e.info(`Day ${this.day}/3 · ⏱ ${Math.ceil(left)}s`);
+      if (!this.dayDone && this.dayT >= this.dayLen){ this.dayDone = true; this.startRewind(e); }
+    }
+    this.drawScene(e);
   },
 };
 

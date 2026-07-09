@@ -6,11 +6,17 @@
       <description>Last 10 notes on Carl’s Digital Garden</description>
       <generator>Quartz -- quartz.jzhao.xyz</generator>
       <item>
+    <title>SparkLab: Maths Practice for Young Inventors</title>
+    <link>https://cscheffler.github.io/garden/concepts/sparklab-toy</link>
+    <guid>https://cscheffler.github.io/garden/concepts/sparklab-toy</guid>
+    <description><![CDATA[ It’s not great to play this in an iframe, so better to open the game in a new window Code on GitHub . ]]></description>
+    <pubDate>Wed, 08 Jul 2026 23:00:00 GMT</pubDate>
+  </item><item>
     <title>Home</title>
     <link>https://cscheffler.github.io/garden/</link>
     <guid>https://cscheffler.github.io/garden/</guid>
     <description><![CDATA[ This is a working, growing garden of notes on mathematics, software, AI safety research, and other projects. ]]></description>
-    <pubDate>Thu, 25 Jun 2026 23:00:00 GMT</pubDate>
+    <pubDate>Wed, 08 Jul 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>BlueDot Technical AI Safety Project</title>
     <link>https://cscheffler.github.io/garden/projects/bluedot-technical-ai-safety-project</link>
@@ -21,7 +27,7 @@
     <title>Whorl: Draw Luminous Symmetric Spirals</title>
     <link>https://cscheffler.github.io/garden/concepts/whorl-toy</link>
     <guid>https://cscheffler.github.io/garden/concepts/whorl-toy</guid>
-    <description><![CDATA[  Code on GitHub. ]]></description>
+    <description><![CDATA[ Code on GitHub . ]]></description>
     <pubDate>Thu, 18 Jun 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>LLMs Can Reliably Tell You What They Believe — But Size Matters</title>
@@ -59,12 +65,6 @@
     <guid>https://cscheffler.github.io/garden/notes/ai-safety-north-star-1</guid>
     <description><![CDATA[ AI Safety North Star 1 What is a North Star? Most of this note borrows heavily from Nanda, et al. 2025. A Pragmatic Vision for Interpretability. ]]></description>
     <pubDate>Thu, 14 May 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>Can we remove honesty like we can remove refusal?</title>
-    <link>https://cscheffler.github.io/garden/notes/can-we-remove-honesty-like-we-can-remove-refusal</link>
-    <guid>https://cscheffler.github.io/garden/notes/can-we-remove-honesty-like-we-can-remove-refusal</guid>
-    <description><![CDATA[ Can we remove honesty like we can remove refusal? There is this cool paper about removing RHLF trained refusal for model misuse from Llama. ]]></description>
-    <pubDate>Sun, 03 May 2026 23:00:00 GMT</pubDate>
   </item>
     </channel>
   </rss>

@@ -1,9 +1,12 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"><url>
+    <loc>https://cscheffler.github.io/garden/concepts/sparklab-toy</loc>
+    <lastmod>2026-07-08T23:00:00.000Z</lastmod>
+  </url><url>
     <loc>https://cscheffler.github.io/garden/concepts/whorl-toy</loc>
     <lastmod>2026-06-18T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://cscheffler.github.io/garden/</loc>
-    <lastmod>2026-06-25T23:00:00.000Z</lastmod>
+    <lastmod>2026-07-08T23:00:00.000Z</lastmod>
   </url><url>
     <loc>https://cscheffler.github.io/garden/logs/claude-chat-about-ai-driven-research-replication</loc>
     <lastmod>2026-04-30T23:00:00.000Z</lastmod>

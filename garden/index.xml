@@ -6,6 +6,18 @@
       <description>Last 10 notes on Carl’s Digital Garden</description>
       <generator>Quartz -- quartz.jzhao.xyz</generator>
       <item>
+    <title>Prompt History for Research Manager Training Curriculum</title>
+    <link>https://cscheffler.github.io/garden/logs/rm-training-prompt-history</link>
+    <guid>https://cscheffler.github.io/garden/logs/rm-training-prompt-history</guid>
+    <description><![CDATA[ This is the prompt history for creating the initial Technical AI Safety Research Manager Training curriculum. ]]></description>
+    <pubDate>Sun, 02 Aug 2026 23:00:00 GMT</pubDate>
+  </item><item>
+    <title>Technical AI Safety Research Manager Training</title>
+    <link>https://cscheffler.github.io/garden/projects/rm-training</link>
+    <guid>https://cscheffler.github.io/garden/projects/rm-training</guid>
+    <description><![CDATA[ Goals Learn, in public, to be a technical AI safety research manager by pulling myself up by my bootstraps — that is, create the curriculum and learn from it at the same time. ]]></description>
+    <pubDate>Sun, 02 Aug 2026 23:00:00 GMT</pubDate>
+  </item><item>
     <title>SparkLab: Maths Practice for Young Inventors</title>
     <link>https://cscheffler.github.io/garden/concepts/sparklab-toy</link>
     <guid>https://cscheffler.github.io/garden/concepts/sparklab-toy</guid>
@@ -53,18 +65,6 @@
     <guid>https://cscheffler.github.io/garden/projects/obeso-et-al-with-internal-labels</guid>
     <description><![CDATA[ This project is a derisking step in my larger white-box honesty probes work. Main paper this work is based on: Obeso, et al. (2025). ]]></description>
     <pubDate>Sun, 31 May 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>BlueDot Technical AI Safety Project, Test: Hallucination Detection With Self-labelled Data</title>
-    <link>https://cscheffler.github.io/garden/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</link>
-    <guid>https://cscheffler.github.io/garden/notes/bluedot-technical-ai-safety-project-test-hallucination-detection-self-labelled-data</guid>
-    <description><![CDATA[ Test: Hallucination Detection With Self-labelled Data This test is part of the BlueDot Technical AI Safety Project. ]]></description>
-    <pubDate>Mon, 25 May 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>AI Safety North Star 1</title>
-    <link>https://cscheffler.github.io/garden/notes/ai-safety-north-star-1</link>
-    <guid>https://cscheffler.github.io/garden/notes/ai-safety-north-star-1</guid>
-    <description><![CDATA[ AI Safety North Star 1 What is a North Star? Most of this note borrows heavily from Nanda, et al. 2025. A Pragmatic Vision for Interpretability. ]]></description>
-    <pubDate>Thu, 14 May 2026 23:00:00 GMT</pubDate>
   </item>
     </channel>
   </rss>

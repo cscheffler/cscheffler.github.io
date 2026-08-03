@@ -6,10 +6,22 @@
       <description>Last 10 notes on Carl’s Digital Garden</description>
       <generator>Quartz -- quartz.jzhao.xyz</generator>
       <item>
+    <title>Home</title>
+    <link>https://cscheffler.github.io/garden/</link>
+    <guid>https://cscheffler.github.io/garden/</guid>
+    <description><![CDATA[ This is a working, growing garden of notes on mathematics, software, AI safety research, and other projects. ]]></description>
+    <pubDate>Sun, 02 Aug 2026 23:00:00 GMT</pubDate>
+  </item><item>
     <title>Prompt History for Research Manager Training Curriculum</title>
     <link>https://cscheffler.github.io/garden/logs/rm-training-prompt-history</link>
     <guid>https://cscheffler.github.io/garden/logs/rm-training-prompt-history</guid>
     <description><![CDATA[ This is the prompt history for creating the initial Technical AI Safety Research Manager Training curriculum. ]]></description>
+    <pubDate>Sun, 02 Aug 2026 23:00:00 GMT</pubDate>
+  </item><item>
+    <title>Status Key</title>
+    <link>https://cscheffler.github.io/garden/notes/status-key</link>
+    <guid>https://cscheffler.github.io/garden/notes/status-key</guid>
+    <description><![CDATA[ Status Key One rough idea. Related . ]]></description>
     <pubDate>Sun, 02 Aug 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>Technical AI Safety Research Manager Training</title>
@@ -22,12 +34,6 @@
     <link>https://cscheffler.github.io/garden/concepts/sparklab-toy</link>
     <guid>https://cscheffler.github.io/garden/concepts/sparklab-toy</guid>
     <description><![CDATA[ It’s not great to play this in an iframe, so better to open the game in a new window Code on GitHub . ]]></description>
-    <pubDate>Wed, 08 Jul 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>Home</title>
-    <link>https://cscheffler.github.io/garden/</link>
-    <guid>https://cscheffler.github.io/garden/</guid>
-    <description><![CDATA[ This is a working, growing garden of notes on mathematics, software, AI safety research, and other projects. ]]></description>
     <pubDate>Wed, 08 Jul 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>BlueDot Technical AI Safety Project</title>
@@ -59,12 +65,6 @@
     <guid>https://cscheffler.github.io/garden/notes/open-weight-llm-sizes-and-costs</guid>
     <description><![CDATA[ A list of open-weight LLMs, how many parameters they have, and how much it would cost to use them on RunPod. ]]></description>
     <pubDate>Wed, 03 Jun 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>Bullshit Detection With Self-Labelled Data</title>
-    <link>https://cscheffler.github.io/garden/projects/obeso-et-al-with-internal-labels</link>
-    <guid>https://cscheffler.github.io/garden/projects/obeso-et-al-with-internal-labels</guid>
-    <description><![CDATA[ This project is a derisking step in my larger white-box honesty probes work. Main paper this work is based on: Obeso, et al. (2025). ]]></description>
-    <pubDate>Sun, 31 May 2026 23:00:00 GMT</pubDate>
   </item>
     </channel>
   </rss>

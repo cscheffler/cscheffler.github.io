@@ -1,0 +1,814 @@
+/*
+  Yoto Icon Editor — stylesheet
+  Zero-dependency. No @import, no external fonts, no network requests.
+  System fonts + local gradients/patterns only.
+*/
+
+:root {
+  --ground: #16151A;
+  --panel: #1F1E25;
+  --hairline: #33313D;
+  --text: #E8E4DC;
+  --muted: #8A8695;
+  --accent: #FFB347;
+  --accent-ink: #16151A;
+
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius: 4px;
+  --radius-sm: 2px;
+
+  --rail-left-w: 56px;
+  --rail-right-w: 260px;
+}
+
+/* ---------- Reset ---------- */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, p {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* Defensive: the hidden attribute must always win over any component rule
+   (#grid-hint, dialog buttons). .toast is excluded: it animates its own
+   [hidden] -> display: none via @starting-style + allow-discrete, and an
+   !important here would out-rank that rule during the transition. */
+[hidden]:not(.toast) {
+  display: none !important;
+}
+
+/* ---------- Focus ---------- */
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Utility ---------- */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.coords {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Header ---------- */
+
+.app-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.app-title {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.app-sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+
+/* ---------- App shell ---------- */
+
+.app {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+/* ---------- Rails ---------- */
+
+.rail {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--panel);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.rail-left {
+  width: var(--rail-left-w);
+  flex-basis: var(--rail-left-w);
+  /* Tighter than the .rail default: four groups (11 buttons) need room at
+     short viewport heights without shrinking the 38px buttons. */
+  gap: 10px;
+  align-items: center;
+  padding: 10px 8px;
+  border-right: 1px solid var(--hairline);
+}
+
+.rail-right {
+  width: var(--rail-right-w);
+  flex-basis: var(--rail-right-w);
+  padding: 16px;
+  border-left: 1px solid var(--hairline);
+}
+
+.tool-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--hairline);
+  width: 100%;
+  align-items: center;
+}
+
+.tool-group:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* ---------- Tool buttons ---------- */
+
+.tool {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--muted);
+  cursor: pointer;
+
+  & svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    fill: none;
+  }
+
+  &:hover {
+    color: var(--text);
+    background: rgba(232, 228, 220, 0.06);
+  }
+
+  &[aria-checked="true"],
+  &[aria-pressed="true"] {
+    color: var(--accent);
+    background: rgba(255, 179, 71, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(255, 179, 71, 0.4);
+  }
+
+  &[disabled] {
+    opacity: 0.35;
+    cursor: default;
+
+    &:hover {
+      color: var(--muted);
+      background: transparent;
+    }
+  }
+}
+
+/* ---------- Stage ---------- */
+
+.stage {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  background: var(--ground);
+}
+
+.canvas-frame {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#grid-canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  image-rendering: pixelated;
+  touch-action: none;
+  cursor: crosshair;
+  border: 1px solid var(--hairline);
+}
+
+.stage-status {
+  /* Set by canvas.js as the canvas is measured, so the coordinates and the
+     lit count sit exactly under the canvas edges rather than the stage edges. */
+  width: var(--canvas-size, 100%);
+  max-width: 100%;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+
+#coords {
+  color: var(--text);
+}
+
+/* ---------- Panels ---------- */
+
+.panel {
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.panel:last-child {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+.panel-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+
+/* ---------- Colour panel ---------- */
+
+.active-color {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.swatch-lg {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  /* Checkerboard sits as an image layer so a future translucent colour
+     (background-color set with alpha < 1) still reads as "transparent"
+     rather than as flat grey. Kept low-contrast so today's fully opaque
+     hex colours read as solid, not patterned. */
+  background-image: repeating-conic-gradient(
+    rgba(0, 0, 0, 0.18) 0% 25%,
+    rgba(255, 255, 255, 0.05) 0% 50%
+  );
+  background-size: 8px 8px;
+}
+
+.hex-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 22px);
+  gap: 3px;
+}
+
+.swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+
+  &[aria-selected="true"] {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+}
+
+/* ---------- Grid panel ---------- */
+
+select {
+  appearance: none;
+  width: 100%;
+  background-color: var(--ground);
+  /* Inline SVG chevron, no network request — same technique as the favicon
+     in index.html. Stroke colour is a literal (data URIs can't use var()),
+     matched to --muted. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238A8695' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  background-size: 10px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 7px 26px 7px 8px;
+  cursor: pointer;
+
+  &:hover {
+    border-color: #454250;
+  }
+}
+
+option {
+  background: var(--ground);
+  color: var(--text);
+}
+
+/* ---------- Device preview panel ---------- */
+
+.previews {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.preview {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.preview canvas {
+  display: block;
+  image-rendering: pixelated;
+  border: 1px solid var(--hairline);
+}
+
+.preview figcaption {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.check input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--muted);
+  margin: 0;
+}
+
+/* ---------- Export panel ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.field-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+input:not([type="checkbox"]) {
+  width: 100%;
+  background: var(--ground);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 7px 8px;
+
+  &:hover {
+    border-color: #454250;
+  }
+}
+
+.btn {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  cursor: pointer;
+
+  &:hover {
+    border-color: #454250;
+  }
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+
+  &:hover {
+    background: #ffbd63;
+    border-color: #ffbd63;
+  }
+}
+
+.hint {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+/* ---------- Dialog ---------- */
+
+#deadzone-dialog {
+  /* Wide enough that the three actions sit on one row; below this they wrap
+     and "Cancel" drops to a line of its own. */
+  max-width: 420px;
+  width: calc(100% - 32px);
+  margin: auto;
+  padding: 20px;
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+
+.dialog-title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 10px;
+}
+
+.dialog-body {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0 0 18px;
+}
+
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+
+  /* .btn is display: block; width: 100% by default — override both so the
+     dialog's buttons size to their label instead of stacking full-width. */
+  .btn {
+    width: auto;
+    padding: 9px 14px;
+  }
+}
+
+#deadzone-dialog::backdrop {
+  background: rgba(10, 9, 12, 0.6);
+  opacity: 1;
+  transition: opacity 120ms ease;
+
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #deadzone-dialog::backdrop {
+    transition: none;
+  }
+}
+
+/* ---------- Gallery ---------- */
+
+.gallery {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 16px;
+  background: var(--panel);
+  border-top: 1px solid var(--hairline);
+}
+
+.gallery-bar {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+
+  .panel-title {
+    margin: 0;
+  }
+}
+
+.gallery-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gallery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Small variant of .btn: the base is display: block; width: 100%, sized to
+   fill a rail column. These sit in a horizontal row instead, so both are
+   overridden to size to the label. */
+.btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.gallery-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  /* Vertical padding gives a focused tile's :focus-visible ring room to
+     render without being clipped by overflow-x: auto. */
+  padding: 6px 6px 10px;
+  list-style: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline) transparent;
+
+  &::-webkit-scrollbar {
+    height: 7px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--hairline);
+    border-radius: var(--radius-sm);
+  }
+}
+
+.gallery-item {
+  flex: 0 0 auto;
+}
+
+.gallery-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(232, 228, 220, 0.06);
+  }
+
+  &[aria-current="true"] {
+    background: rgba(255, 179, 71, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(255, 179, 71, 0.4);
+
+    .gallery-name {
+      color: var(--text);
+    }
+  }
+}
+
+/* Width/height are set by JS via attributes + inline style — do not set
+   them here. */
+.gallery-thumb {
+  display: block;
+  image-rendering: pixelated;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+}
+
+.gallery-name {
+  /* Clamp to roughly the thumbnail width so a long icon name cannot
+     stretch the tile or the strip. */
+  max-width: 56px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-empty {
+  align-self: center;
+  margin: auto;
+  padding: 16px 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---------- Toast ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 10px 16px;
+  opacity: 1;
+  z-index: 1000;
+  transition: opacity 120ms ease, display 120ms ease allow-discrete;
+
+  &[hidden] {
+    display: none;
+    opacity: 0;
+  }
+
+  @starting-style {
+    &:not([hidden]) {
+      opacity: 0;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    transition: none;
+  }
+}
+
+/* ---------- Narrow layout (<= 720px) ---------- */
+
+@media (max-width: 720px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .stage {
+    order: 1;
+    flex: 0 0 auto;
+    padding: 16px;
+  }
+
+  .canvas-frame {
+    flex: none;
+    width: min(100%, 70vh, 480px);
+    aspect-ratio: 1 / 1;
+  }
+
+  .rail-left {
+    order: 2;
+    width: 100%;
+    flex-basis: auto;
+    flex-direction: row;
+    justify-content: center;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px;
+    border-right: none;
+    border-top: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline);
+
+    .tool-group {
+      flex-direction: row;
+      width: auto;
+      padding-bottom: 0;
+      padding-right: 12px;
+      border-bottom: none;
+      border-right: 1px solid var(--hairline);
+    }
+
+    .tool-group:last-child {
+      padding-right: 0;
+      border-right: none;
+    }
+  }
+
+  .rail-right {
+    order: 3;
+    width: 100%;
+    flex-basis: auto;
+    border-left: none;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .tool {
+    width: 40px;
+    height: 40px;
+  }
+
+  .gallery {
+    padding: 8px 12px;
+  }
+
+  .gallery-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .btn-sm {
+    padding: 7px 11px;
+  }
+}

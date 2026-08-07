@@ -13,7 +13,7 @@
 
 <header class="app-header">
   <h1 class="app-title">Yoto Icon Editor</h1>
-  <p class="app-sub">16 &times; 16 &middot; PNG &middot; no black</p>
+  <p class="app-sub">16 &times; 16 &middot; PNG &middot; steps of 15</p>
 </header>
 
 <main class="app">
@@ -104,7 +104,13 @@
 
   <section class="stage">
     <div class="canvas-frame" id="canvas-frame">
-      <canvas id="grid-canvas" tabindex="0" role="img" aria-label="16 by 16 pixel drawing grid"></canvas>
+      <canvas id="grid-canvas" tabindex="0" role="img"
+              aria-label="16 by 16 pixel drawing grid"
+              aria-describedby="canvas-help"></canvas>
+      <p id="canvas-help" class="sr-only">
+        Hold Shift with the arrow keys to move the paint cursor, then press Space to paint.
+        Arrow keys on their own move the whole image, wrapping at the edges.
+      </p>
     </div>
     <div class="stage-status">
       <span class="coords" id="coords">--,--</span>
@@ -118,10 +124,25 @@
       <h2 class="panel-title">Colour</h2>
       <div class="active-color">
         <span class="swatch-lg" id="active-swatch" aria-hidden="true"></span>
-        <input class="hex-input" id="active-hex" value="#FFC13B" spellcheck="false"
+        <input class="hex-input" id="active-hex" value="#FFC33C" spellcheck="false"
                autocomplete="off" aria-label="Active colour, hex value">
       </div>
       <div class="palette" id="palette" role="listbox" aria-label="Palette"></div>
+
+      <h3 class="subhead" id="slots-label">Custom slots</h3>
+      <div class="swatch-row" id="slots" role="listbox" aria-labelledby="slots-label"></div>
+      <div class="custom-row">
+        <label class="picker">
+          <input type="color" id="custom-picker" value="#FFC33C">
+          <span>Pick</span>
+        </label>
+        <button class="btn btn-sm" id="save-slot">Save to slot</button>
+      </div>
+
+      <h3 class="subhead" id="recents-label">Recent</h3>
+      <div class="swatch-row" id="recents" role="listbox" aria-labelledby="recents-label"></div>
+
+      <p class="hint">Colours snap to steps of 15 per channel — what the panel can show.</p>
     </section>
 
     <section class="panel">
@@ -137,9 +158,8 @@
         </select>
       </label>
       <p class="hint" id="grid-hint" hidden>
-        A true centre pixel, at the cost of 31 cells. The icon sits half a pixel
-        off toward its anchor on the display — nothing can fix that, so keep the
-        anchor consistent across a set or they will jitter as the Player scrolls.
+        A true centre pixel, at the cost of 31 cells. The icon sits half a pixel off
+        toward its anchor, so keep one anchor across a set or they will jitter.
       </p>
     </section>
 
@@ -162,13 +182,20 @@
     </section>
 
     <section class="panel">
+      <h2 class="panel-title">Checks</h2>
+      <div class="lint" id="lint" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="panel">
       <h2 class="panel-title">Export</h2>
       <label class="field">
         <span class="field-label">Name</span>
         <input id="icon-name" value="Untitled" spellcheck="false" autocomplete="off">
       </label>
       <button class="btn btn-primary" id="export-png">Export PNG</button>
-      <p class="hint">Exactly 16 &times; 16, transparent background.</p>
+      <button class="btn" id="import-open">Import image</button>
+      <input type="file" id="import-file" accept="image/*" hidden>
+      <p class="hint">Exports exactly 16 &times; 16 on a transparent background. Images can also be dropped onto the canvas.</p>
     </section>
 
   </aside>
@@ -190,8 +217,68 @@
   <ul class="gallery-strip" id="gallery-strip"></ul>
 </section>
 
-<dialog id="deadzone-dialog">
-  <h2 class="dialog-title">Art in the dropped row and column</h2>
+<dialog id="import-dialog" aria-labelledby="import-title">
+  <h2 class="dialog-title" id="import-title">Import image</h2>
+  <div class="import-body">
+
+    <div class="import-source">
+      <div class="crop-stage" id="crop-stage">
+        <canvas id="crop-canvas"></canvas>
+        <div class="crop-box" id="crop-box" tabindex="0"
+             aria-label="Crop area. Drag to move, or use the arrow keys to nudge it."></div>
+      </div>
+      <label class="field">
+        <span class="field-label">Crop size</span>
+        <input type="range" id="crop-size" min="10" max="100" value="100">
+      </label>
+    </div>
+
+    <div class="import-controls">
+      <div class="import-previews">
+        <figure class="preview">
+          <canvas id="import-result"></canvas>
+          <figcaption>result</figcaption>
+        </figure>
+        <figure class="preview">
+          <canvas id="import-device"></canvas>
+          <figcaption>on device</figcaption>
+        </figure>
+      </div>
+
+      <fieldset class="field-group">
+        <legend class="field-label">Downsample</legend>
+        <label class="check"><input type="radio" name="method" value="box" checked><span>Box average</span></label>
+        <label class="check"><input type="radio" name="method" value="nearest"><span>Nearest neighbour</span></label>
+      </fieldset>
+
+      <label class="field">
+        <span class="field-label">Alpha threshold <output id="out-alpha">50%</output></span>
+        <input type="range" id="in-alpha" min="0" max="100" value="50">
+      </label>
+      <label class="field">
+        <span class="field-label">Brightness <output id="out-brightness">0</output></span>
+        <input type="range" id="in-brightness" min="-60" max="60" value="0">
+      </label>
+      <label class="field">
+        <span class="field-label">Saturation <output id="out-saturation">+20</output></span>
+        <input type="range" id="in-saturation" min="-60" max="60" value="20">
+      </label>
+      <label class="check">
+        <input type="checkbox" id="in-quantise">
+        <span>Snap to palette colours</span>
+      </label>
+      <p class="hint" id="import-note"></p>
+    </div>
+  </div>
+
+  <div class="dialog-actions">
+    <button class="btn btn-primary" id="import-apply">Apply</button>
+    <button class="btn" id="import-cancel">Cancel</button>
+  </div>
+</dialog>
+
+<dialog id="deadzone-dialog" aria-labelledby="deadzone-title">
+  <h2 class="dialog-title" id="deadzone-title">Art in the dropped row and column</h2>
   <p class="dialog-body" id="deadzone-message"></p>
   <div class="dialog-actions">
     <button class="btn btn-primary" id="deadzone-shift">Shift the image clear</button>

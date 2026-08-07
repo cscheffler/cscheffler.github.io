@@ -83,6 +83,38 @@ export function normaliseHex(value) {
   return `#${s.toUpperCase()}`;
 }
 
+// ------------------------------------------------------------- colour grid
+//
+// Measured on a real Yoto Mini: the panel only resolves channel values in steps
+// of 15, so 0, 15, 30 ... 240, 255 (255 is 17*15, so the top of the range lands
+// exactly on the grid). Anything between two steps is displayed as one of them.
+//
+// Every colour that enters the app is snapped to this grid — palette defaults,
+// the picker, the hex field, custom slots and anything read back from storage.
+// Holding a colour the device cannot show would break the promise the whole
+// tool exists for: that what you draw is what the Player displays.
+
+export const CHANNEL_STEP = 15;
+
+export function quantiseChannel(value) {
+  const clamped = Math.min(255, Math.max(0, Math.round(value)));
+  return Math.round(clamped / CHANNEL_STEP) * CHANNEL_STEP;
+}
+
+/** Snaps a colour to the display grid. Returns null if it isn't a colour. */
+export function quantiseHex(value) {
+  const hex = normaliseHex(value);
+  if (!hex) return null;
+  const n = parseInt(hex.slice(1), 16);
+  const channels = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(quantiseChannel);
+  return `#${channels.map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
+
+export function isOnGrid(value) {
+  const hex = normaliseHex(value);
+  return hex !== null && quantiseHex(hex) === hex;
+}
+
 /** sRGB relative luminance, 0..1. Used by the device preview and (later) lint. */
 export function luminance(hex) {
   const n = parseInt(hex.slice(1), 16);

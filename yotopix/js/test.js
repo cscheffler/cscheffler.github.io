@@ -6,7 +6,7 @@
 import {
   idx, xy, inBounds, createDoc, setPixel, clearPixels, litCount, normaliseHex,
   region, inRegion, isOdd, mirrorX, mirrorY, symmetryCells, createHistory, SYMMETRY_MODES,
-  PIXEL_COUNT, GRID_MODES,
+  PIXEL_COUNT, GRID_MODES, isOnGrid, luminance,
 } from './state.js';
 import { toBlob, decodeBlob, slugify } from './exporter.js';
 import {
@@ -15,6 +15,15 @@ import {
 import {
   sanitiseDoc, parseBackup, toBackupJSON, backupFilename, isQuotaError, createSaver, SCHEMA_VERSION,
 } from './storage.js';
+import { DEFAULT_PALETTE, allSwatches, pushRecent, RECENT_COUNT } from './palette.js';
+import {
+  centreCrop, clampCrop, boxSample, nearestSample, adjustColor, oklab,
+  preparePalette, nearestPaletteColor, buildPixels,
+} from './importer.js';
+import {
+  findEdgeBlack, findVeryDark, findGutter, litCountInRegion, touchesAllEdges, runLint, applyFix,
+  DARK_THRESHOLD, LIGHTEN_TO,
+} from './lint.js';
 
 // ---- Tiny assertion harness -------------------------------------------
 
@@ -797,8 +806,10 @@ await test('linePoints: includes both endpoints and is 8-connected with no gaps'
 
 await test('sanitiseDoc: a valid document round-trips unchanged', () => {
   const doc = createDoc('My Icon');
-  doc.pixels[0] = '#FF4747';
-  doc.pixels[5] = '#2E8B57';
+  // On-grid colours, so "unchanged" is a meaningful claim: quantising a colour
+  // that already sits on the display's 15-step grid is a no-op.
+  doc.pixels[0] = '#FF4B4B';
+  doc.pixels[5] = '#2D875A';
   doc.grid = 'odd-br';
   const out = sanitiseDoc(doc);
   assert(out, 'a valid document should not be rejected');
@@ -839,7 +850,7 @@ await test('sanitiseDoc: bad individual pixel values degrade to null, not the wh
   // other 255 pixels of a picture — only that one cell should be lost.
   const doc = createDoc('Mixed');
   const pixels = new Array(PIXEL_COUNT).fill(null);
-  pixels[0] = '#FF4747'; // valid — must survive exactly
+  pixels[0] = '#FF4747'; // valid, though off-grid: snaps to #FF4B4B
   pixels[1] = 'not-a-colour';
   pixels[2] = 123;
   pixels[3] = {};
@@ -850,7 +861,7 @@ await test('sanitiseDoc: bad individual pixel values degrade to null, not the wh
   const out = sanitiseDoc(doc);
   assert(out, 'a doc with some bad pixel values should still sanitise, not be rejected wholesale');
   assertEqual(out.pixels.length, 256, 'pixels.length should stay 256 even with bad values mixed in');
-  assertEqual(out.pixels[0], '#FF4747', 'the one valid pixel value should survive exactly');
+  assertEqual(out.pixels[0], '#FF4B4B', 'the one valid pixel value should survive, snapped to the display grid');
   assertEqual(out.pixels[1], null, "'not-a-colour' should degrade to null");
   assertEqual(out.pixels[2], null, '123 (a number) should degrade to null');
   assertEqual(out.pixels[3], null, '{} should degrade to null');
@@ -858,15 +869,20 @@ await test('sanitiseDoc: bad individual pixel values degrade to null, not the wh
   assertEqual(out.pixels[5], null, 'undefined should degrade to null');
 });
 
-await test('sanitiseDoc: pixel hex values are normalised — lowercase uppercased, 3-digit expanded', () => {
+await test('sanitiseDoc: pixel hex values are normalised and snapped to the display grid', () => {
   const doc = createDoc();
   const pixels = new Array(PIXEL_COUNT).fill(null);
-  pixels[0] = '#ff4747';
-  pixels[1] = '#abc';
+  pixels[0] = '#ff4747';   // lowercase AND off-grid
+  pixels[1] = '#abc';      // 3-digit -> #AABBCC (170,187,204), all off-grid
+  pixels[2] = '#0f0f0f';   // already on the grid: must be left alone
   doc.pixels = pixels;
   const out = sanitiseDoc(doc);
-  assertEqual(out.pixels[0], '#FF4747', "'#ff4747' should normalise to '#FF4747'");
-  assertEqual(out.pixels[1], '#AABBCC', "'#abc' should expand and normalise to '#AABBCC'");
+  // The display only resolves channel values in steps of 15, so storage snaps
+  // every colour to that grid on the way in. This doubles as the schema 1 -> 2
+  // migration for art saved before the grid was known.
+  assertEqual(out.pixels[0], '#FF4B4B', "'#ff4747' should uppercase and snap to '#FF4B4B'");
+  assertEqual(out.pixels[1], '#A5B4D2', "'#abc' should expand to #AABBCC and snap to '#A5B4D2'");
+  assertEqual(out.pixels[2], '#0F0F0F', "'#0f0f0f' is already on the grid and should be untouched");
 });
 
 await test('sanitiseDoc: an unknown or missing grid falls back to full; every real mode is preserved', () => {
@@ -911,10 +927,12 @@ await test('sanitiseDoc: non-finite or missing createdAt/updatedAt become finite
 
 await test('parseBackup: round-trips with toBackupJSON', () => {
   const docs = [createDoc('Alpha'), createDoc('Beta'), createDoc('Gamma')];
-  docs[0].pixels[0] = '#FF4747';
-  docs[1].pixels[10] = '#2E8B57';
+  // On-grid colours, so "keeps its pixels exactly" stays a meaningful claim
+  // once storage snaps everything to the display's 15-step grid.
+  docs[0].pixels[0] = '#FF4B4B';
+  docs[1].pixels[10] = '#2D875A';
   docs[1].grid = 'odd-tl';
-  docs[2].pixels[255] = '#4FA8FF';
+  docs[2].pixels[255] = '#4BA5FF';
 
   const { icons } = parseBackup(toBackupJSON(docs));
   assertEqual(icons.length, 3, 'round-tripping 3 docs through toBackupJSON/parseBackup should yield 3 icons');
@@ -1101,6 +1119,730 @@ await test('createSaver.flush: writes immediately and returns a boolean', () => 
       // Nothing more we can do if storage is gone.
     }
   }
+});
+
+
+// ---- 24. palette.js: the curated defaults ----------------------------------
+
+await test('DEFAULT_PALETTE: every swatch sits on the display\'s 15-step channel grid', () => {
+  const offGrid = allSwatches().filter((hex) => !isOnGrid(hex));
+  assertEqual(offGrid, [], `these swatches are not on the 15-step grid: ${offGrid.join(', ')}`);
+});
+
+await test('DEFAULT_PALETTE: no duplicate swatches, and the count is in the documented range', () => {
+  const swatches = allSwatches();
+  const unique = new Set(swatches);
+  assertEqual(unique.size, swatches.length, 'the palette contains a duplicate colour');
+  assert(
+    swatches.length >= 24 && swatches.length <= 33,
+    `SPEC §5 asks for 24-33 swatches, got ${swatches.length}`,
+  );
+});
+
+await test('DEFAULT_PALETTE: is groups of swatches, not a flat list', () => {
+  // Shading ramps (SPEC §15.1) are groups of related colours. v1 only ever
+  // creates single-swatch groups, but the shape has to be right now to avoid a
+  // storage migration later.
+  for (const group of DEFAULT_PALETTE) {
+    assert(Array.isArray(group.swatches), `group '${group.id}' should have a swatches array`);
+    assert(group.swatches.length > 0, `group '${group.id}' should have at least one swatch`);
+    assert(typeof group.name === 'string' && group.name.length > 0, `group '${group.id}' needs a name`);
+  }
+});
+
+await test('DEFAULT_PALETTE: includes pure black, deliberately', () => {
+  // SPEC §1: black is an unlit pixel, so enclosed by lit pixels it reads as a
+  // hole (an eye, a gap) — the only way to draw one on an emissive panel. It
+  // only betrays you where it touches the silhouette edge, which is a lint
+  // concern, not a reason to withhold the colour.
+  const swatches = allSwatches();
+  assert(swatches.includes('#000000'), 'pure black should be in the palette');
+  assertEqual(
+    swatches.filter((hex) => hex === '#000000').length, 1,
+    'pure black should appear exactly once',
+  );
+  assert(swatches.includes('#1E1E1E'), 'the near-black should still be there, for a pixel that is nearly off rather than off');
+});
+
+await test('pushRecent: most recent first, distinct, quantised, and capped', () => {
+  let list = [];
+  list = pushRecent(list, '#FF4B4B');
+  list = pushRecent(list, '#4BB44B');
+  assertEqual(list[0], '#4BB44B', 'the newest colour should be first');
+  assertEqual(list.length, 2, 'two distinct colours should both be kept');
+
+  list = pushRecent(list, '#FF4B4B');
+  assertEqual(list[0], '#FF4B4B', 're-using a colour should move it to the front');
+  assertEqual(list.length, 2, 're-using a colour should not add a duplicate entry');
+
+  // Off-grid input is snapped, so the list can never suggest an undisplayable colour.
+  assertEqual(pushRecent([], '#FF4747')[0], '#FF4B4B', 'a recent colour should be snapped to the grid');
+  assertEqual(pushRecent([], 'nonsense'), [], 'junk should be ignored, not stored');
+
+  let long = [];
+  for (let i = 0; i <= RECENT_COUNT + 4; i++) {
+    long = pushRecent(long, `#${(i * 15).toString(16).padStart(2, '0')}0000`);
+  }
+  assert(long.length <= RECENT_COUNT, `recents should cap at ${RECENT_COUNT}, got ${long.length}`);
+});
+
+// ---- 25. importer.js: centreCrop -------------------------------------------
+
+await test('centreCrop: a wide image crops from the sides, keeping the full height', () => {
+  const crop = centreCrop(100, 60);
+  assertEqual(crop.x, 20, 'centreCrop(100,60).x should be 20');
+  assertEqual(crop.y, 0, 'centreCrop(100,60).y should be 0');
+  assertEqual(crop.size, 60, 'centreCrop(100,60).size should be 60');
+});
+
+await test('centreCrop: a tall image crops from the top and bottom, keeping the full width', () => {
+  const crop = centreCrop(60, 100);
+  assertEqual(crop.x, 0, 'centreCrop(60,100).x should be 0');
+  assertEqual(crop.y, 20, 'centreCrop(60,100).y should be 20');
+  assertEqual(crop.size, 60, 'centreCrop(60,100).size should be 60');
+});
+
+await test('centreCrop: a square image returns the whole thing', () => {
+  const crop = centreCrop(40, 40);
+  assertEqual(crop.x, 0, 'centreCrop(40,40).x should be 0');
+  assertEqual(crop.y, 0, 'centreCrop(40,40).y should be 0');
+  assertEqual(crop.size, 40, 'centreCrop(40,40).size should be 40');
+});
+
+await test('centreCrop: odd dimensions never produce fractional or out-of-range values', () => {
+  const cases = [[101, 60], [60, 101], [99, 99], [1, 1], [7, 2]];
+  for (const [w, h] of cases) {
+    const { x, y, size } = centreCrop(w, h);
+    assert(
+      Number.isInteger(x) && Number.isInteger(y) && Number.isInteger(size),
+      `centreCrop(${w},${h}) should return integers, got x=${x} y=${y} size=${size}`,
+    );
+    assert(size >= 1, `centreCrop(${w},${h}) size should be at least 1, got ${size}`);
+    assert(x >= 0 && x + size <= w, `centreCrop(${w},${h}) x=${x} size=${size} runs outside width ${w}`);
+    assert(y >= 0 && y + size <= h, `centreCrop(${w},${h}) y=${y} size=${size} runs outside height ${h}`);
+  }
+});
+
+// ---- 26. importer.js: clampCrop --------------------------------------------
+
+await test('clampCrop: an already-valid crop is returned unchanged', () => {
+  const out = clampCrop({ x: 5, y: 5, size: 10 }, 40, 40);
+  assertEqual(out.x, 5, 'a valid crop x should be unchanged');
+  assertEqual(out.y, 5, 'a valid crop y should be unchanged');
+  assertEqual(out.size, 10, 'a valid crop size should be unchanged');
+});
+
+await test('clampCrop: negative x/y are pulled back inside the image', () => {
+  const out = clampCrop({ x: -20, y: -20, size: 10 }, 40, 40);
+  assert(out.x >= 0, `clampCrop with negative x should clamp to >= 0, got ${out.x}`);
+  assert(out.y >= 0, `clampCrop with negative y should clamp to >= 0, got ${out.y}`);
+  assertEqual(out.size, 10, 'size should be unaffected by a negative origin');
+});
+
+await test('clampCrop: x/y past the far edge are pulled back so the crop stays inside', () => {
+  const out = clampCrop({ x: 100, y: 100, size: 10 }, 40, 40);
+  assert(out.x + out.size <= 40, `clampCrop x=${out.x} size=${out.size} should stay within width 40`);
+  assert(out.y + out.size <= 40, `clampCrop y=${out.y} size=${out.size} should stay within height 40`);
+  assert(out.size >= 1, `clampCrop size should stay at least 1, got ${out.size}`);
+});
+
+await test('clampCrop: a size larger than the image is capped, and stays square and inside bounds', () => {
+  const out = clampCrop({ x: 0, y: 0, size: 999 }, 40, 30);
+  assertEqual(out.size, 30, 'size should be capped to the smaller image dimension (30)');
+  assert(out.x >= 0 && out.x + out.size <= 40, `clamped crop x=${out.x} size=${out.size} should stay within width 40`);
+  assert(out.y >= 0 && out.y + out.size <= 30, `clamped crop y=${out.y} size=${out.size} should stay within height 30`);
+});
+
+await test('clampCrop: a zero size is floored to at least 1px', () => {
+  const out = clampCrop({ x: 0, y: 0, size: 0 }, 40, 40);
+  assert(out.size >= 1, `clampCrop with size 0 should floor to at least 1px, got ${out.size}`);
+});
+
+// ---- 27. importer.js: boxSample --------------------------------------------
+
+// closeTo: boxSample and adjustColor divide/lerp, so results are floats even
+// when the "obviously correct" answer is a round number — compare with a
+// tolerance instead of exact equality.
+function closeTo(actual, expected, tolerance, msg) {
+  assert(
+    Number.isFinite(actual) && Math.abs(actual - expected) <= tolerance,
+    `${msg || 'value not close enough'} — expected ${expected} ± ${tolerance}, got ${actual}`,
+  );
+}
+
+// Builds a synthetic { width, height, data } image for importer.js's pure
+// pipeline functions. fn(x, y) returns [r, g, b, a] for that pixel. Nothing
+// past decodeToImageData needs a real decoded image, just this shape.
+function makeImage(width, height, fn) {
+  const data = new Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const [r, g, b, a] = fn(x, y);
+      const i = (y * width + x) * 4;
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+      data[i + 3] = a;
+    }
+  }
+  return { width, height, data };
+}
+
+await test('boxSample: a flat-colour region averages to exactly that colour', () => {
+  const image = makeImage(4, 4, () => [100, 150, 200, 255]);
+  const sample = boxSample(image, 0, 0, 4, 4);
+  assertEqual(sample.r, 100, 'flat region r should average to exactly 100');
+  assertEqual(sample.g, 150, 'flat region g should average to exactly 150');
+  assertEqual(sample.b, 200, 'flat region b should average to exactly 200');
+  assertEqual(sample.a, 255, 'flat region a should average to exactly 255');
+});
+
+await test('boxSample: a black pixel and a white pixel average to about 128', () => {
+  const image = makeImage(2, 1, (x) => (x === 0 ? [0, 0, 0, 255] : [255, 255, 255, 255]));
+  const sample = boxSample(image, 0, 0, 2, 1);
+  closeTo(sample.r, 128, 1, 'black+white average r should be about 128');
+  closeTo(sample.g, 128, 1, 'black+white average g should be about 128');
+  closeTo(sample.b, 128, 1, 'black+white average b should be about 128');
+});
+
+await test('boxSample: alpha weighting — a transparent neighbour does not drag an opaque pixel toward black', () => {
+  // A fully transparent pixel normally carries RGB 0 (nothing was ever drawn
+  // there). A naive unweighted mean would blend that 0 straight into the
+  // result, dragging every edge toward black and putting a dark halo around
+  // cut-out artwork. boxSample instead accumulates premultiplied colour and
+  // divides by total alpha, so a transparent neighbour contributes nothing to
+  // the resulting colour — only to how transparent the averaged cell is.
+  const image = makeImage(2, 1, (x) => (x === 0 ? [255, 0, 0, 255] : [0, 0, 0, 0]));
+  const sample = boxSample(image, 0, 0, 2, 1);
+  assertEqual(sample.r, 255, 'opaque red + transparent black should average to pure red (r=255), not a darkened half-red');
+  assertEqual(sample.g, 0, 'opaque red + transparent black should average to pure red (g=0)');
+  assertEqual(sample.b, 0, 'opaque red + transparent black should average to pure red (b=0)');
+  closeTo(sample.a, 128, 1, 'alpha itself should still average normally, to about 128');
+});
+
+await test('boxSample: a fully transparent region returns alpha 0 without dividing by zero or producing NaN', () => {
+  const image = makeImage(3, 3, () => [50, 60, 70, 0]);
+  const sample = boxSample(image, 0, 0, 3, 3);
+  assertEqual(sample.a, 0, 'a fully transparent region should average to alpha 0');
+  assert(Number.isFinite(sample.r), `r should be finite, got ${sample.r}`);
+  assert(Number.isFinite(sample.g), `g should be finite, got ${sample.g}`);
+  assert(Number.isFinite(sample.b), `b should be finite, got ${sample.b}`);
+  assert(Number.isFinite(sample.a), `a should be finite, got ${sample.a}`);
+});
+
+// ---- 28. importer.js: nearestSample ----------------------------------------
+
+await test('nearestSample: picks the pixel at the centre of the rect, not a corner', () => {
+  const image = makeImage(4, 1, (x) => [x * 50, 0, 0, 255]); // gradient: 0, 50, 100, 150
+  const sample = nearestSample(image, 0, 0, 4, 1);
+  assertEqual(sample.r, 100, 'nearestSample over the full 4px width should pick x=2 (the centre), not x=0 or x=3');
+});
+
+// ---- 29. importer.js: adjustColor ------------------------------------------
+
+await test('adjustColor: (0, 0) is the identity — no brightness or saturation change', () => {
+  const out = adjustColor({ r: 10, g: 130, b: 240 }, 0, 0);
+  closeTo(out.r, 10, 0.001, 'r should be unchanged at brightness/saturation 0');
+  closeTo(out.g, 130, 0.001, 'g should be unchanged at brightness/saturation 0');
+  closeTo(out.b, 240, 0.001, 'b should be unchanged at brightness/saturation 0');
+});
+
+await test('adjustColor: brightness +100 doubles a mid grey', () => {
+  const out = adjustColor({ r: 100, g: 100, b: 100 }, 100, 0);
+  closeTo(out.r, 200, 0.001, 'brightness +100 should double r (gain 2x) for a mid grey');
+  closeTo(out.g, 200, 0.001, 'brightness +100 should double g (gain 2x) for a mid grey');
+  closeTo(out.b, 200, 0.001, 'brightness +100 should double b (gain 2x) for a mid grey');
+});
+
+await test('adjustColor: brightness clamps at 255 and never goes below 0, even at the extremes', () => {
+  const bright = adjustColor({ r: 200, g: 200, b: 200 }, 100, 0);
+  assertEqual(bright.r, 255, 'brightness +100 on r=200 (gain 2x -> 400) should clamp to 255');
+  assertEqual(bright.g, 255, 'brightness +100 on g=200 should clamp to 255');
+  assertEqual(bright.b, 255, 'brightness +100 on b=200 should clamp to 255');
+
+  const dark = adjustColor({ r: 200, g: 200, b: 200 }, -100, 0);
+  assertEqual(dark.r, 0, 'brightness -100 (gain 0x) should floor to 0');
+  assertEqual(dark.g, 0, 'brightness -100 (gain 0x) should floor to 0');
+  assertEqual(dark.b, 0, 'brightness -100 (gain 0x) should floor to 0');
+});
+
+await test('adjustColor: saturating a neutral grey leaves it grey — there is nothing to saturate', () => {
+  const out = adjustColor({ r: 128, g: 128, b: 128 }, 0, 100);
+  closeTo(out.r, 128, 0.001, 'saturating a neutral grey should not change r');
+  closeTo(out.g, 128, 0.001, 'saturating a neutral grey should not change g');
+  closeTo(out.b, 128, 0.001, 'saturating a neutral grey should not change b');
+});
+
+await test('adjustColor: saturation +100 pushes a reddish colour further apart from its other channels', () => {
+  const base = { r: 180, g: 100, b: 100 };
+  const out = adjustColor(base, 0, 100);
+  assert(out.r > base.r, `saturation +100 should push r up from ${base.r}, got ${out.r}`);
+  assert(out.g < base.g, `saturation +100 should push g down from ${base.g}, got ${out.g}`);
+});
+
+await test('adjustColor: saturation -100 collapses a colour to a neutral grey (r, g, b within 1 of each other)', () => {
+  const out = adjustColor({ r: 180, g: 100, b: 100 }, 0, -100);
+  assert(Math.abs(out.r - out.g) <= 1, `saturation -100 should collapse r and g together, got r=${out.r} g=${out.g}`);
+  assert(Math.abs(out.g - out.b) <= 1, `saturation -100 should collapse g and b together, got g=${out.g} b=${out.b}`);
+});
+
+await test('adjustColor: every returned channel is finite and within 0..255 for a sweep of inputs', () => {
+  const brightnesses = [-100, -50, 0, 50, 100];
+  const saturations = [-100, -50, 0, 50, 100];
+  const colours = [
+    { r: 0, g: 0, b: 0 },
+    { r: 255, g: 255, b: 255 },
+    { r: 255, g: 0, b: 0 },
+    { r: 12, g: 200, b: 90 },
+  ];
+  for (const brightness of brightnesses) {
+    for (const saturation of saturations) {
+      for (const colour of colours) {
+        const out = adjustColor(colour, brightness, saturation);
+        for (const ch of ['r', 'g', 'b']) {
+          assert(
+            Number.isFinite(out[ch]),
+            `adjustColor(${JSON.stringify(colour)}, ${brightness}, ${saturation}).${ch} should be finite, got ${out[ch]}`,
+          );
+          assert(
+            out[ch] >= 0 && out[ch] <= 255,
+            `adjustColor(${JSON.stringify(colour)}, ${brightness}, ${saturation}).${ch} should be within 0..255, got ${out[ch]}`,
+          );
+        }
+      }
+    }
+  }
+});
+
+// ---- 30. importer.js: oklab ------------------------------------------------
+//
+// These are the properties nearestPaletteColor relies on: a near-uniform
+// lightness axis and a hue/chroma pair that is genuinely 0 for anything grey,
+// so nearest-by-distance actually means "looks closest".
+
+await test('oklab: white has L about 1', () => {
+  const { L } = oklab(255, 255, 255);
+  closeTo(L, 1, 0.01, 'oklab(255,255,255).L should be about 1');
+});
+
+await test('oklab: black has L about 0', () => {
+  const { L } = oklab(0, 0, 0);
+  closeTo(L, 0, 0.01, 'oklab(0,0,0).L should be about 0');
+});
+
+await test('oklab: a neutral grey has a and b about 0', () => {
+  const { a, b } = oklab(128, 128, 128);
+  closeTo(a, 0, 0.01, 'oklab(128,128,128).a should be about 0 for a neutral grey');
+  closeTo(b, 0, 0.01, 'oklab(128,128,128).b should be about 0 for a neutral grey');
+});
+
+// ---- 31. importer.js: nearestPaletteColor / preparePalette ----------------
+
+await test('nearestPaletteColor: near-white picks white, a dark red picks red rather than black, a mid grey picks grey', () => {
+  // A small, explicit palette so the expected winner is obvious by eye, and
+  // one that includes both a saturated colour and true black so "closest" is
+  // a real choice rather than the only option available.
+  const palette = ['#FFFFFF', '#000000', '#CC2222', '#0000CC', '#808080'];
+  const prepared = preparePalette(palette);
+
+  assertEqual(nearestPaletteColor({ r: 250, g: 248, b: 245 }, prepared), '#FFFFFF', 'a near-white colour should match white');
+  assertEqual(nearestPaletteColor({ r: 130, g: 15, b: 10 }, prepared), '#CC2222', 'a dark red colour should match red, not black');
+  assertEqual(nearestPaletteColor({ r: 130, g: 130, b: 130 }, prepared), '#808080', 'a mid grey colour should match the grey swatch, not a saturated colour');
+});
+
+await test('nearestPaletteColor: the result is always one of the palette entries', () => {
+  const palette = ['#FFFFFF', '#000000', '#CC2222', '#0000CC', '#808080', '#22CC22'];
+  const prepared = preparePalette(palette);
+  const samples = [
+    { r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 }, { r: 12, g: 200, b: 90 },
+    { r: 90, g: 12, b: 200 }, { r: 200, g: 90, b: 12 }, { r: 60, g: 60, b: 60 },
+  ];
+  for (const rgb of samples) {
+    const match = nearestPaletteColor(rgb, prepared);
+    assert(palette.includes(match), `nearestPaletteColor(${JSON.stringify(rgb)}) returned '${match}', which is not in the palette`);
+  }
+});
+
+// ---- 32. importer.js: buildPixels — the whole import pipeline -------------
+
+await test('buildPixels: returns exactly size*size entries — 16 gives 256, 15 gives the odd-grid target of 225', () => {
+  const image = makeImage(16, 16, (x, y) => [x * 16, 255 - x * 16, (y * 16) % 256, 255]);
+  assertEqual(buildPixels(image, { size: 16 }).length, 256, 'size:16 should produce 256 entries');
+  assertEqual(buildPixels(image, { size: 15 }).length, 225, 'size:15 should produce 225 entries');
+});
+
+await test('buildPixels: every non-null entry sits on the 15-step display grid, with or without a palette', () => {
+  // Mandatory and independent of the palette option: the panel cannot show
+  // anything off this grid, whether or not the user asked for palette colours.
+  const image = makeImage(16, 16, (x, y) => [x * 16, 255 - x * 16, (y * 16) % 256, 255]);
+
+  const withoutPalette = buildPixels(image, { size: 16 });
+  const offGrid1 = withoutPalette.filter((hex) => hex !== null && !isOnGrid(hex));
+  assertEqual(offGrid1, [], `every non-null pixel without a palette should be on-grid, found off-grid: ${offGrid1.join(', ')}`);
+
+  const withPalette = buildPixels(image, { size: 16, palette: allSwatches() });
+  const offGrid2 = withPalette.filter((hex) => hex !== null && !isOnGrid(hex));
+  assertEqual(offGrid2, [], `every non-null pixel with a palette should also be on-grid, found off-grid: ${offGrid2.join(', ')}`);
+});
+
+await test('buildPixels: alpha threshold — 120/255 alpha comes out entirely transparent at 0.5 and entirely opaque at 0.4', () => {
+  const image = makeImage(16, 16, () => [200, 50, 50, 120]); // 120/255 ≈ 0.47
+  const highThreshold = buildPixels(image, { size: 16, alphaThreshold: 0.5 });
+  assert(highThreshold.every((p) => p === null), 'alphaThreshold 0.5 with source alpha ~0.47 should produce an entirely transparent result');
+
+  const lowThreshold = buildPixels(image, { size: 16, alphaThreshold: 0.4 });
+  assert(lowThreshold.every((p) => p !== null), 'alphaThreshold 0.4 with source alpha ~0.47 should produce an entirely opaque result');
+});
+
+await test('buildPixels: with a palette, every non-null output is a member of that palette', () => {
+  const image = makeImage(32, 32, (x, y) => [(x * 7) % 256, (y * 11) % 256, ((x + y) * 5) % 256, 255]);
+  const swatches = allSwatches();
+  const out = buildPixels(image, { size: 16, palette: swatches });
+  const foreign = out.filter((hex) => hex !== null && !swatches.includes(hex));
+  assertEqual(foreign, [], `every non-null pixel should be a palette member, found non-members: ${foreign.join(', ')}`);
+});
+
+await test("buildPixels: 'nearest' and the default box method both produce on-grid output, and actually differ on a busy image", () => {
+  // A pixel-level checkerboard, downsampled 4x: each output cell mixes black
+  // and white source pixels, so box-averaging (mid grey) and nearest-picking
+  // (whichever one pixel lands on the centre) should disagree.
+  const checker = makeImage(64, 64, (x, y) => ((x + y) % 2 === 0 ? [255, 255, 255, 255] : [0, 0, 0, 255]));
+  const boxOut = buildPixels(checker, { size: 16 });
+  const nearOut = buildPixels(checker, { size: 16, method: 'nearest' });
+
+  assert(
+    boxOut.every((p) => p === null || isOnGrid(p)),
+    'box method output should be entirely on-grid',
+  );
+  assert(
+    nearOut.every((p) => p === null || isOnGrid(p)),
+    'nearest method output should be entirely on-grid',
+  );
+  assert(
+    JSON.stringify(boxOut) !== JSON.stringify(nearOut),
+    'box and nearest sampling should disagree somewhere on a busy checkerboard image',
+  );
+});
+
+await test('buildPixels: an entirely transparent source produces an all-null result', () => {
+  const image = makeImage(16, 16, () => [10, 20, 30, 0]);
+  const out = buildPixels(image, { size: 16 });
+  assert(out.every((p) => p === null), 'a fully transparent source image should produce nothing but null pixels');
+});
+
+await test('buildPixels: does not mutate the input image data', () => {
+  const image = makeImage(16, 16, (x, y) => [x * 16, 255 - x * 16, (y * 16) % 256, 255]);
+  const before = image.data.slice();
+  buildPixels(image, { size: 16, palette: allSwatches() });
+  assertEqual(image.data, before, 'buildPixels should not modify the source image data array');
+});
+
+// ---- 33. lint.js: findEdgeBlack — enclosed vs exposed black ----------------
+//
+// This is the crux of the whole lint module (SPEC §1, §7): on an emissive
+// panel, black and "off" are the same physical thing. Black surrounded by lit
+// pixels reads as a deliberate hole (an eye, a mouth) and must never be
+// flagged. Black that is 4-connected to a transparent pixel, or to the edge
+// of the drawing area, reads as transparent and erodes the silhouette — that
+// is the only case that should be flagged. Getting this backwards would make
+// the tool nag about exactly the reason black is in the palette, so both
+// directions are tested explicitly below.
+
+// Builds a document from an array of equal-length strings, one character per
+// pixel, via a legend mapping characters to colours (or null for
+// transparent). Rows are placed at the top-left of the 16x16 canvas; any cell
+// beyond the given rows/columns is left transparent. Turns the pixel pictures
+// in the comments below into the actual documents under test.
+function docFromRows(rows, legend, grid = 'full') {
+  const doc = createDoc();
+  doc.grid = grid;
+  for (let y = 0; y < rows.length; y++) {
+    const row = rows[y];
+    for (let x = 0; x < row.length; x++) {
+      const color = legend[row[x]];
+      if (color !== undefined) doc.pixels[idx(x, y)] = color;
+    }
+  }
+  return doc;
+}
+
+await test('findEdgeBlack: a black pixel fully enclosed by lit pixels is a deliberate hole and is not flagged', () => {
+  // A solid 5x5 blob with one black pixel dead centre: all four of its
+  // neighbours are lit, so this reads as an eye or a gap cut into the shape —
+  // exactly what black in the palette exists for.
+  const doc = docFromRows([
+    '........',
+    '........',
+    '..XXXXX.',
+    '..XXXXX.',
+    '..XXKXX.',
+    '..XXXXX.',
+    '..XXXXX.',
+    '........',
+  ], { '.': null, X: '#FF4747', K: '#000000' });
+
+  assertEqual(findEdgeBlack(doc), [], 'a black pixel enclosed on all four sides by lit pixels should never be flagged');
+});
+
+await test('findEdgeBlack: the same blob with the black pixel moved to its boundary is flagged', () => {
+  // Same shape, but the black pixel now sits on the blob's left edge: its
+  // west neighbour is transparent, so it reads as transparent itself and eats
+  // into the silhouette.
+  const doc = docFromRows([
+    '........',
+    '........',
+    '..XXXXX.',
+    '..XXXXX.',
+    '..KXXXX.',
+    '..XXXXX.',
+    '..XXXXX.',
+    '........',
+  ], { '.': null, X: '#FF4747', K: '#000000' });
+
+  assertEqual(findEdgeBlack(doc), [idx(2, 4)], "a black pixel with a transparent neighbour on the blob's boundary should be flagged, exactly that one cell");
+});
+
+await test('findEdgeBlack: a black pixel at the canvas edge is flagged — outside the canvas counts as outside the icon', () => {
+  const doc = docFromRows(['K'], { K: '#000000' }); // (0,0), everything else transparent
+  assertEqual(findEdgeBlack(doc), [idx(0, 0)], 'a black pixel at (0,0) with nothing else painted should be flagged');
+});
+
+await test("findEdgeBlack: odd-br — a black pixel against the region boundary is flagged, because the region edge is the icon's edge", () => {
+  // (1,1) is the region's own top-left corner in odd-br (region x0=1,y0=1).
+  // Its in-region neighbours (2,1) and (1,2) are lit, so it is not exposed by
+  // an ordinary null neighbour — it is exposed only because the dropped row
+  // (y=0) and dropped column (x=0) sit right next to it, and that boundary
+  // counts as the edge of the drawing area.
+  const doc = docFromRows([
+    '.......',
+    '.KX....',
+    '.X.....',
+  ], { '.': null, X: '#FF4747', K: '#000000' }, 'odd-br');
+
+  assertEqual(findEdgeBlack(doc), [idx(1, 1)], 'a black pixel at the odd-br region corner (1,1) should be flagged');
+});
+
+await test('findEdgeBlack: diagonal-only exposure does not count — the rule is 4-connected, not 8', () => {
+  // Black pixel at the centre of a plus of lit pixels: all four 4-neighbours
+  // are lit, but a diagonal neighbour (3,3) is transparent. An 8-connected
+  // rule would flag this; the correct 4-connected rule must not.
+  const doc = docFromRows([
+    '.......',
+    '.......',
+    '.......',
+    '....X..',
+    '...XKX.',
+    '....X..',
+    '.......',
+  ], { '.': null, X: '#FF4747', K: '#000000' });
+
+  assertEqual(findEdgeBlack(doc), [], 'a black pixel with all 4-neighbours lit must not be flagged just because a diagonal neighbour is transparent');
+});
+
+// ---- 34. lint.js: findVeryDark ----------------------------------------------
+
+await test('findVeryDark: LIGHTEN_TO does not itself re-trigger the warning it exists to fix', () => {
+  // If the one-click fix colour were itself below DARK_THRESHOLD, applying
+  // the fix would leave the pixel just as flagged as before — an embarrassing
+  // loop dressed up as a fix.
+  assert(
+    luminance(LIGHTEN_TO) > DARK_THRESHOLD,
+    `luminance(LIGHTEN_TO) (${luminance(LIGHTEN_TO)}) should be above DARK_THRESHOLD (${DARK_THRESHOLD})`,
+  );
+});
+
+await test('findVeryDark: a near-black grey below DARK_THRESHOLD is flagged; a bright colour and pure black are not', () => {
+  const doc = docFromRows(['DBK'], { D: '#1E1E1E', B: '#FF4747', K: '#000000' });
+  // (0,0) is #1E1E1E (dark), (1,0) is a bright colour, (2,0) is pure black —
+  // pure black is excluded here because it is findEdgeBlack's business, and
+  // enclosed black is deliberate rather than a mistake.
+  assertEqual(findVeryDark(doc), [idx(0, 0)], '#1E1E1E should be the only flagged pixel');
+});
+
+// ---- 35. lint.js: findGutter -------------------------------------------------
+
+await test('findGutter: odd grid mode reports painted pixels outside the region, and none inside it', () => {
+  const doc = docFromRows([
+    'X........',
+    '.Y.......',
+  ], { X: '#FF4747', Y: '#2E8B57', '.': null }, 'odd-br');
+  // (0,0) is in the dropped row AND column; (1,1) is the region's own corner.
+
+  assertEqual(findGutter(doc), [idx(0, 0)], 'only the pixel outside the odd-br region should be reported as gutter paint');
+});
+
+await test('findGutter: full grid mode always returns empty, regardless of content', () => {
+  const doc = docFromRows([
+    'X........',
+    '.Y.......',
+  ], { X: '#FF4747', Y: '#2E8B57', '.': null }, 'full');
+
+  assertEqual(findGutter(doc), [], 'full grid mode has no gutter, so findGutter should return empty no matter what is painted');
+});
+
+// ---- 36. lint.js: litCountInRegion -------------------------------------------
+
+await test('litCountInRegion: counts only paint inside the active region, ignoring the gutter', () => {
+  const doc = docFromRows([
+    'X........',
+    '.YY......',
+  ], { X: '#FF4747', Y: '#2E8B57', '.': null }, 'odd-br');
+  // (0,0) is gutter (dropped row+column); (1,1) and (2,1) are inside the region.
+
+  assertEqual(litCountInRegion(doc), 2, 'litCountInRegion should count the 2 in-region pixels and skip the 1 gutter pixel');
+});
+
+// ---- 37. lint.js: touchesAllEdges --------------------------------------------
+
+await test('touchesAllEdges: false for inset art that reaches no edge', () => {
+  const doc = createDoc();
+  setPixel(doc, 7, 7, '#FF4747');
+  setPixel(doc, 8, 8, '#FF4747');
+  assert(!touchesAllEdges(doc), 'a small inset shape should not report touching all four edges');
+});
+
+await test('touchesAllEdges: false when only three of the four edges are reached', () => {
+  const doc = createDoc();
+  setPixel(doc, 0, 5, '#FF4747');  // left
+  setPixel(doc, 15, 5, '#FF4747'); // right
+  setPixel(doc, 5, 0, '#FF4747');  // top
+  // bottom (y=15) deliberately left untouched
+  assert(!touchesAllEdges(doc), 'reaching only three of the four edges should not count as touching all edges');
+});
+
+await test('touchesAllEdges: true once paint reaches all four edges of a full-grid canvas', () => {
+  const doc = createDoc();
+  setPixel(doc, 0, 5, '#FF4747');  // left
+  setPixel(doc, 15, 5, '#FF4747'); // right
+  setPixel(doc, 5, 0, '#FF4747');  // top
+  setPixel(doc, 5, 15, '#FF4747'); // bottom
+  assert(touchesAllEdges(doc), 'paint touching all four canvas edges should report true');
+});
+
+await test("touchesAllEdges: odd-br — the edges are the region's edges (x=1/x=15, y=1/y=15), not the canvas edges", () => {
+  const doc = createDoc();
+  doc.grid = 'odd-br';
+  setPixel(doc, 1, 8, '#FF4747');  // region left edge (x0=1)
+  setPixel(doc, 15, 8, '#FF4747'); // region right edge
+  setPixel(doc, 8, 1, '#FF4747');  // region top edge (y0=1)
+  setPixel(doc, 8, 15, '#FF4747'); // region bottom edge
+  assert(touchesAllEdges(doc), 'paint touching all four edges of the odd-br region should report true');
+
+  // Remove the region's own left-edge pixel: the canvas still has an x=0
+  // column, but it is outside the region and must not stand in for it.
+  setPixel(doc, 1, 8, null);
+  assert(!touchesAllEdges(doc), "without paint on the region's own left edge, touchesAllEdges should be false");
+});
+
+// ---- 38. lint.js: runLint ----------------------------------------------------
+
+await test('runLint: a clean, inset, mid-brightness icon has nothing to say', () => {
+  const doc = createDoc();
+  setPixel(doc, 6, 6, '#FF4747');
+  setPixel(doc, 7, 7, '#4FA8FF');
+  setPixel(doc, 8, 8, '#2E8B57');
+  assertEqual(runLint(doc), [], 'a small, inset, well-lit icon should produce no warnings');
+});
+
+await test('runLint: an empty document gets the empty warning, and not the edges warning too', () => {
+  const warnings = runLint(createDoc());
+  const ids = warnings.map((w) => w.id);
+  assert(ids.includes('empty'), 'an empty document should get the empty warning');
+  assert(!ids.includes('edges'), 'an empty document touches no edge, so it must not also get the edges warning');
+});
+
+await test('runLint: messages are non-empty, end with a full stop, use no exclamation marks, and count-based ones include the count', () => {
+  const doc = createDoc();
+  doc.grid = 'odd-br';
+  setPixel(doc, 0, 0, '#FF4747');  // gutter: outside the region
+  setPixel(doc, 1, 1, '#000000'); // black-edge: exposed black at the region corner
+  setPixel(doc, 5, 5, '#1E1E1E'); // too-dark
+  setPixel(doc, 15, 8, '#4FA8FF'); // region right edge
+  setPixel(doc, 8, 15, '#4FA8FF'); // region bottom edge
+  // (1,1) above sits on both the region's left and top edges, so together with
+  // the two pixels just above this document should trigger all of gutter,
+  // black-edge, too-dark and edges at once.
+
+  const warnings = runLint(doc);
+  const ids = warnings.map((w) => w.id);
+  for (const id of ['gutter', 'black-edge', 'too-dark', 'edges']) {
+    assert(ids.includes(id), `expected the '${id}' warning to be triggered by this document, got ${JSON.stringify(ids)}`);
+  }
+
+  for (const w of warnings) {
+    assert(typeof w.message === 'string' && w.message.length > 0, `warning '${w.id}' should have a non-empty message`);
+    assert(w.message.endsWith('.'), `warning '${w.id}' message should end with a full stop, got '${w.message}'`);
+    // SPEC §7: say what is wrong and what to do — no apologising, no exclamation marks.
+    assert(!w.message.includes('!'), `warning '${w.id}' message should contain no exclamation mark, got '${w.message}'`);
+  }
+
+  for (const id of ['gutter', 'black-edge', 'too-dark']) {
+    const w = warnings.find((x) => x.id === id);
+    assert(w.message.includes('1'), `'${id}' message should mention its count (1), got '${w.message}'`);
+  }
+});
+
+await test("runLint: warnings that offer fixes have well-formed entries; the empty warning offers none", () => {
+  const doc = createDoc();
+  doc.grid = 'odd-br';
+  setPixel(doc, 0, 0, '#FF4747');  // gutter
+  setPixel(doc, 1, 5, '#000000'); // black-edge
+  setPixel(doc, 5, 5, '#1E1E1E'); // too-dark
+
+  const warnings = runLint(doc);
+  for (const id of ['gutter', 'black-edge', 'too-dark']) {
+    const w = warnings.find((x) => x.id === id);
+    assert(w, `expected the '${id}' warning`);
+    assert(Array.isArray(w.fixes) && w.fixes.length > 0, `warning '${id}' should offer at least one fix`);
+    for (const fix of w.fixes) {
+      assert(typeof fix.label === 'string' && fix.label.length > 0, `a fix for '${id}' should have a non-empty label string`);
+      assert(typeof fix.action === 'string' && fix.action.length > 0, `a fix for '${id}' should have a non-empty action string`);
+    }
+  }
+
+  const emptyWarning = runLint(createDoc()).find((w) => w.id === 'empty');
+  assertEqual(emptyWarning.fixes, [], 'the empty warning has nothing to fix, so its fixes array should be empty');
+});
+
+// ---- 39. lint.js: applyFix ---------------------------------------------------
+
+await test('applyFix: lighten sets cells to LIGHTEN_TO and reports a change; a second call reports none', () => {
+  const doc = createDoc();
+  setPixel(doc, 4, 4, '#1E1E1E');
+  const first = applyFix(doc, [idx(4, 4)], 'lighten');
+  assertEqual(first, true, 'lightening a dark pixel should report a change');
+  assertEqual(doc.pixels[idx(4, 4)], LIGHTEN_TO, 'the fixed cell should now hold LIGHTEN_TO');
+
+  const second = applyFix(doc, [idx(4, 4)], 'lighten');
+  assertEqual(second, false, 'lightening an already-lightened cell again should report no change');
+});
+
+await test('applyFix: clear sets cells to null and reports a change', () => {
+  const doc = createDoc();
+  setPixel(doc, 4, 4, '#000000');
+  const changed = applyFix(doc, [idx(4, 4)], 'clear');
+  assertEqual(changed, true, 'clearing a painted cell should report a change');
+  assertEqual(doc.pixels[idx(4, 4)], null, 'the cleared cell should now be null');
+});
+
+await test("applyFix: only touches the cells it was given, leaving a neighbour untouched", () => {
+  const doc = createDoc();
+  setPixel(doc, 4, 4, '#000000');
+  setPixel(doc, 5, 4, '#FF4747');
+  applyFix(doc, [idx(4, 4)], 'clear');
+  assertEqual(doc.pixels[idx(5, 4)], '#FF4747', "applyFix should not touch a neighbouring cell it wasn't given");
+});
+
+await test('applyFix: fixing the flagged cells actually resolves the black-edge warning', () => {
+  const doc = createDoc();
+  setPixel(doc, 4, 4, '#000000'); // exposed: every neighbour is transparent
+  let warnings = runLint(doc);
+  const blackWarning = warnings.find((w) => w.id === 'black-edge');
+  assert(blackWarning, 'expected the black-edge warning to be present before the fix');
+
+  applyFix(doc, blackWarning.cells, 'clear');
+  warnings = runLint(doc);
+  assert(!warnings.some((w) => w.id === 'black-edge'), 'after applying the fix, the black-edge warning should be gone');
 });
 
 // ---- Render results to the page and console -------------------------------

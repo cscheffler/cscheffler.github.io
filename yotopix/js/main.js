@@ -1,7 +1,7 @@
 // Wiring and app bootstrap.
 
 import {
-  createDoc, clearPixels, litCount, normaliseHex,
+  createDoc, clearPixels, litCount, quantiseHex,
   createHistory, region, isOdd, idx,
 } from './state.js';
 import { createGridView } from './canvas.js';
@@ -9,14 +9,19 @@ import {
   PEN, ERASER, FILL, EYEDROPPER, LINE, RECT,
   shiftPixels, deadZoneCells,
 } from './tools.js';
-import { createPalette, DEFAULT_PALETTE } from './palette.js';
+import {
+  createPalette, createSlots, createRecents, pushRecent, allSwatches,
+  DEFAULT_PALETTE, SLOT_COUNT,
+} from './palette.js';
 import { drawPreview } from './preview.js';
 import { downloadPNG } from './exporter.js';
 import { createGallery } from './gallery.js';
+import { createImportUI } from './importui.js';
+import { runLint, applyFix } from './lint.js';
 import { buildExamples } from './examples.js';
 import {
   storageAvailable, load, createSaver, isQuotaError,
-  downloadBackup, parseBackup,
+  downloadBackup, parseBackup, sanitisePalette,
 } from './storage.js';
 
 const $ = (id) => document.getElementById(id);
@@ -35,6 +40,10 @@ const el = {
   gridMode: $('grid-mode'),
   gridHint: $('grid-hint'),
   palette: $('palette'),
+  slots: $('slots'),
+  recents: $('recents'),
+  customPicker: $('custom-picker'),
+  saveSlot: $('save-slot'),
   activeSwatch: $('active-swatch'),
   activeHex: $('active-hex'),
   previewLife: $('preview-life'),
@@ -48,6 +57,10 @@ const el = {
   dialogShift: $('deadzone-shift'),
   dialogDrop: $('deadzone-drop'),
   dialogCancel: $('deadzone-cancel'),
+  lint: $('lint'),
+  importOpen: $('import-open'),
+  importFile: $('import-file'),
+  importDialog: $('import-dialog'),
   strip: $('gallery-strip'),
   storageNote: $('storage-note'),
   newIcon: $('new-icon'),
@@ -63,11 +76,13 @@ const app = {
   icons: [],
   doc: null,
   tool: PEN,
-  color: '#FFC13B',
-  previousColor: '#4FA8FF',
+  color: '#FFC33C',
+  previousColor: '#4BA5FF',
   glow: false,
   symmetry: 'off',
   persists: true,
+  slots: new Array(SLOT_COUNT).fill(null),
+  recents: [],
 };
 
 const history = createHistory();
@@ -103,6 +118,10 @@ function loadGallery() {
     ? app.icons.find((icon) => icon.id === stored.lastOpenId)
     : null;
   app.doc = last ?? app.icons[0];
+
+  const palette = stored?.palette ?? sanitisePalette(null);
+  app.slots = palette.slots;
+  app.recents = palette.recents;
 }
 
 loadGallery();
@@ -122,7 +141,11 @@ const saver = createSaver({
   },
 });
 
-const snapshotState = () => ({ icons: app.icons, lastOpenId: app.doc?.id ?? null });
+const snapshotState = () => ({
+  icons: app.icons,
+  lastOpenId: app.doc?.id ?? null,
+  palette: { slots: app.slots, recents: app.recents },
+});
 
 function persist() {
   if (!app.persists) return;
@@ -159,8 +182,54 @@ function renderGridUI() {
 function onDocChanged() {
   renderPreviews();
   el.litCount.textContent = `${litCount(app.doc)} lit`;
+  renderLint();
   gallery.refresh(app.doc);
   persist();
+}
+
+/**
+ * Non-blocking warnings, updated live — SPEC §7. The container is aria-live, so
+ * it is rebuilt rather than diffed; at this size that costs nothing and keeps
+ * announcements honest.
+ */
+function renderLint() {
+  const warnings = runLint(app.doc);
+  el.lint.replaceChildren();
+
+  if (warnings.length === 0) {
+    const clear = document.createElement('p');
+    clear.className = 'lint-clear';
+    clear.textContent = 'Nothing to flag. This will read correctly on the display.';
+    el.lint.append(clear);
+    return;
+  }
+
+  for (const warning of warnings) {
+    const item = document.createElement('div');
+    item.className = 'lint-item';
+
+    const text = document.createElement('p');
+    text.className = 'lint-message';
+    text.textContent = warning.message;
+    item.append(text);
+
+    if (warning.fixes.length) {
+      const row = document.createElement('div');
+      row.className = 'lint-fixes';
+      for (const fix of warning.fixes) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-sm';
+        button.textContent = fix.label;
+        button.addEventListener('click', () => {
+          edit(() => applyFix(app.doc, warning.cells, fix.action));
+        });
+        row.append(button);
+      }
+      item.append(row);
+    }
+    el.lint.append(item);
+  }
 }
 
 /** After anything that changes the document wholesale (undo, shift, mode). */
@@ -173,18 +242,37 @@ function refreshAll() {
 
 // ------------------------------------------------------------------ colour
 
+/**
+ * The one place a colour becomes active. Everything is snapped to the display's
+ * 15-step channel grid on the way in, so the app never holds a colour the panel
+ * cannot show — see state.js.
+ */
 function setColor(hex, { fromInput = false } = {}) {
-  const next = normaliseHex(hex);
+  const next = quantiseHex(hex);
   if (!next || next === app.color) {
-    if (!fromInput) return;
-    el.activeHex.value = app.color; // reject junk, snap the field back
+    // Junk, or a colour that snapped to the one already active: put the field
+    // back so it always shows what is really selected.
+    if (fromInput) el.activeHex.value = app.color;
+    syncColorUI();
     return;
   }
   app.previousColor = app.color;
   app.color = next;
-  el.activeSwatch.style.background = next;
-  if (el.activeHex.value.toUpperCase() !== next) el.activeHex.value = next;
-  paletteUI.setActive(next);
+  syncColorUI();
+}
+
+function syncColorUI() {
+  el.activeSwatch.style.background = app.color;
+  // Exact comparison, not case-insensitive: typing "#ff0000" must be rewritten
+  // as the canonical "#FF0000" rather than left as the user spelled it. The
+  // guard only exists to avoid pointlessly rewriting an identical value.
+  if (el.activeHex.value !== app.color) el.activeHex.value = app.color;
+  // The native colour input always reports lowercase, so compare case-folded
+  // or this would rewrite it on every sync.
+  if (el.customPicker.value.toUpperCase() !== app.color) el.customPicker.value = app.color;
+  paletteUI.setActive(app.color);
+  slotsUI.setActive(app.color);
+  recentsUI.render(app.recents, app.color);
 }
 
 const paletteUI = createPalette({
@@ -192,6 +280,63 @@ const paletteUI = createPalette({
   palette: DEFAULT_PALETTE,
   onPick: (hex) => setColor(hex),
 });
+
+const slotsUI = createSlots({
+  container: el.slots,
+  onPick: (hex) => setColor(hex),
+  onAssign: (index) => assignSlot(index, app.color),
+  onClear: (index) => {
+    if (app.slots[index] === null) return;
+    app.slots[index] = null;
+    slotsUI.set(app.slots, app.color);
+    persist();
+    toast(`Slot ${index + 1} cleared`);
+  },
+});
+
+const recentsUI = createRecents({
+  container: el.recents,
+  onPick: (hex) => setColor(hex),
+});
+
+function assignSlot(index, hex) {
+  const colour = quantiseHex(hex);
+  if (!colour) return;
+  app.slots[index] = colour;
+  slotsUI.set(app.slots, app.color);
+  persist();
+  toast(`Saved ${colour} to slot ${index + 1}`);
+}
+
+/** Stores the active colour in the first free slot — SPEC §5's 8 custom slots. */
+function saveToSlot() {
+  const existing = app.slots.indexOf(app.color);
+  if (existing !== -1) {
+    toast(`${app.color} is already in slot ${existing + 1}`);
+    return;
+  }
+  const free = app.slots.indexOf(null);
+  if (free === -1) {
+    toast('All eight slots are full. Right-click or press Delete on one to clear it.');
+    return;
+  }
+  assignSlot(free, app.color);
+}
+
+el.saveSlot.addEventListener('click', saveToSlot);
+
+// SPEC §12.6: <input type="color"> fires `input` continuously while the user
+// drags around the picker. Only `change` is a committed choice.
+el.customPicker.addEventListener('change', () => setColor(el.customPicker.value));
+
+/** Records a colour actually painted with, not merely selected — SPEC §5. */
+function recordRecent(hex) {
+  const next = pushRecent(app.recents, hex);
+  if (next[0] === app.recents[0] && next.length === app.recents.length) return;
+  app.recents = next;
+  recentsUI.render(app.recents, app.color);
+  persist();
+}
 
 // SPEC §12.6: <input type="color"> fires input continuously while dragging.
 // This is a text field, but the same principle applies — only commit on change
@@ -315,7 +460,7 @@ el.deleteIcon.addEventListener('click', deleteIcon);
 
 el.backupExport.addEventListener('click', () => {
   try {
-    const filename = downloadBackup(app.icons);
+    const filename = downloadBackup(app.icons, { slots: app.slots, recents: app.recents });
     toast(`Backed up ${app.icons.length} icons to ${filename}`);
   } catch (error) {
     toast(`Backup failed: ${error.message}`);
@@ -329,12 +474,19 @@ el.backupFile.addEventListener('change', async () => {
   el.backupFile.value = ''; // let the same file be chosen twice
   if (!file) return;
   try {
-    const { icons, skipped } = parseBackup(await file.text());
+    const { icons, skipped, palette } = parseBackup(await file.text());
     const message = `Restore ${icons.length} icons? This replaces the ${app.icons.length} `
       + `currently in the gallery.${skipped ? ` ${skipped} unreadable entries will be skipped.` : ''}`;
     if (!confirm(message)) return;
     app.icons = icons;
     app.doc = icons[0];
+    // Older backups have no palette; keep the current slots rather than wiping
+    // them, since the file simply has nothing to say about them.
+    if (palette) {
+      app.slots = palette.slots;
+      app.recents = palette.recents;
+      slotsUI.set(app.slots, app.color);
+    }
     history.clear();
     el.name.value = app.doc.name;
     renderGallery();
@@ -356,8 +508,13 @@ const view = createGridView({
   getColor: () => app.color,
   getSymmetry: () => app.symmetry,
   onStrokeStart: () => history.begin(app.doc),
-  onStrokeEnd: () => {
-    if (history.commit(app.doc)) renderHistoryButtons();
+  onStrokeEnd: (usedColor) => {
+    if (!history.commit(app.doc)) return;
+    renderHistoryButtons();
+    // Recents records what was actually painted with, not what is merely
+    // selected — and `usedColor` is null for an erase, including a right-drag
+    // erase that overrode the active tool.
+    if (usedColor) recordRecent(usedColor);
   },
   onChange: onDocChanged,
   onPick: (hex) => setColor(hex),
@@ -523,6 +680,73 @@ async function exportPNG() {
 
 el.export.addEventListener('click', exportPNG);
 
+// ------------------------------------------------------------------ import
+
+const importUI = createImportUI({
+  dialog: el.importDialog,
+  getGrid: () => app.doc.grid,
+  getPalette: () => allSwatches(DEFAULT_PALETTE).concat(app.slots.filter(Boolean)),
+  onApply: (pixels) => {
+    // An import is a normal, undoable edit to the current icon — SPEC §8.
+    edit(() => {
+      app.doc.pixels = pixels;
+    });
+    toast('Image imported. Cmd+Z undoes it.');
+  },
+  elements: {
+    cropStage: $('crop-stage'),
+    cropCanvas: $('crop-canvas'),
+    cropBox: $('crop-box'),
+    cropSize: $('crop-size'),
+    result: $('import-result'),
+    device: $('import-device'),
+    methods: [...document.querySelectorAll('input[name="method"]')],
+    alpha: $('in-alpha'),
+    brightness: $('in-brightness'),
+    saturation: $('in-saturation'),
+    quantise: $('in-quantise'),
+    outAlpha: $('out-alpha'),
+    outBrightness: $('out-brightness'),
+    outSaturation: $('out-saturation'),
+    note: $('import-note'),
+    apply: $('import-apply'),
+    cancel: $('import-cancel'),
+  },
+});
+
+async function openImport(source) {
+  try {
+    await importUI.open(source);
+  } catch (error) {
+    toast(`Could not read that image: ${error.message}`);
+  }
+}
+
+el.importOpen.addEventListener('click', () => el.importFile.click());
+el.importFile.addEventListener('change', () => {
+  const file = el.importFile.files?.[0];
+  el.importFile.value = ''; // let the same file be chosen twice
+  if (file) openImport(file);
+});
+
+// Drop an image anywhere on the drawing stage — SPEC §8.
+for (const type of ['dragenter', 'dragover']) {
+  el.stage.addEventListener(type, (event) => {
+    if (![...event.dataTransfer.types].includes('Files')) return;
+    event.preventDefault();
+    el.stage.classList.add('drop-target');
+  });
+}
+for (const type of ['dragleave', 'drop']) {
+  el.stage.addEventListener(type, () => el.stage.classList.remove('drop-target'));
+}
+el.stage.addEventListener('drop', (event) => {
+  const file = [...(event.dataTransfer?.files ?? [])].find((f) => f.type.startsWith('image/'));
+  if (!file) return;
+  event.preventDefault();
+  openImport(file);
+});
+
 // ------------------------------------------------------------------- toast
 
 let toastTimer;
@@ -549,8 +773,8 @@ function isTyping(target) {
 }
 
 window.addEventListener('keydown', (e) => {
-  // While the modal is up it owns the keyboard; Escape is handled by <dialog>.
-  if (el.dialog.open) return;
+  // While a modal is up it owns the keyboard; Escape is handled by <dialog>.
+  if (el.dialog.open || el.importDialog.open) return;
 
   const mod = e.metaKey || e.ctrlKey;
   const typing = isTyping(e.target);
@@ -592,6 +816,14 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  // Digits 1-8 select the custom slots — SPEC §5.
+  if (/^[1-8]$/.test(key)) {
+    const hex = app.slots[Number(key) - 1];
+    if (hex) setColor(hex);
+    else toast(`Slot ${key} is empty`);
+    return;
+  }
+
   switch (key) {
     case 'm':
       setMirror(app.symmetry === 'off');
@@ -624,9 +856,8 @@ document.addEventListener('visibilitychange', () => {
 
 function boot() {
   setTool(PEN);
-  el.activeSwatch.style.background = app.color;
-  el.activeHex.value = app.color;
-  paletteUI.setActive(app.color);
+  slotsUI.set(app.slots, app.color);
+  syncColorUI();
   el.name.value = app.doc.name;
   renderGallery();
   renderGridUI();

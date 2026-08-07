@@ -4,10 +4,11 @@
 // every other character is a key into that icon's own `legend`, mapping to an
 // uppercase #RRGGBB colour taken from the curated palette (see palette.js).
 //
-// Hard rule shared with the rest of the app (SPEC §1): never #000000. Pure
-// black does not light up on the LED panel — a black pixel is indistinguishable
-// from a transparent one — so no legend here contains it, and nothing below
-// about 0.02 relative luminance belongs in one either.
+// None of these use black. Black is a legitimate colour on this panel when it is
+// enclosed by lit pixels (SPEC §1), but at 16x16 these three read best as solid
+// silhouettes, and black touching an edge would erode them.
+//
+// Every colour also sits on the display's 15-step channel grid (see state.js).
 //
 // All three keep the outer ring transparent: an icon that touches all four
 // edges loses its silhouette against the dark panel.
@@ -21,7 +22,7 @@ export const EXAMPLE_ICONS = [
     // as noise, so the only marking is the eye.
     name: 'Dinosaur',
     grid: 'full',
-    legend: { G: '#4CAF50', D: '#2E8B57', W: '#FFFFFF' },
+    legend: { G: '#4BB44B', D: '#2D875A', W: '#FFFFFF' },
     rows: [
       '................',
       '..........GGGG..',
@@ -47,7 +48,7 @@ export const EXAMPLE_ICONS = [
     // with a ragged edge reads as a lemon, not a moon.
     name: 'Crescent moon',
     grid: 'full',
-    legend: { M: '#FFC13B', H: '#FFE44D', S: '#FFFFFF' },
+    legend: { M: '#FFC33C', H: '#FFE14B', S: '#FFFFFF' },
     rows: [
       '................',
       '.....HMMMM......',
@@ -70,7 +71,7 @@ export const EXAMPLE_ICONS = [
   {
     name: 'Cat face',
     grid: 'full',
-    legend: { F: '#C8C8C8', D: '#8A8A8A', E: '#C6E44A', N: '#FF8FB8' },
+    legend: { F: '#C3C3C3', D: '#878787', E: '#C3E14B', N: '#FF96B4' },
     rows: [
       '................',
       '.....F....F.....',

@@ -6,9 +6,13 @@
 // truncated by a full disk. sanitiseDoc() is the only way documents enter the
 // app, and it never throws — a corrupt entry is dropped, not fatal.
 
-import { PIXEL_COUNT, GRID_MODES, normaliseHex, createDoc } from './state.js';
+import { PIXEL_COUNT, GRID_MODES, quantiseHex, createDoc } from './state.js';
 
-export const SCHEMA_VERSION = 1;
+// 2: every colour is snapped to the display's 15-step channel grid. Documents
+// saved under version 1 are migrated silently on load by sanitiseDoc(), which
+// quantises unconditionally — there is no version-specific branch to maintain,
+// because a colour already on the grid is unchanged by quantising it again.
+export const SCHEMA_VERSION = 2;
 const KEY = 'yotopix.gallery';
 const SAVE_DELAY = 500;
 
@@ -53,7 +57,9 @@ export function sanitiseDoc(raw) {
   if (!raw || typeof raw !== 'object') return null;
   if (!Array.isArray(raw.pixels) || raw.pixels.length !== PIXEL_COUNT) return null;
 
-  const pixels = raw.pixels.map((value) => (value === null ? null : normaliseHex(value)));
+  // Quantising here is also the schema 1 -> 2 migration: art saved before the
+  // 15-step grid was known snaps to colours the panel can actually show.
+  const pixels = raw.pixels.map((value) => (value === null ? null : quantiseHex(value)));
 
   const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 64) : 'Untitled';
   const doc = createDoc(name);
@@ -81,6 +87,29 @@ function sanitiseIcons(list) {
 }
 
 /**
+ * The user's palette additions: 8 fixed slots (null where empty) and the
+ * recently-used list. Both are untrusted on the way in, like everything else.
+ */
+export function sanitisePalette(raw, { slotCount = 8, recentCount = 8 } = {}) {
+  const slots = new Array(slotCount).fill(null);
+  if (Array.isArray(raw?.slots)) {
+    for (let i = 0; i < slotCount; i++) {
+      const value = raw.slots[i];
+      slots[i] = value === null || value === undefined ? null : quantiseHex(value);
+    }
+  }
+  const recents = [];
+  if (Array.isArray(raw?.recents)) {
+    for (const value of raw.recents) {
+      const colour = quantiseHex(value);
+      if (colour && !recents.includes(colour)) recents.push(colour);
+      if (recents.length >= recentCount) break;
+    }
+  }
+  return { slots, recents };
+}
+
+/**
  * Reads the gallery. Returns null when there is nothing stored at all, which
  * the caller uses to decide whether to seed the examples — distinct from an
  * empty gallery the user has deliberately emptied.
@@ -100,21 +129,23 @@ export function load() {
   } catch {
     // Corrupt JSON: treat as empty rather than wiping it, so the user still has
     // the raw value in devtools if they want to recover it by hand.
-    return { icons: [], lastOpenId: null, corrupt: true };
+    return { icons: [], lastOpenId: null, palette: sanitisePalette(null), corrupt: true };
   }
 
   return {
     icons: sanitiseIcons(parsed?.icons),
     lastOpenId: safeId(parsed?.lastOpenId),
+    palette: sanitisePalette(parsed?.palette),
     corrupt: false,
   };
 }
 
 /** Writes the gallery. Throws on quota; the caller must surface that. */
-export function save({ icons, lastOpenId }) {
+export function save({ icons, lastOpenId, palette }) {
   const payload = JSON.stringify({
     schemaVersion: SCHEMA_VERSION,
     lastOpenId: lastOpenId ?? null,
+    palette: palette ?? { slots: [], recents: [] },
     icons,
   });
   localStorage.setItem(KEY, payload);
@@ -167,8 +198,12 @@ export function backupFilename(date = new Date()) {
   return `yotopix-gallery-${stamp}.json`;
 }
 
-export function toBackupJSON(icons) {
-  return JSON.stringify({ schemaVersion: SCHEMA_VERSION, icons }, null, 2);
+export function toBackupJSON(icons, palette = null) {
+  const payload = { schemaVersion: SCHEMA_VERSION, icons };
+  // Custom slots and recents are part of what the user built up, so a backup
+  // that dropped them would not actually be a backup of their work.
+  if (palette) payload.palette = palette;
+  return JSON.stringify(payload, null, 2);
 }
 
 /**
@@ -190,11 +225,14 @@ export function parseBackup(text) {
   if (icons.length === 0) {
     throw new Error('That backup contains no usable icons.');
   }
-  return { icons, skipped: list.length - icons.length };
+  const palette = Array.isArray(parsed) || !parsed?.palette
+    ? null
+    : sanitisePalette(parsed.palette);
+  return { icons, skipped: list.length - icons.length, palette };
 }
 
-export function downloadBackup(icons) {
-  const blob = new Blob([toBackupJSON(icons)], { type: 'application/json' });
+export function downloadBackup(icons, palette = null) {
+  const blob = new Blob([toBackupJSON(icons, palette)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

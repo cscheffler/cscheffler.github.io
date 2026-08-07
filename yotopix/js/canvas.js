@@ -327,7 +327,7 @@ export function createGridView({
       onStrokeStart?.();
       write(floodFillCells(getDoc(), x, y, grid()), strokeColor);
       drawing = false;
-      onStrokeEnd?.();
+      onStrokeEnd?.(strokeColor);
       return;
     }
 
@@ -371,9 +371,9 @@ export function createGridView({
       anchor = null;
       onStrokeStart?.();
       write(cells, strokeColor);
-      onStrokeEnd?.();
+      onStrokeEnd?.(strokeColor);
     } else {
-      onStrokeEnd?.();
+      onStrokeEnd?.(strokeColor);
     }
 
     last = null;
@@ -421,7 +421,7 @@ export function createGridView({
       } else {
         write([{ ...cursor }], tool === ERASER ? null : getColor());
       }
-      onStrokeEnd?.();
+      onStrokeEnd?.(tool === ERASER ? null : getColor());
       render();
     }
   });

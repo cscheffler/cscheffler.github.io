@@ -283,8 +283,10 @@ button {
 /* ---------- Panels ---------- */
 
 .panel {
-  padding-bottom: 20px;
-  margin-bottom: 20px;
+  /* Tight: the right rail carries five panels and overflows a laptop viewport
+     even so. See DECISIONS.md — it scrolls, which is the accepted trade. */
+  padding-bottom: 14px;
+  margin-bottom: 14px;
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -351,6 +353,108 @@ button {
 
   &[aria-selected="true"] {
     box-shadow: 0 0 0 2px var(--accent);
+  }
+}
+
+/* Custom slots + recents: a quieter sub-heading, the shared swatch row
+   layout, and the two "nothing here" states (empty slot, empty row). */
+
+.subhead {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 12px 0 6px;
+}
+
+.swatch-row {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+/* Matches .swatch's box (22px, --radius-sm) but dashed and unfilled, so an
+   empty custom slot reads as "nothing here yet" without relying on colour. */
+.swatch-empty {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px dashed var(--hairline);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+
+  &:hover {
+    border-color: #454250;
+  }
+}
+
+.swatch-row-empty {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.custom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+/* Native colour inputs render inconsistently across platforms, so the
+   picker is a compact .btn-sm-like label wrapping a small square swatch. */
+.picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: var(--ground);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    border-color: #454250;
+  }
+}
+
+/* input[type="color"] also matches the generic `input:not([type="checkbox"])`
+   rule below, which would force width: 100% and text-field padding onto it.
+   ".picker input[type=color]" has higher specificity (0,2,1 vs 0,1,1) so it
+   wins regardless of source order, and every conflicting property (width,
+   padding, background, border, border-radius) is re-declared explicitly
+   here too, so the override doesn't rely on cascade order alone. appearance
+   is deliberately left at its default — `appearance: none` hides the swatch
+   entirely in some browsers, leaving no indication of the chosen colour. */
+.picker input[type="color"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+
+  &::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+
+  &::-webkit-color-swatch {
+    border: none;
+    border-radius: 1px;
+  }
+
+  &::-moz-color-swatch {
+    border: none;
   }
 }
 
@@ -427,6 +531,51 @@ option {
   height: 15px;
   accent-color: var(--muted);
   margin: 0;
+}
+
+/* ---------- Lint panel ---------- */
+
+.lint {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The steady state — seen far more often than any warning — so it must stay
+   quiet: no border, no icon, no colour that reads as a success banner. */
+.lint-clear {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* A restrained left-edge rule rather than a filled box. The colour is a
+   desaturated clay/amber-brown, deliberately not --accent: #FFB347 already
+   means "active tool / primary action" everywhere else in this interface,
+   so reusing it here would make a warning look like an invitation to click.
+   ~5.2:1 against --panel, well clear of the 3:1 needed for a UI marker. */
+.lint-item {
+  padding-left: 10px;
+  border-left: 2px solid #B8865B;
+}
+
+.lint-message {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+
+.lint-fixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  /* .btn-sm already sets display: inline-flex; width: auto (see Export
+     panel below), so the buttons here size to their label rather than
+     inheriting .btn's display: block; width: 100% — no override needed. */
 }
 
 /* ---------- Export panel ---------- */
@@ -543,7 +692,8 @@ input:not([type="checkbox"]) {
   }
 }
 
-#deadzone-dialog::backdrop {
+#deadzone-dialog::backdrop,
+#import-dialog::backdrop {
   background: rgba(10, 9, 12, 0.6);
   opacity: 1;
   transition: opacity 120ms ease;
@@ -554,9 +704,166 @@ input:not([type="checkbox"]) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #deadzone-dialog::backdrop {
+  #deadzone-dialog::backdrop,
+  #import-dialog::backdrop {
     transition: none;
   }
+}
+
+/* ---------- Import dialog ---------- */
+
+/* Same look as #deadzone-dialog (panel, hairline, --radius, ~20px padding)
+   but wider, and capped so it can never exceed the viewport. display is
+   deliberately left unset here — the UA stylesheet toggles dialog { display }
+   between none and block via the [open] attribute, and an unconditional
+   author rule would fight that toggle. Instead .import-body itself scrolls
+   (below), so ordinary block flow keeps the title and .dialog-actions in
+   place without needing flex on the dialog. */
+#import-dialog {
+  max-width: 720px;
+  width: calc(100% - 32px);
+  max-height: calc(100vh - 48px);
+  margin: auto;
+  padding: 20px;
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+
+.import-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  /* Roughly the dialog's own padding (40px) plus the title and action rows
+     that sit above/below this element, so this — not the dialog — is what
+     scrolls when the crop stage and controls together run tall, and the
+     buttons in .dialog-actions never get pushed off screen. */
+  max-height: calc(100vh - 48px - 170px);
+  overflow: auto;
+}
+
+.import-source {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.import-controls {
+  flex: 0 0 260px;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .import-body {
+    flex-direction: column;
+  }
+
+  .import-controls {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+.crop-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--ground);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+}
+
+/* Sized by JS via attributes + inline style — no width/height here.
+   Smoothing is left on (no image-rendering override): this shows a
+   full-resolution source photo, not the pixel-art grid. */
+#crop-canvas {
+  display: block;
+  max-width: 100%;
+}
+
+.crop-box {
+  position: absolute;
+  border: 2px solid var(--accent);
+  cursor: move;
+  /* A huge spread box-shadow instead of a fill: it darkens everything
+     outside the box as a flat scrim (clipped to the stage by
+     .crop-stage's overflow: hidden), not a decorative drop shadow. */
+  box-shadow: 0 0 0 9999px rgba(10, 9, 12, 0.55);
+
+  &:focus-visible {
+    /* The global :focus-visible outline sits outside the border box and
+       would be clipped by .crop-stage's overflow: hidden, so it's swapped
+       for an inset ring layered alongside the scrim instead. */
+    outline: none;
+    box-shadow:
+      0 0 0 9999px rgba(10, 9, 12, 0.55),
+      inset 0 0 0 3px var(--accent);
+  }
+}
+
+.import-previews {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+
+  legend {
+    padding: 0 4px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+  }
+}
+
+.check input[type="radio"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--muted);
+  margin: 0;
+}
+
+/* Only turn .field-label into a space-between row when it wraps an
+   <output> (the slider readouts) — the plain text labels elsewhere are
+   left untouched. */
+.field-label:has(output) {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+output {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* input[type="range"] and input:not([type="checkbox"]) are both exactly as
+   specific as each other (one type selector + one attribute selector each:
+   0,1,1). This rule wins the tie because it appears later in the
+   cascade — no !important, no extra selector weight needed. */
+input[type="range"] {
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 /* ---------- Gallery ---------- */
@@ -763,6 +1070,10 @@ input:not([type="checkbox"]) {
     width: 100%;
     flex-basis: auto;
     flex-direction: row;
+    /* Eleven 40px buttons cannot sit on one row at phone width. Without
+       wrapping they overflow, and .rail's overflow-x: hidden then clips them
+       away entirely, leaving tools unreachable rather than merely cramped. */
+    flex-wrap: wrap;
     justify-content: center;
     align-items: stretch;
     gap: 8px;
@@ -773,6 +1084,8 @@ input:not([type="checkbox"]) {
 
     .tool-group {
       flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
       width: auto;
       padding-bottom: 0;
       padding-right: 12px;

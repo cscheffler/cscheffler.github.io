@@ -1,6 +1,6 @@
 import { PixelCanvas } from "./canvas.js";
 import { DevicePreview } from "./device-preview.js";
-import { createExampleDocuments } from "./examples.js";
+import { createExampleDocuments, upgradeExampleDocuments } from "./examples.js";
 import { downloadPng } from "./exporter.js";
 import { ImageImportDialog } from "./import-dialog.js";
 import { analyzeDocument, clearInactiveGutters, replaceExactColor } from "./lint.js";
@@ -119,6 +119,7 @@ let galleryStorage = null;
 let appState = createEmptyEnvelope();
 let firstLoad = false;
 let bootstrapError = null;
+let upgradedExampleCount = 0;
 
 try {
   galleryStorage = createGalleryStorage();
@@ -133,6 +134,10 @@ try {
 if (firstLoad) {
   appState.documents = createExampleDocuments();
   appState.lastOpenId = appState.documents[0]?.id ?? null;
+} else {
+  const upgrade = upgradeExampleDocuments(appState.documents);
+  appState.documents = upgrade.documents;
+  upgradedExampleCount = upgrade.upgraded;
 }
 
 const preferences = normalizePreferences(appState.preferences);
@@ -816,7 +821,7 @@ function downloadBackup() {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `yoto-pixel-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  anchor.download = `yotopix-backup-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
@@ -827,6 +832,8 @@ async function requestBackupImport(file) {
   if (!file) return;
   try {
     const replacement = parseBackup(await file.text());
+    const exampleUpgrade = upgradeExampleDocuments(replacement.documents);
+    replacement.documents = exampleUpgrade.documents;
     const count = replacement.documents.length;
     elements.replaceGalleryMessage.textContent = `Import “${file.name}” with ${count} ${count === 1 ? "icon" : "icons"}? Your current gallery will be replaced.`;
     const choice = await showDialog(elements.replaceGalleryDialog);
@@ -1021,7 +1028,7 @@ bootstrapping = false;
 if (bootstrapError) {
   handleStorageError(bootstrapError);
 }
-if (firstLoad) {
+if (firstLoad || upgradedExampleCount > 0) {
   scheduleSave();
   flushSave();
 }

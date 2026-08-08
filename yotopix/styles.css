@@ -1049,8 +1049,25 @@ input[type="range"] {
 /* ---------- Narrow layout (<= 720px) ---------- */
 
 @media (max-width: 720px) {
+  /* Stacked, the three regions are far taller than the viewport. On desktop
+     `body` is pinned to the viewport and the rails scroll inside it; keeping
+     that here caps .app at the leftover space while its children overflow the
+     box, so the gallery — laid out after .app — is painted straight over the
+     tools and the right rail. On narrow screens the page itself scrolls
+     instead: body grows with content, .app is sized by its children, and the
+     rails stop being scroll containers. */
+  html,
+  body {
+    height: auto;
+  }
+
   .app {
     flex-direction: column;
+    flex: 0 0 auto;
+  }
+
+  .rail {
+    overflow-y: visible;
   }
 
   .stage {

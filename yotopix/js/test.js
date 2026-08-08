@@ -24,6 +24,11 @@ import {
   WARM_HUE, COOL_HUE,
 } from './ramp.js';
 import { sanitiseRamp, sanitisePalette } from './storage.js';
+import { solveHomography, project, isValidQuad, solveLinear } from './homography.js';
+import {
+  sampleCells, estimatePaperWhite, whiteBalanceGains, applyGains,
+  isBlank, saturationOf, buildFromPhoto,
+} from './paper.js';
 import {
   centreCrop, clampCrop, boxSample, nearestSample, adjustColor, oklab,
   preparePalette, nearestPaletteColor, buildPixels,
@@ -2077,6 +2082,187 @@ await test('sanitisePalette: carries ramps alongside slots and recents', () => {
   assertEqual(ramps.length, 2, 'two usable ramps should survive and the broken one be dropped');
   assert(ramps[0].id !== ramps[1].id, 'colliding ramp ids should be re-keyed, as selection is by id');
   assertEqual(sanitisePalette(null).ramps, [], 'a missing palette should yield no ramps');
+});
+
+
+// ---- 44. homography.js: the perspective transform --------------------------
+
+await test('solveLinear: solves a system and reports a singular one', () => {
+  const x = solveLinear([[2, 0], [0, 4]], [4, 8]);
+  closeTo(x[0], 2, 1e-9, 'first unknown');
+  closeTo(x[1], 2, 1e-9, 'second unknown');
+  assertEqual(solveLinear([[1, 1], [2, 2]], [1, 2]), null, 'a singular system should return null, not NaNs');
+});
+
+await test('solveHomography: the four corners round-trip exactly', () => {
+  // A hand-held photo of a sheet: tilted, off-centre, keystoned.
+  const quad = [{ x: 40, y: 60 }, { x: 520, y: 20 }, { x: 600, y: 430 }, { x: 15, y: 380 }];
+  const h = solveHomography(quad);
+  assert(h, 'a proper quad should solve');
+  const corners = [[0, 0], [1, 0], [1, 1], [0, 1]];
+  corners.forEach(([u, v], i) => {
+    const p = project(h, u, v);
+    closeTo(p.x, quad[i].x, 1e-6, `corner ${i} x`);
+    closeTo(p.y, quad[i].y, 1e-6, `corner ${i} y`);
+  });
+});
+
+await test('solveHomography: a perspective quad is genuinely not affine', () => {
+  // If it were affine, the centre of the square would land on the average of
+  // the corners. It does not, and that difference is the whole point of using a
+  // homography rather than interpolating between the edges.
+  const quad = [{ x: 40, y: 60 }, { x: 520, y: 20 }, { x: 600, y: 430 }, { x: 15, y: 380 }];
+  const h = solveHomography(quad);
+  const centre = project(h, 0.5, 0.5);
+  const average = {
+    x: (40 + 520 + 600 + 15) / 4,
+    y: (60 + 20 + 430 + 380) / 4,
+  };
+  assert(Math.hypot(centre.x - average.x, centre.y - average.y) > 1,
+    `the perspective centre ${centre.x.toFixed(1)},${centre.y.toFixed(1)} should not be the corner average`);
+  assert(Math.abs(h[6]) > 1e-6 || Math.abs(h[7]) > 1e-6, 'the projective terms should be non-zero');
+});
+
+await test('project: straight lines stay straight', () => {
+  const quad = [{ x: 40, y: 60 }, { x: 520, y: 20 }, { x: 600, y: 430 }, { x: 15, y: 380 }];
+  const h = solveHomography(quad);
+  const row = [0, 0.25, 0.5, 0.75, 1].map((u) => project(h, u, 0.37));
+  const cross = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  for (let i = 2; i < row.length; i++) {
+    closeTo(cross(row[0], row[1], row[i]), 0, 1e-6, `point ${i} of a grid row drifted off the line`);
+  }
+});
+
+await test('isValidQuad: rejects what a photographed rectangle cannot be', () => {
+  const good = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
+  assert(isValidQuad(good), 'a plain rectangle should be valid');
+  // The 8x8 solve alone does not catch these: coincident corners still give a
+  // non-singular system and a map that collapses an edge to a point.
+  assert(!isValidQuad([{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }]), 'coincident corners');
+  assert(!isValidQuad([{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 0, y: 100 }, { x: 100, y: 100 }]), 'a crossed bow-tie');
+  assert(!isValidQuad([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }]), 'collinear corners');
+  assert(!isValidQuad(null), 'null');
+  assert(!isValidQuad([{ x: 0, y: 0 }, { x: 1, y: 0 }]), 'too few corners');
+  assertEqual(solveHomography([{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }]), null,
+    'an invalid quad should have no homography');
+});
+
+// ---- 45. paper.js: reading a photographed grid ----------------------------
+
+/**
+ * Paints a fake photograph of a coloured-in printed grid: the drawing mapped
+ * through the real homography into a quad, on cream paper, with printed rules
+ * and a lighting gradient. Forward-mapped, so no inverse transform is needed.
+ */
+function fakeSheet(truth, quad, width, height, { tint = [1, 0.94, 0.81], lines = true } = {}) {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let i = 0; i < width * height; i++) {
+    data[i * 4] = 40; data[i * 4 + 1] = 38; data[i * 4 + 2] = 36; data[i * 4 + 3] = 255;
+  }
+  const h = solveHomography(quad);
+  const paper = [242, 238, 230];
+  const steps = 1500;
+
+  for (let i = 0; i <= steps; i++) {
+    for (let j = 0; j <= steps; j++) {
+      const u = i / steps;
+      const v = j / steps;
+      const p = project(h, u, v);
+      if (!p) continue;
+      const x = Math.round(p.x);
+      const y = Math.round(p.y);
+      if (x < 0 || y < 0 || x >= width || y >= height) continue;
+
+      const cx = Math.min(15, Math.floor(u * 16));
+      const cy = Math.min(15, Math.floor(v * 16));
+      const fx = u * 16 - cx;
+      const fy = v * 16 - cy;
+      let colour;
+      if (lines && (fx < 0.06 || fx > 0.94 || fy < 0.06 || fy > 0.94)) colour = [120, 118, 115];
+      else {
+        const hex = truth[cy * 16 + cx];
+        colour = hex
+          ? [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]
+          : paper;
+      }
+      const shade = 1.05 - 0.20 * (x / width) - 0.09 * (y / height);
+      const k = (y * width + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        data[k + c] = Math.max(0, Math.min(255, colour[c] * tint[c] * shade));
+      }
+      data[k + 3] = 255;
+    }
+  }
+  return { width, height, data };
+}
+
+const SHEET_ART = [
+  '................', '................', '...RRRRRRRRRR...', '..RRRRRRRRRRRR..',
+  '..RR.YY..YY.RR..', '..RRRRRRRRRRRR..', '..RR.R....R.RR..', '..RRR.RRRR.RRR..',
+  '..RRRRRRRRRRRR..', '...RRRRRRRRRR...', '....GGGGGGGG....', '....GG....GG....',
+  '................', '................', '................', '................',
+];
+const SHEET_LEGEND = { R: '#FF4B4B', Y: '#FFE14B', G: '#4BB44B' };
+const sheetTruth = [];
+for (const row of SHEET_ART) for (const ch of row) sheetTruth.push(SHEET_LEGEND[ch] ?? null);
+const SHEET_QUAD = [{ x: 96, y: 70 }, { x: 604, y: 44 }, { x: 648, y: 452 }, { x: 52, y: 424 }];
+
+await test('paper: white balance neutralises a warm photograph', () => {
+  const photo = fakeSheet(sheetTruth, SHEET_QUAD, 720, 540);
+  const samples = sampleCells(photo, SHEET_QUAD);
+  assertEqual(samples.length, 256, 'every cell should be sampled');
+
+  const paper = estimatePaperWhite(samples);
+  assert(paper.r > paper.b + 8, `the paper should measure warm before correction (r ${paper.r.toFixed(0)}, b ${paper.b.toFixed(0)})`);
+  const fixed = applyGains(paper, whiteBalanceGains(paper));
+  assert(Math.abs(fixed.r - fixed.b) < 12, `and near neutral after (r ${fixed.r.toFixed(0)}, b ${fixed.b.toFixed(0)})`);
+});
+
+await test('paper: recovers the drawing from a tilted, badly lit photograph', () => {
+  const photo = fakeSheet(sheetTruth, SHEET_QUAD, 720, 540);
+  const got = buildFromPhoto(photo, SHEET_QUAD, { palette: allSwatches() });
+  assertEqual(got.length, 256, 'one entry per cell');
+  for (const hex of got) {
+    if (hex !== null) assert(isOnGrid(hex), `${hex} is not on the 15-step channel grid`);
+  }
+
+  let blanksKept = 0;
+  let blanks = 0;
+  let coloursKept = 0;
+  let colours = 0;
+  sheetTruth.forEach((want, i) => {
+    if (want === null) { blanks++; if (got[i] === null) blanksKept++; }
+    else { colours++; if (got[i] === want) coloursKept++; }
+  });
+  assertEqual(blanksKept, blanks, `every blank square should stay blank (${blanksKept}/${blanks})`);
+  assertEqual(coloursKept, colours, `every coloured square should come back (${coloursKept}/${colours})`);
+});
+
+await test('paper: a degenerate corner set is refused rather than guessed at', () => {
+  const photo = fakeSheet(sheetTruth, SHEET_QUAD, 720, 540);
+  assertEqual(buildFromPhoto(photo, [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }]), null,
+    'coincident corners should give null');
+  assertEqual(sampleCells(photo, [{ x: 0, y: 0 }, { x: 1, y: 0 }]), null, 'too few corners should give null');
+});
+
+await test('paper: blank means bright AND unsaturated', () => {
+  // Brightness alone would erase a yellow crayon, which is bright and very much
+  // a colour. Saturation is what keeps it.
+  assert(isBlank({ r: 250, g: 248, b: 245 }, 0.72), 'bare paper should read as blank');
+  assert(!isBlank({ r: 255, g: 225, b: 75 }, 0.72), 'a bright yellow should not read as blank');
+  assert(!isBlank({ r: 90, g: 40, b: 40 }, 0.72), 'a dark red should not read as blank');
+  assertEqual(saturationOf({ r: 255, g: 255, b: 255 }), 0, 'white has no saturation');
+});
+
+await test('paper: a square coloured pure white comes back blank', () => {
+  // Correct, not a defect: on white paper, and to a camera, "coloured white"
+  // and "left alone" are the same thing. The printable sheet says so.
+  const truth = new Array(256).fill(null);
+  truth[8 * 16 + 8] = '#FFFFFF';
+  const flat = [{ x: 60, y: 50 }, { x: 660, y: 50 }, { x: 660, y: 490 }, { x: 60, y: 490 }];
+  const photo = fakeSheet(truth, flat, 720, 540, { tint: [1, 1, 1] });
+  assertEqual(buildFromPhoto(photo, flat, { palette: allSwatches() })[8 * 16 + 8], null,
+    'a white square is indistinguishable from bare paper');
 });
 
 // ---- Render results to the page and console -------------------------------

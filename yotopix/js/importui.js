@@ -130,7 +130,11 @@ export function createImportUI({ dialog, elements, getGrid, getPalette, onApply 
 
   el.cropBox.addEventListener('pointerdown', (event) => {
     event.preventDefault();
-    el.cropBox.setPointerCapture?.(event.pointerId);
+    try {
+      el.cropBox.setPointerCapture(event.pointerId);
+    } catch {
+      // Same as the canvas: capture is an optimisation, not a requirement.
+    }
     dragging = { px: event.clientX, py: event.clientY, x: crop.x, y: crop.y };
   });
 

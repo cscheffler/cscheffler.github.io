@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YotoPix — printable grid</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%2316151A'/><rect x='5' y='5' width='6' height='6' fill='%23FFB347'/></svg>">
+<style>
+  /*
+    A 16x16 grid to print, colour in by hand, photograph, and import — SPEC
+    §15.2. An HTML page with a print stylesheet rather than a generated PDF:
+    no dependency, and browsers print it perfectly well.
+
+    Sizes are in millimetres so the cells come out the same on any printer.
+    11mm cells give a 176mm grid, which fits A4 and US Letter with room to
+    spare, and is big enough for a crayon.
+  */
+  :root {
+    --cell: 11mm;
+    --rule: 0.25mm;
+    --ink: #444;
+    --mark: #000;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 24px;
+    background: #16151A;
+    color: #E8E4DC;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  h1 {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0 0 4px;
+  }
+
+  p { margin: 0 0 12px; max-width: 66ch; color: #8A8695; }
+  ol { max-width: 66ch; color: #8A8695; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  strong { color: #E8E4DC; font-weight: 600; }
+
+  button {
+    font: inherit;
+    font-size: 12px;
+    padding: 9px 14px;
+    background: #FFB347;
+    color: #16151A;
+    border: 1px solid #FFB347;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  a { color: #FFB347; }
+
+  /* The sheet itself: white, so it looks like what will come out. */
+  .sheet {
+    background: #fff;
+    color: #000;
+    padding: 10mm;
+    margin: 20px 0;
+    width: max-content;
+  }
+
+  .title-line {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-family: ui-monospace, monospace;
+    font-size: 3.6mm;
+    color: #000;
+    margin-bottom: 5mm;
+  }
+
+  .title-line .rule-line {
+    flex: 1 1 auto;
+    border-bottom: 0.25mm solid #999;
+    min-width: 60mm;
+  }
+
+  /*
+    Crop marks sit OUTSIDE the grid so they cannot be coloured over. Their
+    inner corner is exactly the grid corner, which is the point to drag each
+    handle to when importing the photo.
+  */
+  .grid-wrap {
+    position: relative;
+    padding: 6mm;
+    width: max-content;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(16, var(--cell));
+    grid-template-rows: repeat(16, var(--cell));
+    border: 0.5mm solid var(--mark);
+  }
+
+  .grid div {
+    border-right: var(--rule) solid var(--ink);
+    border-bottom: var(--rule) solid var(--ink);
+  }
+
+  .grid div:nth-child(16n) { border-right: 0; }
+  .grid div:nth-child(n + 241) { border-bottom: 0; }
+
+  /* Every fourth line a little stronger, matching the editor's guides. */
+  .grid div.major-x { border-right-width: 0.45mm; }
+  .grid div.major-y { border-bottom-width: 0.45mm; }
+
+  .mark {
+    position: absolute;
+    width: 6mm;
+    height: 6mm;
+  }
+
+  .mark::before,
+  .mark::after {
+    content: "";
+    position: absolute;
+    background: var(--mark);
+  }
+
+  .mark::before { width: 6mm; height: 0.4mm; }
+  .mark::after { width: 0.4mm; height: 6mm; }
+
+  /*
+    The marks are exactly the size of the wrapper's padding, and sit flush in
+    its corners, so the inner corner of each L lands precisely on the grid
+    corner with the arms pointing away from the drawing. That inner corner is
+    the point to put a handle on; if these are off, every import is skewed.
+  */
+  .mark.tl { top: 0; left: 0; }
+  .mark.tl::before { bottom: 0; left: 0; }
+  .mark.tl::after { right: 0; top: 0; }
+
+  .mark.tr { top: 0; right: 0; }
+  .mark.tr::before { bottom: 0; right: 0; }
+  .mark.tr::after { left: 0; top: 0; }
+
+  .mark.bl { bottom: 0; left: 0; }
+  .mark.bl::before { top: 0; left: 0; }
+  .mark.bl::after { right: 0; bottom: 0; }
+
+  .mark.br { bottom: 0; right: 0; }
+  .mark.br::before { top: 0; right: 0; }
+  .mark.br::after { left: 0; bottom: 0; }
+
+  .sheet-note {
+    font-family: ui-monospace, monospace;
+    font-size: 2.9mm;
+    color: #555;
+    margin-top: 4mm;
+    max-width: 176mm;
+  }
+
+  @media print {
+    @page { margin: 12mm; }
+
+    body {
+      background: #fff;
+      color: #000;
+      padding: 0;
+      /* Without this the corner marks and rules print washed out or not at all. */
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+
+    .no-print { display: none !important; }
+
+    .sheet {
+      margin: 0;
+      padding: 0;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <h1>Printable grid</h1>
+  <p>
+    Print this, colour it in, photograph it, and bring it back into the editor with
+    <strong>Paper to pixel</strong>. One square on the page is one pixel on the card.
+  </p>
+  <ol>
+    <li>Print at <strong>100%</strong> — no "fit to page", or the squares stop being square.</li>
+    <li>Colour the squares. Staying inside the lines helps, but only the middle of each
+      square is read, so it does not have to be neat.</li>
+    <li><strong>Leave a square blank for transparent.</strong> White crayon will not come
+      back — on the display, and to the camera, white paper and nothing are the same thing.</li>
+    <li>Photograph the whole sheet in even light. Avoid a hard shadow across the page;
+      a slight angle is fine, that is what the corner handles are for.</li>
+  </ol>
+  <p>
+    <button onclick="window.print()">Print this sheet</button>
+    &nbsp; <a href="./index.html">Back to the editor</a>
+  </p>
+</div>
+
+<div class="sheet">
+  <div class="title-line">
+    <span>Name</span><span class="rule-line"></span>
+  </div>
+
+  <div class="grid-wrap">
+    <div class="mark tl"></div>
+    <div class="mark tr"></div>
+    <div class="mark bl"></div>
+    <div class="mark br"></div>
+    <div class="grid" id="grid" aria-hidden="true"></div>
+  </div>
+
+  <p class="sheet-note">
+    YotoPix · 16 × 16 · colour the squares, leave blanks for transparent, then photograph
+    the whole sheet including the four corner marks.
+  </p>
+</div>
+
+<script>
+  // 256 cells, with the 4-cell guides marked so a subject can be centred by eye.
+  const grid = document.getElementById('grid');
+  const frag = document.createDocumentFragment();
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const cell = document.createElement('div');
+      if (x % 4 === 3 && x !== 15) cell.classList.add('major-x');
+      if (y % 4 === 3 && y !== 15) cell.classList.add('major-y');
+      frag.append(cell);
+    }
+  }
+  grid.append(frag);
+</script>
+
+</body>
+</html>

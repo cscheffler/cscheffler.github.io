@@ -723,6 +723,18 @@ input:not([type="checkbox"]) {
   &:hover {
     border-color: #454250;
   }
+
+  /* Not previously needed — #paper-apply is the first .btn that ships
+     disabled. Reduced opacity plus a hover reset so a disabled button reads
+     as unavailable rather than merely quiet. */
+  &[disabled] {
+    opacity: 0.5;
+    cursor: default;
+
+    &:hover {
+      border-color: var(--hairline);
+    }
+  }
 }
 
 .btn-primary {
@@ -734,6 +746,15 @@ input:not([type="checkbox"]) {
   &:hover {
     background: #ffbd63;
     border-color: #ffbd63;
+  }
+
+  /* Same tie-break as the base hover rule: equal specificity to
+     .btn[disabled]:hover, so source order (this block is later) decides —
+     keeps the disabled primary button amber instead of falling back to a
+     hairline border on hover. */
+  &[disabled]:hover {
+    background: var(--accent);
+    border-color: var(--accent);
   }
 }
 
@@ -791,7 +812,8 @@ input:not([type="checkbox"]) {
 
 #deadzone-dialog::backdrop,
 #import-dialog::backdrop,
-#ramp-dialog::backdrop {
+#ramp-dialog::backdrop,
+#paper-dialog::backdrop {
   background: rgba(10, 9, 12, 0.6);
   opacity: 1;
   transition: opacity 120ms ease;
@@ -804,7 +826,8 @@ input:not([type="checkbox"]) {
 @media (prefers-reduced-motion: reduce) {
   #deadzone-dialog::backdrop,
   #import-dialog::backdrop,
-  #ramp-dialog::backdrop {
+  #ramp-dialog::backdrop,
+  #paper-dialog::backdrop {
     transition: none;
   }
 }
@@ -1016,6 +1039,167 @@ input[type="range"] {
   border: none;
   accent-color: var(--accent);
   cursor: pointer;
+}
+
+/* ---------- Paper to pixel dialog ---------- */
+
+/* Same treatment as #import-dialog (panel, hairline, --radius, ~20px
+   padding, capped so it can never exceed the viewport) but a little
+   narrower, since this dialog carries a fixed-size photo stage rather than
+   a resizable crop. display is deliberately left unset, as with the other
+   dialogs — the UA stylesheet toggles dialog { display } via [open], and an
+   unconditional author rule would fight that. .paper-body itself scrolls
+   (below), so the title and .dialog-actions stay put and the buttons are
+   never pushed off screen. */
+#paper-dialog {
+  max-width: 760px;
+  width: calc(100% - 32px);
+  max-height: calc(100vh - 48px);
+  margin: auto;
+  padding: 20px;
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+
+.paper-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  /* Roughly the dialog's own padding (40px) plus the title and action rows
+     above/below, same estimate as .import-body — this, not the dialog, is
+     what scrolls when the stage and controls together run tall. */
+  max-height: calc(100vh - 48px - 170px);
+  overflow: auto;
+}
+
+.paper-source {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.paper-controls {
+  flex: 0 0 260px;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (max-width: 700px) {
+  .paper-body {
+    flex-direction: column;
+  }
+
+  .paper-controls {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+.paper-stage {
+  position: relative;
+  /* Unlike .crop-stage, this does not hide overflow: the handles are
+     centred ON the photo's corners and their rings extend past the edge,
+     and their :focus-visible ring must render unclipped too. */
+  overflow: visible;
+  width: max-content;
+  margin: 0 auto;
+  background: var(--ground);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+}
+
+/* Sized by JS via attributes + inline style — no width/height here, and no
+   image-rendering override: this shows a photo of paper, not the pixel-art
+   grid, so smoothing stays on. */
+#paper-canvas {
+  display: block;
+}
+
+/* Sized by JS via inline width/height, and pointer-events: none so it can
+   never swallow a handle drag — the handles paint after it in DOM order and
+   receive the pointer directly. */
+.paper-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.paper-outline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  /* Keeps the line a true 2px regardless of how the viewBox scale relates
+     to the on-screen size. */
+  vector-effect: non-scaling-stroke;
+}
+
+/* The quad's midlines, at the same accent but faint, so a twisted quad
+   (crossed corners) is obvious at a glance. */
+.paper-cross {
+  stroke: var(--accent);
+  opacity: 0.45;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The draggable corner targets, and the most important control in the
+   dialog: a light ring rather than a filled blob so the photo underneath
+   stays visible, at a 26px hit target comfortable for both mouse and touch.
+   border-radius: 50% is the one place in this stylesheet a radius above 4px
+   is deliberate — it is what turns the ring into a circle, not an oversight.
+   JS sets left/top to the corner's own coordinate, so the button is centred
+   ON that point via translate(-50%, -50%) rather than offset from it. The
+   global :focus-visible ring (see Focus, above) applies here unchanged and
+   is left to render unclipped by .paper-stage's overflow: visible. */
+.paper-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+
+  /* The exact point being placed, marked unambiguously at the ring's centre. */
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+/* .paper-controls reuses .import-previews, .preview, .field, .field-label,
+   .check, .hint and input[type="range"] as-is — only the rule below is
+   specific to this dialog. */
+
+#paper-note {
+  /* Muted is the resting colour for .hint elsewhere, but this line is the
+     live feedback that tells the user whether their corners are right, so
+     it reads at full text contrast instead. */
+  color: var(--text);
+  /* About two lines at this font-size/line-height, so the message ("N of
+     256 squares picked up") changing length doesn't jump the layout. */
+  min-height: 3em;
 }
 
 /* ---------- Gallery ---------- */

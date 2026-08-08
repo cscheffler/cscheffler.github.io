@@ -241,7 +241,12 @@
       <button class="btn btn-primary" id="export-png">Export PNG</button>
       <button class="btn" id="import-open">Import image</button>
       <input type="file" id="import-file" accept="image/*" hidden>
-      <p class="hint">16 &times; 16, transparent. Images can also be dropped on the canvas.</p>
+      <button class="btn" id="paper-open">Paper to pixel&hellip;</button>
+      <input type="file" id="paper-file" accept="image/*" hidden>
+      <p class="hint">
+        16 &times; 16, transparent. Images can also be dropped on the canvas.
+        Paper to pixel reads a photo of a <a href="./print.html" target="_blank" rel="noopener">printed grid</a>.
+      </p>
     </section>
     </div>
 
@@ -263,6 +268,72 @@
   </div>
   <ul class="gallery-strip" id="gallery-strip"></ul>
 </section>
+
+<dialog id="paper-dialog" aria-labelledby="paper-title">
+  <h2 class="dialog-title" id="paper-title">Paper to pixel</h2>
+  <div class="paper-body">
+
+    <div class="paper-source">
+      <div class="paper-stage" id="paper-stage">
+        <canvas id="paper-canvas"></canvas>
+        <svg class="paper-overlay" id="paper-overlay" aria-hidden="true" focusable="false">
+          <polygon id="paper-outline" class="paper-outline" points=""></polygon>
+          <line id="paper-cross-h" class="paper-cross" x1="0" y1="0" x2="0" y2="0"></line>
+          <line id="paper-cross-v" class="paper-cross" x1="0" y1="0" x2="0" y2="0"></line>
+        </svg>
+        <button class="paper-handle" id="paper-tl" data-corner="0" aria-label="Top left corner of the grid. Drag, or nudge with the arrow keys."></button>
+        <button class="paper-handle" id="paper-tr" data-corner="1" aria-label="Top right corner of the grid. Drag, or nudge with the arrow keys."></button>
+        <button class="paper-handle" id="paper-br" data-corner="2" aria-label="Bottom right corner of the grid. Drag, or nudge with the arrow keys."></button>
+        <button class="paper-handle" id="paper-bl" data-corner="3" aria-label="Bottom left corner of the grid. Drag, or nudge with the arrow keys."></button>
+      </div>
+      <p class="hint">
+        Put each handle on a corner of the printed grid, where the crop marks point.
+        Arrow keys nudge; hold Shift to move faster.
+      </p>
+    </div>
+
+    <div class="paper-controls">
+      <div class="import-previews">
+        <figure class="preview">
+          <canvas id="paper-result"></canvas>
+          <figcaption>result</figcaption>
+        </figure>
+        <figure class="preview">
+          <canvas id="paper-device"></canvas>
+          <figcaption>on device</figcaption>
+        </figure>
+      </div>
+
+      <label class="field">
+        <span class="field-label">Paper threshold <output id="out-paper">72%</output></span>
+        <input type="range" id="in-paper" min="40" max="95" value="72">
+      </label>
+      <label class="field">
+        <span class="field-label">Saturation <output id="out-paper-sat">+25</output></span>
+        <input type="range" id="in-paper-sat" min="-40" max="80" value="25">
+      </label>
+      <label class="check">
+        <input type="checkbox" id="in-paper-balance" checked>
+        <span>Correct the lighting</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="in-paper-snap" checked>
+        <span>Snap to palette colours</span>
+      </label>
+      <p class="hint" id="paper-note"></p>
+      <p class="hint">
+        Squares left blank become transparent. White crayon cannot come back —
+        to the camera it is the same as bare paper.
+      </p>
+    </div>
+  </div>
+
+  <div class="dialog-actions">
+    <button class="btn btn-primary" id="paper-apply">Apply</button>
+    <button class="btn" id="paper-reset">Reset corners</button>
+    <button class="btn" id="paper-cancel">Cancel</button>
+  </div>
+</dialog>
 
 <dialog id="ramp-dialog" aria-labelledby="ramp-title">
   <h2 class="dialog-title" id="ramp-title">New shading ramp</h2>

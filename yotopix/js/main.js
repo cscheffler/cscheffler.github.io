@@ -20,6 +20,7 @@ import { drawPreview } from './preview.js';
 import { downloadPNG } from './exporter.js';
 import { createGallery } from './gallery.js';
 import { createImportUI } from './importui.js';
+import { createPaperUI } from './paperui.js';
 import { runLint, applyFix } from './lint.js';
 import { buildExamples } from './examples.js';
 import {
@@ -78,6 +79,9 @@ const el = {
   importOpen: $('import-open'),
   importFile: $('import-file'),
   importDialog: $('import-dialog'),
+  paperOpen: $('paper-open'),
+  paperFile: $('paper-file'),
+  paperDialog: $('paper-dialog'),
   strip: $('gallery-strip'),
   storageNote: $('storage-note'),
   newIcon: $('new-icon'),
@@ -902,6 +906,53 @@ el.stage.addEventListener('drop', (event) => {
   openImport(file);
 });
 
+// -------------------------------------------------------- paper to pixel
+
+const paperUI = createPaperUI({
+  dialog: el.paperDialog,
+  getGrid: () => app.doc.grid,
+  getPalette: () => allSwatches(DEFAULT_PALETTE).concat(app.slots.filter(Boolean)),
+  onApply: (pixels) => {
+    edit(() => {
+      app.doc.pixels = pixels;
+    });
+    toast('Drawing imported from paper. Cmd+Z undoes it.');
+  },
+  elements: {
+    stage: $('paper-stage'),
+    canvas: $('paper-canvas'),
+    overlay: $('paper-overlay'),
+    outline: $('paper-outline'),
+    crossH: $('paper-cross-h'),
+    crossV: $('paper-cross-v'),
+    handles: [$('paper-tl'), $('paper-tr'), $('paper-br'), $('paper-bl')],
+    result: $('paper-result'),
+    device: $('paper-device'),
+    threshold: $('in-paper'),
+    saturation: $('in-paper-sat'),
+    snap: $('in-paper-snap'),
+    balance: $('in-paper-balance'),
+    outThreshold: $('out-paper'),
+    outSaturation: $('out-paper-sat'),
+    note: $('paper-note'),
+    apply: $('paper-apply'),
+    reset: $('paper-reset'),
+    cancel: $('paper-cancel'),
+  },
+});
+
+el.paperOpen.addEventListener('click', () => el.paperFile.click());
+el.paperFile.addEventListener('change', async () => {
+  const file = el.paperFile.files?.[0];
+  el.paperFile.value = '';
+  if (!file) return;
+  try {
+    await paperUI.open(file);
+  } catch (error) {
+    toast(`Could not read that photo: ${error.message}`);
+  }
+});
+
 // ------------------------------------------------------------------- toast
 
 let toastTimer;
@@ -931,7 +982,8 @@ function isTyping(target) {
 
 window.addEventListener('keydown', (e) => {
   // While a modal is up it owns the keyboard; Escape is handled by <dialog>.
-  if (el.dialog.open || el.importDialog.open || el.rampDialog.open) return;
+  if (el.dialog.open || el.importDialog.open || el.rampDialog.open
+    || el.paperDialog.open) return;
 
   const mod = e.metaKey || e.ctrlKey;
   const typing = isTyping(e.target);

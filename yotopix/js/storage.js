@@ -219,7 +219,7 @@ export function parseBackup(text) {
   }
   const list = Array.isArray(parsed) ? parsed : parsed?.icons;
   if (!Array.isArray(list)) {
-    throw new Error('That file does not look like a Yoto Icon Editor backup.');
+    throw new Error('That file does not look like a YotoPix backup.');
   }
   const icons = sanitiseIcons(list);
   if (icons.length === 0) {

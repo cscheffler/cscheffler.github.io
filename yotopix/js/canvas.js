@@ -6,8 +6,8 @@
 
 import { SIZE, idx, region, inRegion, centre, symmetryCells } from './state.js';
 import {
-  bresenham, applyCells, cellsForShape, floodFillCells,
-  PEN, ERASER, FILL, EYEDROPPER, SHAPE_TOOLS,
+  bresenham, applyCells, applyShade, cellsForShape, floodFillCells,
+  PEN, ERASER, FILL, EYEDROPPER, SHADE, SHAPE_TOOLS,
 } from './tools.js';
 
 // Screen-space, deliberately NOT scaled with zoom: at 32x a "2px at 1x" checker
@@ -31,6 +31,7 @@ export function createGridView({
   onHover,
   onResize,
   onPick,
+  getShade,
 }) {
   const ctx = canvas.getContext('2d', { alpha: false });
   let dpr = 1;
@@ -46,6 +47,10 @@ export function createGridView({
 
   let cursor = { x: 0, y: 0 }; // keyboard caret
   let cursorVisible = false;
+  // Cells already stepped by the current shading stroke. Without this, dragging
+  // back across a pixel would walk it down the whole ramp.
+  let shaded = new Set();
+  let shadeDelta = 1;
 
   const grid = () => getDoc().grid ?? 'full';
   const symmetry = () => getSymmetry?.() ?? 'off';
@@ -222,18 +227,47 @@ export function createGridView({
     }
   }
 
-  /** Dashed line on the mirror axis while symmetry is active — SPEC §5. */
-  function drawMirrorAxis() {
-    if (symmetry() === 'off') return;
-    const axis = (centre(grid()).x + 0.5) * cell;
+  /**
+   * The live symmetry axes — SPEC §5, §15.1. Positions come from the active
+   * region, so in odd-grid mode they run through the true centre cell rather
+   * than between cells.
+   */
+  function drawSymmetryAxes() {
+    const mode = symmetry();
+    if (mode === 'off') return;
+
+    const { x0, y0, size } = region(grid());
+    const middle = centre(grid());
+    const vertical = (middle.x + 0.5) * cell;
+    const horizontal = (middle.y + 0.5) * cell;
+    const near = x0 * cell;
+    const far = (x0 + size) * cell;
+    const top = y0 * cell;
+    const bottom = (y0 + size) * cell;
+
     ctx.save();
     ctx.strokeStyle = ACCENT;
     ctx.lineWidth = Math.max(1, Math.round(dpr));
     ctx.setLineDash([Math.round(cell * 0.35), Math.round(cell * 0.3)]);
-    ctx.beginPath();
-    ctx.moveTo(axis, 0);
-    ctx.lineTo(axis, canvas.height);
-    ctx.stroke();
+
+    const line = (ax, ay, bx, by) => {
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+    };
+
+    if (mode === 'vertical' || mode === 'quad' || mode === 'eight') {
+      line(vertical, 0, vertical, canvas.height);
+    }
+    if (mode === 'horizontal' || mode === 'quad' || mode === 'eight') {
+      line(0, horizontal, canvas.width, horizontal);
+    }
+    if (mode === 'eight') {
+      // Only meaningful on a square region, which this always is.
+      line(near, top, far, bottom);
+      line(far, top, near, bottom);
+    }
     ctx.restore();
   }
 
@@ -255,7 +289,7 @@ export function createGridView({
     drawPreview();
     if (showGrid) drawGrid();
     drawGutter();
-    drawMirrorAxis();
+    drawSymmetryAxes();
     drawCursor();
   }
 
@@ -280,11 +314,33 @@ export function createGridView({
     return changed;
   }
 
+  /** Steps each fresh cell one place along the active ramp — SPEC §15.1. */
+  function shade(cells) {
+    const fresh = cells.filter((c) => {
+      const key = idx(c.x, c.y);
+      if (shaded.has(key)) return false;
+      shaded.add(key);
+      return true;
+    });
+    if (!fresh.length) return false;
+
+    const changed = applyShade(
+      getDoc(), fresh, (current) => getShade?.(current, shadeDelta) ?? null,
+      { grid: grid(), symmetry: symmetry() },
+    );
+    if (changed) {
+      render();
+      onChange?.();
+    }
+    return changed;
+  }
+
   function strokeTo(x, y) {
     const cells = [];
     if (last) bresenham(last.x, last.y, x, y, (px, py) => cells.push({ x: px, y: py }));
     else cells.push({ x, y });
     last = { x, y };
+    if (activeTool === SHADE) return shade(cells);
     return write(cells, strokeColor);
   }
 
@@ -322,6 +378,11 @@ export function createGridView({
 
     drawing = true;
     strokeColor = activeTool === ERASER ? null : getColor();
+    if (activeTool === SHADE) {
+      shaded = new Set();
+      // Shift inverts: plain drag lightens, Shift+drag darkens.
+      shadeDelta = e.shiftKey ? -1 : 1;
+    }
 
     if (activeTool === FILL) {
       onStrokeStart?.();
@@ -414,7 +475,12 @@ export function createGridView({
       cursorVisible = true;
       const tool = getTool();
       onStrokeStart?.();
-      if (tool === FILL) {
+      if (tool === SHADE) {
+        shaded = new Set();
+        shadeDelta = e.shiftKey ? -1 : 1;
+        activeTool = SHADE;
+        shade([{ ...cursor }]);
+      } else if (tool === FILL) {
         write(floodFillCells(getDoc(), cursor.x, cursor.y, grid()), getColor());
       } else if (tool === EYEDROPPER) {
         pickAt(cursor.x, cursor.y);

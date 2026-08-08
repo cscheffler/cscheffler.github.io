@@ -17,6 +17,14 @@ import {
 } from './storage.js';
 import { DEFAULT_PALETTE, allSwatches, pushRecent, RECENT_COUNT } from './palette.js';
 import {
+  srgbToOklab, oklabToOklch, hexToOklch, oklchToHex, rotateToward,
+} from './oklab.js';
+import {
+  generateRamp, createRamp, findRampFor, nearestStep, shadeStep,
+  WARM_HUE, COOL_HUE,
+} from './ramp.js';
+import { sanitiseRamp, sanitisePalette } from './storage.js';
+import {
   centreCrop, clampCrop, boxSample, nearestSample, adjustColor, oklab,
   preparePalette, nearestPaletteColor, buildPixels,
 } from './importer.js';
@@ -1843,6 +1851,232 @@ await test('applyFix: fixing the flagged cells actually resolves the black-edge 
   applyFix(doc, blackWarning.cells, 'clear');
   warnings = runLint(doc);
   assert(!warnings.some((w) => w.id === 'black-edge'), 'after applying the fix, the black-edge warning should be gone');
+});
+
+
+// ---- 40. oklab.js: conversions and gamut mapping ---------------------------
+
+await test('oklab: hex round-trips through OKLCh unchanged', () => {
+  for (const hex of ['#FF4B4B', '#4BB44B', '#4BA5FF', '#FFFFFF', '#000000', '#878787', '#F0C396']) {
+    assertEqual(oklchToHex(hexToOklch(hex)), hex, `${hex} should survive a round trip through OKLCh`);
+  }
+});
+
+await test('oklab: white, black and grey have the expected coordinates', () => {
+  closeTo(oklabToOklch(srgbToOklab(255, 255, 255)).L, 1, 0.01, 'white should sit at L ~ 1');
+  closeTo(oklabToOklch(srgbToOklab(0, 0, 0)).L, 0, 0.01, 'black should sit at L ~ 0');
+  closeTo(oklabToOklch(srgbToOklab(128, 128, 128)).C, 0, 0.01, 'a neutral grey should have ~no chroma');
+});
+
+await test('oklab: hue is reported in 0..360, never negative', () => {
+  for (const hex of ['#4BA5FF', '#785AE1', '#2D875A', '#FF4B4B']) {
+    const { h } = hexToOklch(hex);
+    assert(h >= 0 && h < 360, `${hex} reported hue ${h}, which is outside 0..360`);
+  }
+});
+
+await test('oklab: gamut mapping keeps hue instead of clipping channels', () => {
+  // Clipping each channel independently shifts hue — a too-saturated red clips
+  // to a different red. Walking chroma down is what keeps a ramp on one hue.
+  const asked = 29;
+  const mapped = hexToOklch(oklchToHex({ L: 0.6, C: 0.9, h: asked }));
+  const drift = Math.abs(((mapped.h - asked + 540) % 360) - 180);
+  assert(drift < 12, `hue drifted ${drift.toFixed(1)}° while mapping an out-of-gamut colour into sRGB`);
+});
+
+await test('rotateToward: takes the short arc and respects the cap', () => {
+  assertEqual(rotateToward(10, 90, 20), 30, 'should move 20° of the way from 10 toward 90');
+  assertEqual(rotateToward(350, 90, 20), 10, 'should wrap across 0 rather than going the long way');
+  assertEqual(rotateToward(100, 90, 20), 90, 'should stop at the target rather than overshoot');
+  assertEqual(rotateToward(50, 50, 20), 50, 'a hue already at the target should not move');
+});
+
+// ---- 41. ramp.js: the generator -------------------------------------------
+
+const RAMP_BASES = ['#FF4B4B', '#4BA5FF', '#2D875A', '#F0C396', '#A55AD2', '#FFE14B'];
+const towardHue = (from, target) => Math.abs(((target - from + 540) % 360) - 180);
+
+await test('generateRamp: five distinct steps, all on the display grid', () => {
+  for (const base of RAMP_BASES) {
+    const { swatches } = generateRamp(base);
+    assertEqual(swatches.length, 5, `${base} should give 5 steps by default`);
+    for (const hex of swatches) {
+      assert(isOnGrid(hex), `${base}: step ${hex} is not on the 15-step channel grid`);
+    }
+    // The grid is coarse enough that neighbouring steps can quantise onto the
+    // same colour; the generator widens them until they separate.
+    assertEqual(new Set(swatches).size, swatches.length,
+      `${base}: steps collided after snapping -> ${swatches.join(' ')}`);
+  }
+});
+
+await test('generateRamp: lightness rises monotonically from shadow to highlight', () => {
+  for (const base of RAMP_BASES) {
+    const Ls = generateRamp(base).swatches.map((h) => hexToOklch(h).L);
+    for (let i = 1; i < Ls.length; i++) {
+      assert(Ls[i] > Ls[i - 1],
+        `${base}: step ${i} is not lighter than step ${i - 1} -> ${Ls.map((l) => l.toFixed(3)).join(',')}`);
+    }
+  }
+});
+
+await test('generateRamp: lightness follows an S-curve, not a straight line', () => {
+  for (const base of RAMP_BASES) {
+    const Ls = generateRamp(base).swatches.map((h) => hexToOklch(h).L);
+    const gaps = [Ls[1] - Ls[0], Ls[2] - Ls[1], Ls[3] - Ls[2], Ls[4] - Ls[3]];
+    // Compared in aggregate rather than per step: a symmetric curve passes
+    // through the linear midpoint by construction, and snapping each step to the
+    // channel grid moves lightness by enough to swamp a single gap.
+    const inner = gaps[1] + gaps[2];
+    const outer = gaps[0] + gaps[3];
+    assert(inner > outer * 1.1,
+      `${base}: spacing looks linear (inner ${inner.toFixed(3)} vs outer ${outer.toFixed(3)})`);
+  }
+});
+
+await test('generateRamp: hue warms toward the highlight and cools toward the shadow', () => {
+  // SPEC §15.1: a lightness-only ramp is the most recognisable mark of amateur
+  // pixel art. Highlights rotate toward yellow, shadows toward blue.
+  for (const base of RAMP_BASES) {
+    const hs = generateRamp(base).swatches.map((h) => hexToOklch(h).h);
+    const light = hs[hs.length - 1];
+    const dark = hs[0];
+    assert(towardHue(light, WARM_HUE) < towardHue(dark, WARM_HUE) - 1,
+      `${base}: the highlight is not warmer than the shadow`);
+    assert(towardHue(dark, COOL_HUE) < towardHue(light, COOL_HUE) - 1,
+      `${base}: the shadow is not cooler than the highlight`);
+  }
+});
+
+await test('generateRamp: chroma peaks in the middle and drops at both ends', () => {
+  for (const base of RAMP_BASES) {
+    const Cs = generateRamp(base).swatches.map((h) => hexToOklch(h).C);
+    assert(Cs[2] >= Cs[0] && Cs[2] >= Cs[4],
+      `${base}: chroma does not arc through the mid-steps -> ${Cs.map((c) => c.toFixed(3)).join(',')}`);
+  }
+});
+
+await test('generateRamp: step count is honoured and clamped to 3..5', () => {
+  for (const n of [3, 4, 5]) {
+    assertEqual(generateRamp('#FF4B4B', { steps: n }).swatches.length, n, `steps: ${n} should give ${n} swatches`);
+  }
+  assertEqual(generateRamp('#FF4B4B', { steps: 9 }).swatches.length, 5, 'more than 5 steps should clamp to 5');
+  assertEqual(generateRamp('#FF4B4B', { steps: 1 }).swatches.length, 3, 'fewer than 3 steps should clamp up to 3');
+});
+
+await test('generateRamp: a base near white or black still yields distinct steps', () => {
+  // Without borrowing range from the other end these would collapse.
+  for (const base of ['#FFFFFF', '#000000', '#0F0F0F', '#F0F0F0']) {
+    const { swatches } = generateRamp(base);
+    assertEqual(new Set(swatches).size, 5,
+      `${base} should still give 5 distinct steps -> ${swatches.join(' ')}`);
+  }
+});
+
+await test('generateRamp: the hue-shift and direction controls change the result', () => {
+  const soft = generateRamp('#FF4B4B', { hueShift: 0 }).swatches;
+  const hard = generateRamp('#FF4B4B', { hueShift: 20 }).swatches;
+  assert(soft.join() !== hard.join(), 'hueShift 0 and 20 should not produce the same ramp');
+
+  const warm = generateRamp('#4BA5FF', { direction: 'warm-light' }).swatches;
+  const cool = generateRamp('#4BA5FF', { direction: 'cool-light' }).swatches;
+  assert(warm.join() !== cool.join(), 'flipping direction should not produce the same ramp');
+
+  // With no shift asked for, hue holds steady where chroma is high enough for
+  // hue to mean anything; a near-white step has C ~ 0.02 and is numerically noisy.
+  const hues = soft.map((h) => hexToOklch(h)).filter((c) => c.C > 0.05).map((c) => c.h);
+  const spread = Math.max(...hues) - Math.min(...hues);
+  assert(spread < 14, `hueShift 0 should hold hue roughly fixed, but it spread ${spread.toFixed(1)}°`);
+});
+
+await test('generateRamp: a grey base stays neutral', () => {
+  // There is no chroma to rotate, so a grey ramp is a lightness ramp. Shifting
+  // hue on it would invent a colour cast the user did not ask for.
+  const { swatches } = generateRamp('#878787');
+  for (const hex of swatches) {
+    assert(hexToOklch(hex).C < 0.02, `${hex} should have stayed neutral`);
+  }
+  assertEqual(new Set(swatches).size, 5, 'a grey ramp should still have distinct steps');
+});
+
+// ---- 42. ramp.js: lookup and the shading step ------------------------------
+
+await test('findRampFor: locates the owning ramp and the index within it', () => {
+  const a = createRamp('#FF4B4B');
+  const b = createRamp('#4BA5FF');
+  assert(a.id !== b.id, 'two ramps should get distinct ids');
+
+  const found = findRampFor([a, b], b.swatches[3]);
+  assert(found, 'a colour belonging to a ramp should be found');
+  assertEqual(found.ramp.id, b.id, 'the second ramp should be identified as the owner');
+  assertEqual(found.index, 3, 'the index within the ramp should be reported');
+  assertEqual(findRampFor([a, b], '#123450'), null, 'a colour in no ramp should return null');
+});
+
+await test('nearestStep: enters the ramp at the perceptually closest step', () => {
+  const ramp = createRamp('#FF4B4B');
+  assertEqual(nearestStep(ramp, ramp.swatches[3]), 3, 'an exact member should report its own index');
+  assertEqual(nearestStep(ramp, '#FFFFFF'), 4, 'white should be nearest the lightest step');
+  assertEqual(nearestStep(ramp, '#000000'), 0, 'black should be nearest the darkest step');
+});
+
+await test('shadeStep: moves one step and clamps at both ends', () => {
+  const ramp = createRamp('#FF4B4B');
+  assertEqual(shadeStep(ramp, ramp.swatches[2], 1), ramp.swatches[3], 'should step one lighter');
+  assertEqual(shadeStep(ramp, ramp.swatches[2], -1), ramp.swatches[1], 'should step one darker');
+  assertEqual(shadeStep(ramp, ramp.swatches[4], 1), null, 'should report nothing to do at the light end');
+  assertEqual(shadeStep(ramp, ramp.swatches[0], -1), null, 'should report nothing to do at the dark end');
+});
+
+await test('shadeStep: leaves transparent alone and pulls flat colour into the ramp', () => {
+  const ramp = createRamp('#FF4B4B');
+  assertEqual(shadeStep(ramp, null, 1), null, 'a transparent pixel should be left alone');
+  assertEqual(shadeStep(null, ramp.swatches[1], 1), null, 'with no ramp there is nothing to do');
+  // Shading has to work on artwork it did not paint itself, so a colour outside
+  // the ramp enters at its nearest step rather than being ignored.
+  const entered = shadeStep(ramp, '#FF9628', 1);
+  assert(entered !== null && ramp.swatches.includes(entered),
+    `a foreign colour should enter the ramp, got ${entered}`);
+});
+
+// ---- 43. storage.js: ramps are persisted and sanitised --------------------
+
+await test('sanitiseRamp: accepts a good ramp and snaps its colours to the grid', () => {
+  const ramp = sanitiseRamp({
+    id: 'r1', name: '  Skin  ', swatches: ['#FF4747', '#4CAF50'], base: '#FF4747',
+    hueShift: 12, direction: 'cool-light',
+  });
+  assert(ramp, 'a usable ramp should not be rejected');
+  assertEqual(ramp.name, 'Skin', 'the name should be trimmed');
+  assertEqual(ramp.swatches, ['#FF4B4B', '#4BB44B'], 'stored colours should snap to the 15-step grid');
+  assertEqual(ramp.steps, 2, 'steps should follow the number of swatches actually present');
+  assertEqual(ramp.direction, 'cool-light', 'a valid direction should survive');
+});
+
+await test('sanitiseRamp: rejects what it cannot use, and never throws', () => {
+  for (const bad of [null, undefined, 'a string', 42, {}, { swatches: 'nope' }, { swatches: [] }, { swatches: ['#FF4B4B'] }]) {
+    assertEqual(sanitiseRamp(bad), null, `${JSON.stringify(bad)} should be rejected`);
+  }
+  const repaired = sanitiseRamp({ swatches: ['#FF4B4B', 'junk', '#4BB44B'], direction: 'sideways', hueShift: 'lots' });
+  assert(repaired, 'a ramp with one bad colour should still be usable');
+  assertEqual(repaired.swatches.length, 2, 'the unusable colour should be dropped');
+  assertEqual(repaired.direction, 'warm-light', 'an unknown direction should fall back');
+  assert(Number.isFinite(repaired.hueShift), 'a non-numeric hue shift should become a number');
+  assert(typeof repaired.id === 'string' && repaired.id.length > 0, 'a missing id should be generated');
+});
+
+await test('sanitisePalette: carries ramps alongside slots and recents', () => {
+  const { ramps } = sanitisePalette({
+    slots: [], recents: [],
+    ramps: [
+      { id: 'x', name: 'A', swatches: ['#FF4B4B', '#FFC33C'] },
+      { id: 'x', name: 'B', swatches: ['#4BA5FF', '#C3F0FF'] },
+      { swatches: 'broken' },
+    ],
+  });
+  assertEqual(ramps.length, 2, 'two usable ramps should survive and the broken one be dropped');
+  assert(ramps[0].id !== ramps[1].id, 'colliding ramp ids should be re-keyed, as selection is by id');
+  assertEqual(sanitisePalette(null).ramps, [], 'a missing palette should yield no ramps');
 });
 
 // ---- Render results to the page and console -------------------------------

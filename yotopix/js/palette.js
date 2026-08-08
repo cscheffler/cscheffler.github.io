@@ -251,3 +251,77 @@ export function createRecents({ container, onPick }) {
   wireRovingList(container);
   return { render };
 }
+
+// ------------------------------------------------------------------ ramps
+
+/**
+ * Saved shading ramps, drawn as connected strips rather than loose swatches
+ * (SPEC §15.1) — the point is to see them as one object with an order, not as
+ * five unrelated colours.
+ *
+ * Each ramp is only 3-5 buttons, so unlike the 32-swatch palette these are
+ * individually tabbable; a roving listbox would be more machinery than the
+ * content justifies.
+ */
+export function createRamps({ container, onPick, onDelete }) {
+  function render(ramps, activeHex = null, activeRampId = null) {
+    container.replaceChildren();
+
+    if (ramps.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'swatch-row-empty';
+      empty.textContent = 'No ramps yet';
+      container.append(empty);
+      return;
+    }
+
+    for (const ramp of ramps) {
+      const row = document.createElement('div');
+      row.className = 'ramp';
+      row.dataset.id = ramp.id;
+      if (ramp.id === activeRampId) row.dataset.active = 'true';
+
+      const head = document.createElement('div');
+      head.className = 'ramp-head';
+
+      const name = document.createElement('span');
+      name.className = 'ramp-name';
+      name.textContent = ramp.name;
+      name.title = ramp.name;
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'ramp-delete';
+      remove.textContent = '×';
+      remove.title = `Delete ${ramp.name}`;
+      remove.setAttribute('aria-label', `Delete ramp ${ramp.name}`);
+      remove.addEventListener('click', () => onDelete(ramp.id));
+
+      head.append(name, remove);
+
+      const strip = document.createElement('div');
+      strip.className = 'ramp-strip';
+      strip.setAttribute('role', 'group');
+      strip.setAttribute('aria-label', `${ramp.name}, ${ramp.swatches.length} steps`);
+
+      ramp.swatches.forEach((hex, i) => {
+        const step = document.createElement('button');
+        step.type = 'button';
+        step.className = 'swatch ramp-step';
+        step.style.background = hex;
+        step.dataset.hex = hex;
+        step.setAttribute('aria-pressed', hex === activeHex ? 'true' : 'false');
+        const label = `${ramp.name}, step ${i + 1} of ${ramp.swatches.length}, ${hex}`;
+        step.title = label;
+        step.setAttribute('aria-label', label);
+        step.addEventListener('click', () => onPick(hex, ramp.id));
+        strip.append(step);
+      });
+
+      row.append(head, strip);
+      container.append(row);
+    }
+  }
+
+  return { render };
+}

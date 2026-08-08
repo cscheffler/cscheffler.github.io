@@ -12,6 +12,7 @@
 // No dithering. At 16x16 it reads as noise (§8).
 
 import { quantiseHex } from './state.js';
+import { srgbToOklab } from './oklab.js';
 
 export const BOX = 'box';
 export const NEAREST = 'nearest';
@@ -121,31 +122,11 @@ export function adjustColor({ r, g, b }, brightness = 0, saturation = 0) {
 
 // --------------------------------------------------------------- OKLab
 
-function srgbToLinear(c) {
-  const v = c / 255;
-  return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-}
-
 /**
- * sRGB -> OKLab. SPEC §8 is explicit that naive RGB distance produces obviously
- * wrong matches; OKLab is near-uniform perceptually, so nearest-by-distance in
- * it actually means "looks closest".
+ * Re-exported so the perceptual match reads the same as it always did. The
+ * transform itself now lives in oklab.js, shared with the ramp generator.
  */
-export function oklab(r, g, b) {
-  const lr = srgbToLinear(r);
-  const lg = srgbToLinear(g);
-  const lb = srgbToLinear(b);
-
-  const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
-  const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
-  const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
-
-  return {
-    L: 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
-    a: 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
-    b: 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
-  };
-}
+export const oklab = (r, g, b) => srgbToOklab(r, g, b);
 
 export function hexToRgb(hex) {
   const n = parseInt(hex.slice(1), 16);

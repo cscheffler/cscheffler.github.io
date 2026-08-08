@@ -12,9 +12,10 @@ export const FILL = 'fill';
 export const EYEDROPPER = 'eyedropper';
 export const LINE = 'line';
 export const RECT = 'rect';
+export const SHADE = 'shade';
 
 /** Tools that paint by dragging a continuous stroke. */
-export const STROKE_TOOLS = new Set([PEN, ERASER]);
+export const STROKE_TOOLS = new Set([PEN, ERASER, SHADE]);
 /** Tools that preview a shape while dragging and commit on release. */
 export const SHAPE_TOOLS = new Set([LINE, RECT]);
 
@@ -135,6 +136,34 @@ export function applyCells(doc, cells, color, { grid = 'full', symmetry = 'off' 
       written.add(i);
       if (doc.pixels[i] === color) continue;
       doc.pixels[i] = color;
+      changed = true;
+    }
+  }
+  if (changed) doc.updatedAt = Date.now();
+  return changed;
+}
+
+/**
+ * Like applyCells, but each cell's new colour is computed from what is already
+ * there — the shading tool steps a pixel along a ramp rather than painting one
+ * value (SPEC §15.1). `getNext` returns null to leave a cell alone.
+ *
+ * Symmetry mirrors the OPERATION, not the value: a mirrored cell is stepped
+ * from its own current colour, which is the only reading that behaves when the
+ * two sides are already shaded differently.
+ */
+export function applyShade(doc, cells, getNext, { grid = 'full', symmetry = 'off' } = {}) {
+  const written = new Set();
+  let changed = false;
+
+  for (const { x, y } of cells) {
+    for (const cell of symmetryCells(grid, x, y, symmetry)) {
+      const i = idx(cell.x, cell.y);
+      if (written.has(i)) continue;
+      written.add(i);
+      const next = getNext(doc.pixels[i]);
+      if (next === null || next === undefined || doc.pixels[i] === next) continue;
+      doc.pixels[i] = next;
       changed = true;
     }
   }

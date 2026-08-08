@@ -87,10 +87,40 @@ function sanitiseIcons(list) {
 }
 
 /**
- * The user's palette additions: 8 fixed slots (null where empty) and the
- * recently-used list. Both are untrusted on the way in, like everything else.
+ * One shading ramp, or null if it is too broken to use. A ramp is a palette
+ * group with generator settings attached (SPEC §5, §15.1), so it needs the same
+ * untrusted-input treatment as everything else that comes off disk.
  */
-export function sanitisePalette(raw, { slotCount = 8, recentCount = 8 } = {}) {
+export function sanitiseRamp(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  if (!Array.isArray(raw.swatches)) return null;
+
+  const swatches = raw.swatches.map(quantiseHex).filter(Boolean);
+  if (swatches.length < 2) return null;
+  // Trust the stored colours, not the stored settings: regenerating on load
+  // would silently rewrite a user's ramp if a constant here ever changed.
+  const steps = swatches.length;
+
+  const name = typeof raw.name === 'string' && raw.name.trim()
+    ? raw.name.trim().slice(0, 40)
+    : `Ramp ${swatches[Math.floor(steps / 2)]}`;
+
+  return {
+    id: safeId(raw.id) ?? createDoc().id,
+    name,
+    swatches,
+    base: quantiseHex(raw.base) ?? swatches[Math.floor(steps / 2)],
+    steps,
+    hueShift: Number.isFinite(raw.hueShift) ? Math.max(0, Math.min(40, raw.hueShift)) : 11,
+    direction: raw.direction === 'cool-light' ? 'cool-light' : 'warm-light',
+  };
+}
+
+/**
+ * The user's palette additions: 8 fixed slots (null where empty), the
+ * recently-used list, and any shading ramps. All untrusted on the way in.
+ */
+export function sanitisePalette(raw, { slotCount = 8, recentCount = 8, rampLimit = 12 } = {}) {
   const slots = new Array(slotCount).fill(null);
   if (Array.isArray(raw?.slots)) {
     for (let i = 0; i < slotCount; i++) {
@@ -106,7 +136,20 @@ export function sanitisePalette(raw, { slotCount = 8, recentCount = 8 } = {}) {
       if (recents.length >= recentCount) break;
     }
   }
-  return { slots, recents };
+  const ramps = [];
+  if (Array.isArray(raw?.ramps)) {
+    const seen = new Set();
+    for (const entry of raw.ramps) {
+      const ramp = sanitiseRamp(entry);
+      if (!ramp) continue;
+      if (seen.has(ramp.id)) ramp.id = createDoc().id;
+      seen.add(ramp.id);
+      ramps.push(ramp);
+      if (ramps.length >= rampLimit) break;
+    }
+  }
+
+  return { slots, recents, ramps };
 }
 
 /**
@@ -145,7 +188,7 @@ export function save({ icons, lastOpenId, palette }) {
   const payload = JSON.stringify({
     schemaVersion: SCHEMA_VERSION,
     lastOpenId: lastOpenId ?? null,
-    palette: palette ?? { slots: [], recents: [] },
+    palette: palette ?? { slots: [], recents: [], ramps: [] },
     icons,
   });
   localStorage.setItem(KEY, payload);

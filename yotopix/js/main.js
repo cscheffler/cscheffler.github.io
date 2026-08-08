@@ -2,17 +2,20 @@
 
 import {
   createDoc, clearPixels, litCount, quantiseHex,
-  createHistory, region, isOdd, idx,
+  createHistory, region, isOdd, idx, SYMMETRY_MODES,
 } from './state.js';
 import { createGridView } from './canvas.js';
 import {
-  PEN, ERASER, FILL, EYEDROPPER, LINE, RECT,
+  PEN, ERASER, FILL, EYEDROPPER, LINE, RECT, SHADE,
   shiftPixels, deadZoneCells,
 } from './tools.js';
 import {
-  createPalette, createSlots, createRecents, pushRecent, allSwatches,
+  createPalette, createSlots, createRecents, createRamps, pushRecent, allSwatches,
   DEFAULT_PALETTE, SLOT_COUNT,
 } from './palette.js';
+import {
+  createRamp, generateRamp, findRampFor, shadeStep, RAMP_DEFAULTS,
+} from './ramp.js';
 import { drawPreview } from './preview.js';
 import { downloadPNG } from './exporter.js';
 import { createGallery } from './gallery.js';
@@ -33,7 +36,7 @@ const el = {
   coords: $('coords'),
   litCount: $('lit-count'),
   toggleGrid: $('toggle-grid'),
-  toggleMirror: $('toggle-mirror'),
+  symmetryButtons: [...document.querySelectorAll('.tool[data-symmetry]')],
   undo: $('undo'),
   redo: $('redo'),
   clear: $('clear-canvas'),
@@ -44,6 +47,20 @@ const el = {
   recents: $('recents'),
   customPicker: $('custom-picker'),
   saveSlot: $('save-slot'),
+  ramps: $('ramps'),
+  newRamp: $('new-ramp'),
+  rampDialog: $('ramp-dialog'),
+  rampPreview: $('ramp-preview'),
+  rampHexes: $('ramp-hexes'),
+  rampBase: $('ramp-base'),
+  rampBaseHex: $('ramp-base-hex'),
+  rampSteps: $('ramp-steps'),
+  rampHue: $('ramp-hue'),
+  rampName: $('ramp-name'),
+  rampCreate: $('ramp-create'),
+  rampCancel: $('ramp-cancel'),
+  outSteps: $('out-steps'),
+  outHue: $('out-hue'),
   activeSwatch: $('active-swatch'),
   activeHex: $('active-hex'),
   previewLife: $('preview-life'),
@@ -83,9 +100,14 @@ const app = {
   persists: true,
   slots: new Array(SLOT_COUNT).fill(null),
   recents: [],
+  ramps: [],
+  activeRampId: null,
 };
 
 const history = createHistory();
+
+/** Cell under the pointer or the keyboard caret, for the bracket-key shading. */
+let lastCell = null;
 
 /**
  * Resolves which documents exist and which one is open. This runs BEFORE the
@@ -122,6 +144,8 @@ function loadGallery() {
   const palette = stored?.palette ?? sanitisePalette(null);
   app.slots = palette.slots;
   app.recents = palette.recents;
+  app.ramps = palette.ramps;
+  app.activeRampId = app.ramps[0]?.id ?? null;
 }
 
 loadGallery();
@@ -144,7 +168,7 @@ const saver = createSaver({
 const snapshotState = () => ({
   icons: app.icons,
   lastOpenId: app.doc?.id ?? null,
-  palette: { slots: app.slots, recents: app.recents },
+  palette: { slots: app.slots, recents: app.recents, ramps: app.ramps },
 });
 
 function persist() {
@@ -262,6 +286,12 @@ function setColor(hex, { fromInput = false } = {}) {
 }
 
 function syncColorUI() {
+  // A colour that belongs to a ramp activates that ramp — this is the
+  // ramp-aware eyedropper from SPEC §15.1, and it covers every route to a
+  // colour at once: the dropper, a ramp swatch, the hex field, recents.
+  const owned = findRampFor(app.ramps, app.color);
+  if (owned) app.activeRampId = owned.ramp.id;
+
   el.activeSwatch.style.background = app.color;
   // Exact comparison, not case-insensitive: typing "#ff0000" must be rewritten
   // as the canonical "#FF0000" rather than left as the user spelled it. The
@@ -273,6 +303,7 @@ function syncColorUI() {
   paletteUI.setActive(app.color);
   slotsUI.setActive(app.color);
   recentsUI.render(app.recents, app.color);
+  renderRamps();
 }
 
 const paletteUI = createPalette({
@@ -297,6 +328,98 @@ const slotsUI = createSlots({
 const recentsUI = createRecents({
   container: el.recents,
   onPick: (hex) => setColor(hex),
+});
+
+const rampsUI = createRamps({
+  container: el.ramps,
+  onPick: (hex, rampId) => {
+    app.activeRampId = rampId;
+    setColor(hex);
+  },
+  onDelete: (rampId) => {
+    const ramp = app.ramps.find((r) => r.id === rampId);
+    if (!ramp) return;
+    if (!confirm(`Delete the ramp "${ramp.name}"?`)) return;
+    app.ramps = app.ramps.filter((r) => r.id !== rampId);
+    if (app.activeRampId === rampId) app.activeRampId = app.ramps[0]?.id ?? null;
+    renderRamps();
+    persist();
+    toast(`Deleted ${ramp.name}`);
+  },
+});
+
+function activeRamp() {
+  return app.ramps.find((r) => r.id === app.activeRampId) ?? null;
+}
+
+function renderRamps() {
+  rampsUI.render(app.ramps, app.color, app.activeRampId);
+}
+
+// ------------------------------------------------------------ ramp dialog
+
+function rampSettings() {
+  return {
+    steps: Number(el.rampSteps.value),
+    hueShift: Number(el.rampHue.value),
+    direction: [...document.querySelectorAll('input[name="ramp-dir"]')]
+      .find((r) => r.checked)?.value ?? RAMP_DEFAULTS.direction,
+  };
+}
+
+function renderRampPreview() {
+  const base = quantiseHex(el.rampBase.value) ?? '#FF4B4B';
+  const generated = generateRamp(base, rampSettings());
+
+  el.rampBaseHex.textContent = base;
+  el.outSteps.textContent = String(generated.steps);
+  el.outHue.textContent = `${el.rampHue.value}°`;
+
+  el.rampPreview.replaceChildren();
+  for (const hex of generated.swatches) {
+    const step = document.createElement('span');
+    step.className = 'ramp-step-view';
+    step.style.background = hex;
+    el.rampPreview.append(step);
+  }
+  el.rampPreview.setAttribute('aria-label', `Ramp preview: ${generated.swatches.join(', ')}`);
+  el.rampHexes.textContent = generated.swatches.join('  ');
+  return generated;
+}
+
+for (const input of [el.rampBase, el.rampSteps, el.rampHue]) {
+  // Ranges and the colour input both fire `input` continuously; the preview is
+  // cheap and this is not a committed edit, so live is right here.
+  input.addEventListener('input', renderRampPreview);
+}
+for (const radio of document.querySelectorAll('input[name="ramp-dir"]')) {
+  radio.addEventListener('change', renderRampPreview);
+}
+
+el.newRamp.addEventListener('click', () => {
+  el.rampBase.value = app.color;
+  el.rampSteps.value = String(RAMP_DEFAULTS.steps);
+  el.rampHue.value = String(RAMP_DEFAULTS.hueShift);
+  el.rampName.value = '';
+  const warm = document.querySelector('input[name="ramp-dir"][value="warm-light"]');
+  if (warm) warm.checked = true;
+  renderRampPreview();
+  el.rampDialog.showModal();
+  el.rampName.focus();
+});
+
+el.rampCancel.addEventListener('click', () => el.rampDialog.close());
+
+el.rampCreate.addEventListener('click', () => {
+  const base = quantiseHex(el.rampBase.value) ?? app.color;
+  const ramp = createRamp(base, rampSettings(), el.rampName.value.trim());
+  app.ramps.push(ramp);
+  app.activeRampId = ramp.id;
+  el.rampDialog.close();
+  renderRamps();
+  persist();
+  setTool(SHADE);
+  toast(`${ramp.name} created. Drag to lighten, Shift-drag to darken.`);
 });
 
 function assignSlot(index, hex) {
@@ -353,6 +476,10 @@ el.activeHex.addEventListener('keydown', (e) => {
 // ------------------------------------------------------------------- tools
 
 function setTool(tool) {
+  if (tool === SHADE && app.ramps.length === 0) {
+    toast('The shade tool needs a ramp. Make one under Shading ramps.');
+    return;
+  }
   app.tool = tool;
   for (const button of el.tools) {
     const active = button.dataset.tool === tool;
@@ -519,11 +646,13 @@ const view = createGridView({
   onChange: onDocChanged,
   onPick: (hex) => setColor(hex),
   onHover: (cell) => {
+    lastCell = cell;
     el.coords.textContent = cell ? `${cell.x},${cell.y}` : '--,--';
   },
   onResize: (cssSize) => {
     el.stage.style.setProperty('--canvas-size', `${cssSize}px`);
   },
+  getShade: (current, delta) => shadeStep(activeRamp(), current, delta),
 });
 
 // ------------------------------------------------------------------ history
@@ -559,13 +688,39 @@ el.toggleGrid.addEventListener('click', () => {
   view.setShowGrid(showGrid);
 });
 
-function setMirror(on) {
-  app.symmetry = on ? 'vertical' : 'off';
-  el.toggleMirror.setAttribute('aria-pressed', String(on));
+/**
+ * Symmetry: off / vertical / horizontal / quad / eight — SPEC §15.1.
+ *
+ * The helper behind this has handled all five modes, region-aware, since mirror
+ * mode was built (DECISIONS #12), which is exactly what §15.3 asked for. This
+ * only exposes them.
+ */
+function setSymmetry(mode) {
+  if (!SYMMETRY_MODES.includes(mode)) return;
+  app.symmetry = mode;
+  for (const button of el.symmetryButtons) {
+    const active = button.dataset.symmetry === mode;
+    button.setAttribute('aria-checked', String(active));
+    button.tabIndex = active ? 0 : -1;
+  }
   view.render();
 }
 
-el.toggleMirror.addEventListener('click', () => setMirror(app.symmetry === 'off'));
+for (const button of el.symmetryButtons) {
+  button.addEventListener('click', () => setSymmetry(button.dataset.symmetry));
+}
+
+// Roving focus inside the radiogroup, as the ARIA pattern expects.
+el.symmetryButtons[0].parentElement.addEventListener('keydown', (e) => {
+  const keys = ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'];
+  if (!keys.includes(e.key)) return;
+  e.preventDefault();
+  const dir = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 1;
+  const i = SYMMETRY_MODES.indexOf(app.symmetry);
+  const next = SYMMETRY_MODES[(i + dir + SYMMETRY_MODES.length) % SYMMETRY_MODES.length];
+  setSymmetry(next);
+  el.symmetryButtons.find((b) => b.dataset.symmetry === next)?.focus();
+});
 
 el.toggleGlow.addEventListener('change', () => {
   app.glow = el.toggleGlow.checked;
@@ -761,7 +916,9 @@ function toast(message) {
 
 // ---------------------------------------------------------------- keyboard
 
-const TOOL_KEYS = { b: PEN, e: ERASER, g: FILL, i: EYEDROPPER, l: LINE, r: RECT };
+const TOOL_KEYS = {
+  b: PEN, e: ERASER, g: FILL, i: EYEDROPPER, l: LINE, r: RECT, d: SHADE,
+};
 const ARROWS = {
   ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
 };
@@ -774,7 +931,7 @@ function isTyping(target) {
 
 window.addEventListener('keydown', (e) => {
   // While a modal is up it owns the keyboard; Escape is handled by <dialog>.
-  if (el.dialog.open || el.importDialog.open) return;
+  if (el.dialog.open || el.importDialog.open || el.rampDialog.open) return;
 
   const mod = e.metaKey || e.ctrlKey;
   const typing = isTyping(e.target);
@@ -811,6 +968,29 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  // Step the pixel under the cursor along the ramp without changing tools —
+  // the fast path SPEC §15.1 asks for. Alt is already the eyedropper, so this
+  // uses bracket keys rather than a mouse modifier; see DECISIONS.md.
+  if (key === '[' || key === ']') {
+    e.preventDefault();
+    const ramp = activeRamp();
+    if (!ramp) {
+      toast('No ramp yet. Make one under Shading ramps.');
+      return;
+    }
+    if (!lastCell) {
+      toast('Point at a pixel first.');
+      return;
+    }
+    const i = idx(lastCell.x, lastCell.y);
+    const next = shadeStep(ramp, app.doc.pixels[i], key === ']' ? 1 : -1);
+    if (next === null) return;
+    edit(() => {
+      app.doc.pixels[i] = next;
+    });
+    return;
+  }
+
   if (TOOL_KEYS[key]) {
     setTool(TOOL_KEYS[key]);
     return;
@@ -826,7 +1006,7 @@ window.addEventListener('keydown', (e) => {
 
   switch (key) {
     case 'm':
-      setMirror(app.symmetry === 'off');
+      setSymmetry(SYMMETRY_MODES[(SYMMETRY_MODES.indexOf(app.symmetry) + 1) % SYMMETRY_MODES.length]);
       break;
     case 'x':
       setColor(app.previousColor);
@@ -857,6 +1037,7 @@ document.addEventListener('visibilitychange', () => {
 function boot() {
   setTool(PEN);
   slotsUI.set(app.slots, app.color);
+  renderRamps();
   syncColorUI();
   el.name.value = app.doc.name;
   renderGallery();

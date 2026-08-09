@@ -29,6 +29,7 @@ import {
   sampleCells, estimatePaperWhite, whiteBalanceGains, applyGains,
   isBlank, saturationOf, buildFromPhoto,
 } from './paper.js';
+import { createReference, REFERENCE_DEFAULTS } from './reference.js';
 import {
   centreCrop, clampCrop, boxSample, nearestSample, adjustColor, oklab,
   preparePalette, nearestPaletteColor, buildPixels,
@@ -48,9 +49,18 @@ function assert(cond, msg) {
   if (!cond) throw new Error(msg || 'assertion failed');
 }
 
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
 function deepEqual(a, b) {
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((v, i) => deepEqual(v, b[i]));
+  }
+  // Settings objects get compared by value too — otherwise a getter that hands
+  // back a defensive copy can never equal the defaults it was copied from.
+  if (isPlainObject(a) && isPlainObject(b)) {
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length
+      && keys.every((k) => Object.hasOwn(b, k) && deepEqual(a[k], b[k]));
   }
   return Object.is(a, b);
 }
@@ -955,6 +965,35 @@ await test('parseBackup: round-trips with toBackupJSON', () => {
     assertEqual(match.grid, original.grid, `icon '${original.name}' should keep its grid mode`);
     assertEqual(match.pixels, original.pixels, `icon '${original.name}' should keep its pixels exactly`);
   }
+});
+
+await test('parseBackup: a backup carries the whole palette, ramps included', () => {
+  // Regression: the backup used to be written with only { slots, recents }, so
+  // restoring a gallery silently threw away every shading ramp the user had
+  // built — a worse copy than the autosave it exists to protect.
+  const docs = [createDoc('Alpha')];
+  const palette = {
+    slots: ['#FF4B4B', null, null, null, null, null, null, '#2D875A'],
+    // On the 15-step grid, or storage snaps them and the comparison below
+    // fails for a reason that has nothing to do with backups.
+    recents: ['#4BA5FF', '#FFB44B'],
+    ramps: [{
+      id: 'r1',
+      name: 'Leaf',
+      swatches: ['#0F3C1E', '#1E5A2D', '#2D875A', '#5AB478', '#96D2A5'],
+      base: '#2D875A',
+      steps: 5,
+      hueShift: 11,
+    }],
+  };
+
+  const { palette: back } = parseBackup(toBackupJSON(docs, palette));
+  assert(back, 'the palette should survive the round trip at all');
+  assertEqual(back.slots, palette.slots, 'custom slots should survive');
+  assertEqual(back.recents, palette.recents, 'recents should survive');
+  assertEqual(back.ramps.length, 1, 'the ramp should survive');
+  assertEqual(back.ramps[0].name, 'Leaf', 'and keep its name');
+  assertEqual(back.ramps[0].swatches, palette.ramps[0].swatches, 'and every step, in order');
 });
 
 await test('parseBackup: accepts a bare top-level array as well as the {schemaVersion, icons} object form', () => {
@@ -2263,6 +2302,171 @@ await test('paper: a square coloured pure white comes back blank', () => {
   const photo = fakeSheet(truth, flat, 720, 540, { tint: [1, 1, 1] });
   assertEqual(buildFromPhoto(photo, flat, { palette: allSwatches() })[8 * 16 + 8], null,
     'a white square is indistinguishable from bare paper');
+});
+
+
+// ---- 46. reference.js: tracing underlay and its eyedropper ----------------
+
+/** A four-quarter test image, so where you sample decides what you get. */
+async function quartersImage(size = 320) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const half = size / 2;
+  ctx.fillStyle = '#E1004B'; ctx.fillRect(0, 0, half, half);
+  ctx.fillStyle = '#00A5E1'; ctx.fillRect(half, 0, half, half);
+  ctx.fillStyle = '#0FB400'; ctx.fillRect(0, half, half, half);
+  ctx.fillStyle = '#F0C300'; ctx.fillRect(half, half, half, half);
+  return createImageBitmap(canvas);
+}
+
+await test('reference: starts empty and reports it', () => {
+  const reference = createReference();
+  assertEqual(reference.has(), false, 'a fresh reference holds nothing');
+  assertEqual(reference.showing(), false, 'and is therefore not showing');
+  assertEqual(reference.sampleCell(4, 4), null, 'sampling nothing should give null, not throw');
+  assertEqual(reference.draw({}, 512), false, 'drawing nothing should be a no-op');
+});
+
+await test('reference: sampleCell reads the source image, quarter by quarter', async () => {
+  const reference = createReference();
+  await reference.load(await quartersImage());
+  assert(reference.has(), 'the image should have loaded');
+  // A square image at scale 100 exactly fills the grid, so each quadrant of
+  // cells sits over one quadrant of the picture.
+  assertEqual(reference.sampleCell(4, 4), '#E1004B', 'top-left quarter');
+  assertEqual(reference.sampleCell(11, 4), '#00A5E1', 'top-right quarter');
+  assertEqual(reference.sampleCell(4, 11), '#0FB400', 'bottom-left quarter');
+  assertEqual(reference.sampleCell(11, 11), '#F0C300', 'bottom-right quarter');
+});
+
+await test('reference: opacity and visibility govern display, not the sampled colour', async () => {
+  const reference = createReference();
+  await reference.load(await quartersImage());
+
+  // Dimming the image must not change the colour it yields: the eyedropper
+  // reads the source, not the dimmed composite on screen.
+  reference.set({ opacity: 5 });
+  assertEqual(reference.sampleCell(4, 4), '#E1004B', 'a dimmed reference still yields its true colour');
+  assertEqual(reference.showing(), true, 'and is still showing at 5%');
+
+  reference.set({ opacity: 0 });
+  assertEqual(reference.showing(), false, 'zero opacity is not showing');
+  assertEqual(reference.sampleCell(4, 4), '#E1004B', 'but the colour is still readable');
+
+  // Hidden is different: there is nothing on screen to point at, so refuse.
+  reference.set({ opacity: 45 });
+  reference.toggle();
+  assertEqual(reference.get().visible, false, 'toggle should hide it');
+  assertEqual(reference.sampleCell(4, 4), null, 'a hidden reference must not be sampled');
+  reference.toggle();
+  assertEqual(reference.sampleCell(4, 4), '#E1004B', 'and is readable again once shown');
+});
+
+await test('reference: position and scale move what sits under a cell', async () => {
+  const reference = createReference();
+  await reference.load(await quartersImage());
+  assertEqual(reference.sampleCell(4, 4), '#E1004B', 'before moving, the top-left quarter');
+
+  // Slide the image a full half-grid left: the right-hand quarters move across.
+  reference.set({ x: -8 });
+  assertEqual(reference.sampleCell(4, 4), '#00A5E1', 'after sliding left, the top-right quarter is here');
+  assertEqual(reference.sampleCell(11, 4), null, 'and the far side is now off the image');
+
+  reference.set({ x: 0, y: -8 });
+  assertEqual(reference.sampleCell(4, 4), '#0FB400', 'sliding up brings the bottom-left quarter');
+
+  // Shrinking leaves the corners outside the image entirely.
+  reference.set({ x: 0, y: 0, scale: 50 });
+  assertEqual(reference.sampleCell(0, 0), null, 'a corner cell falls outside a half-size reference');
+  assertEqual(reference.sampleCell(8, 8), '#F0C300', 'while the middle still reads');
+});
+
+await test('reference: samplePoint reads a patch, not the whole square', async () => {
+  const reference = createReference();
+  await reference.load(await quartersImage());
+
+  // Cell (7,7) is the last cell of the top-left quarter and cell (8,8) the
+  // first of the bottom-right, so the four quarters meet exactly at grid
+  // coordinate (8,8). Either side of that corner is a different colour.
+  assertEqual(reference.samplePoint(7.5, 7.5), '#E1004B', 'just inside the top-left quarter');
+  assertEqual(reference.samplePoint(8.5, 7.5), '#00A5E1', 'just inside the top-right quarter');
+  assertEqual(reference.samplePoint(7.5, 8.5), '#0FB400', 'just inside the bottom-left quarter');
+  assertEqual(reference.samplePoint(8.5, 8.5), '#F0C300', 'just inside the bottom-right quarter');
+});
+
+await test('reference: a point pick beats a cell average on a straddling square', async () => {
+  const reference = createReference();
+  // Two halves split down the middle of a cell rather than on a cell boundary:
+  // scaled to the grid, the seam runs down the centre of column 8.
+  const canvas = document.createElement('canvas');
+  canvas.width = 1088;   // 16 cells of 68px, seam at 8.5 cells = 578px
+  canvas.height = 1088;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, 578, 1088);
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(578, 0, 510, 1088);
+  await reference.load(await createImageBitmap(canvas));
+
+  // The whole square is half black and half white, so its average is a mid grey
+  // that appears nowhere in the picture. That is the right answer for an edge.
+  const average = reference.sampleCell(8, 4);
+  assert(average !== '#000000' && average !== '#FFFFFF',
+    `a straddling square should average to neither side, got ${average}`);
+
+  // Pointing at either half gets the actual colour there, which is the whole
+  // reason this mode exists.
+  assertEqual(reference.samplePoint(8.2, 4.5), '#000000', 'the dark half of that same square');
+  assertEqual(reference.samplePoint(8.8, 4.5), '#FFFFFF', 'the light half of that same square');
+});
+
+await test('reference: samplePoint respects placement, edges and visibility', async () => {
+  const reference = createReference();
+  await reference.load(await quartersImage());
+
+  // The grid corners are the image corners at scale 100, and just outside them
+  // is nothing. Half a cell in from each is safely inside.
+  assertEqual(reference.samplePoint(0.5, 0.5), '#E1004B', 'inside the top-left corner');
+  assertEqual(reference.samplePoint(15.5, 15.5), '#F0C300', 'inside the bottom-right corner');
+  assertEqual(reference.samplePoint(-0.5, 8), null, 'left of the image picks nothing');
+  assertEqual(reference.samplePoint(16.5, 8), null, 'right of the image picks nothing');
+  assertEqual(reference.samplePoint(8, -0.5), null, 'above the image picks nothing');
+  assertEqual(reference.samplePoint(8, 16.5), null, 'below the image picks nothing');
+
+  // Shrinking leaves the grid corners off the image, exactly as for cells.
+  reference.set({ scale: 50 });
+  assertEqual(reference.samplePoint(0.5, 0.5), null, 'a corner falls outside a half-size reference');
+  assertEqual(reference.samplePoint(8.5, 8.5), '#F0C300', 'while the middle still reads');
+
+  reference.set({ scale: 100 });
+  reference.toggle();
+  assertEqual(reference.samplePoint(4, 4), null, 'a hidden reference must not be point-sampled');
+});
+
+await test('reference: dimming does not change a point pick either', async () => {
+  const reference = createReference();
+  await reference.load(await quartersImage());
+  reference.set({ opacity: 5 });
+  assertEqual(reference.samplePoint(4.5, 4.5), '#E1004B', 'the source colour, not the dimmed one');
+});
+
+await test('reference: clear forgets the image and resets every control', async () => {
+  const reference = createReference();
+  await reference.load(await quartersImage());
+  reference.set({ opacity: 90, scale: 250, x: 3, y: -2, visible: false });
+  reference.clear();
+  assertEqual(reference.has(), false, 'the image should be gone');
+  assertEqual(reference.sampleCell(4, 4), null, 'and unsamplable');
+  assertEqual(reference.get(), REFERENCE_DEFAULTS, 'the controls should be back at their defaults');
+});
+
+await test('reference: loading a second image resets the controls', async () => {
+  const reference = createReference();
+  await reference.load(await quartersImage());
+  reference.set({ opacity: 90, scale: 300, x: 5 });
+  await reference.load(await quartersImage(160));
+  assertEqual(reference.get(), REFERENCE_DEFAULTS,
+    'a new reference should not inherit the last one position and scale');
 });
 
 // ---- Render results to the page and console -------------------------------

@@ -39,6 +39,7 @@ export function createGridView({
   onHover,
   onResize,
   onPick,
+  onPickReference,
   getShade,
   drawReference,
 }) {
@@ -326,6 +327,10 @@ export function createGridView({
       x: Math.min(SIZE - 1, Math.max(0, x)),
       y: Math.min(SIZE - 1, Math.max(0, y)),
       inside: x >= 0 && y >= 0 && x < SIZE && y < SIZE,
+      // Fractional cell position, for a reference point-pick — kept alongside
+      // the clamped integer cell rather than replacing it.
+      u: Math.min(SIZE, Math.max(0, (e.clientX - rect.left) / size)),
+      v: Math.min(SIZE, Math.max(0, (e.clientY - rect.top) / size)),
     };
   }
 
@@ -384,7 +389,7 @@ export function createGridView({
       // optimisation for drags that leave the canvas, not a requirement.
     }
 
-    const { x, y } = cellFromEvent(e);
+    const { x, y, u, v } = cellFromEvent(e);
     cursor = { x, y };
     cursorVisible = false;
     last = null;
@@ -396,7 +401,11 @@ export function createGridView({
     activeTool = e.button === 2 ? ERASER : e.altKey ? EYEDROPPER : getTool();
 
     if (activeTool === EYEDROPPER) {
-      pickAt(x, y);
+      // Shift samples the reference image instead of the drawing. Free whenever
+      // the dropper is the effective tool, so it works with the tool selected
+      // and with the temporary Alt dropper alike.
+      if (e.shiftKey) onPickReference?.(x, y, u, v);
+      else pickAt(x, y);
       return;
     }
 
@@ -507,7 +516,10 @@ export function createGridView({
       } else if (tool === FILL) {
         write(floodFillCells(getDoc(), cursor.x, cursor.y, grid()), getColor());
       } else if (tool === EYEDROPPER) {
-        pickAt(cursor.x, cursor.y);
+        // No pointer position from the keyboard, so sample the middle of the
+        // caret's cell rather than its top-left corner.
+        if (e.shiftKey) onPickReference?.(cursor.x, cursor.y, cursor.x + 0.5, cursor.y + 0.5);
+        else pickAt(cursor.x, cursor.y);
       } else {
         write([{ ...cursor }], tool === ERASER ? null : getColor());
       }

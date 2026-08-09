@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YotoPix &mdash; help</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%2316151A'/><rect x='5' y='5' width='6' height='6' fill='%23FFB347'/></svg>">
+<style>
+  /*
+    Self-contained on purpose, like print.html: the app's stylesheet is all
+    editor layout and none of it applies to a page of prose. The palette below
+    is copied from styles.css so the two pages look like one product.
+  */
+  :root {
+    --ground: #16151A;
+    --panel: #1F1E25;
+    --hairline: #33313D;
+    --text: #E8E4DC;
+    --muted: #8A8695;
+    --accent: #FFB347;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0 20px 64px;
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  header.top {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 18px 0 14px;
+    border-bottom: 1px solid var(--hairline);
+    margin-bottom: 22px;
+  }
+  header.top h1 { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+  header.top .sub { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  header.top .back { margin-left: auto; font-size: 13px; }
+
+  a { color: var(--accent); }
+
+  h2 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 30px 0 8px;
+    padding-top: 14px;
+    border-top: 1px solid var(--hairline);
+  }
+  h2:first-of-type { border-top: 0; padding-top: 0; }
+
+  h3 { font-size: 13px; font-weight: 600; margin: 18px 0 4px; color: var(--text); }
+
+  p, li { color: #C9C4BC; }
+  p { margin: 0 0 10px; }
+  ul { margin: 0 0 10px; padding-left: 20px; }
+  li { margin-bottom: 3px; }
+  strong { color: var(--text); font-weight: 600; }
+
+  /* The quick-jump list: a plain wrapped row of links, no bullets. */
+  nav.jump { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 4px; font-size: 13px; }
+
+  .note {
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 12px 14px;
+    margin: 0 0 18px;
+  }
+  .note p:last-child { margin-bottom: 0; }
+
+  kbd {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: #2A2833;
+    border: 1px solid var(--hairline);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  /* Tool rows: the real icon from the toolbar, so it can be matched by eye. */
+  .tool-row { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+  .tool-icon {
+    flex: 0 0 auto;
+    width: 34px; height: 34px;
+    display: grid; place-items: center;
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: 4px;
+    color: var(--text);
+  }
+  .tool-icon svg { width: 21px; height: 21px; }
+  .tool-body { flex: 1 1 auto; min-width: 0; }
+  .tool-body .name { font-weight: 600; color: var(--text); }
+  .tool-body p { margin: 1px 0 0; }
+
+  table { border-collapse: collapse; width: 100%; margin: 0 0 12px; font-size: 13px; }
+  th, td { text-align: left; padding: 5px 10px 5px 0; vertical-align: top; border-bottom: 1px solid var(--hairline); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td:first-child { white-space: nowrap; width: 1%; padding-right: 18px; }
+
+  /* Wide content must scroll in its own box rather than the page. */
+  .scroll { overflow-x: auto; }
+
+  footer { margin-top: 34px; padding-top: 14px; border-top: 1px solid var(--hairline); color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>YotoPix help</h1>
+  <span class="sub">16 &times; 16 &middot; PNG &middot; steps of 15</span>
+  <a class="back" href="./index.html">&larr; Back to the editor</a>
+</header>
+
+<nav class="jump">
+  <a href="#rule">The one rule</a>
+  <a href="#tools">Tools</a>
+  <a href="#canvas">Drawing</a>
+  <a href="#colour">Colour</a>
+  <a href="#ramps">Shading ramps</a>
+  <a href="#symmetry">Symmetry</a>
+  <a href="#grid">Grid mode</a>
+  <a href="#checks">Checks</a>
+  <a href="#reference">Reference tracing</a>
+  <a href="#import">Import an image</a>
+  <a href="#paper">Paper to pixel</a>
+  <a href="#saving">Saving &amp; export</a>
+  <a href="#keys">Every shortcut</a>
+</nav>
+
+<h2 id="rule">The one rule that matters</h2>
+
+<div class="note">
+  <p>
+    A Yoto icon is <strong>16 &times; 16 pixels with no background</strong>. The display has no
+    backlight behind a transparent pixel, so transparent is not a colour &mdash; it is the
+    unlit panel. Draw the <em>shape</em> of the thing and leave everything around it empty. A
+    filled square with a picture inside it will read as a glowing block.
+  </p>
+  <p>
+    The display also resolves each colour channel in <strong>steps of 15</strong>, so every
+    colour here snaps to that grid. Two shades closer together than one step are the same
+    shade on the device.
+  </p>
+</div>
+
+<h2 id="tools">Tools</h2>
+
+<p>Down the left edge. Click one, or press its key.</p>
+<div class="tool-row">
+  <div class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4 20v-3.5L15.5 5l3.5 3.5L7.5 20H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M13.5 7l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+        </svg></div>
+  <div class="tool-body">
+    <span class="name">Pen</span> <kbd>B</kbd>
+    <p>Click or drag to paint with the active colour. Drags are joined up, so a fast stroke does not come out as dots.</p>
+  </div>
+</div>
+<div class="tool-row">
+  <div class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M20 20H7l-4-4a1 1 0 0 1 0-1.4l9.6-9.6a2 2 0 0 1 2.8 0l5.6 5.6a2 2 0 0 1 0 2.8L14 20M18 13 11 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg></div>
+  <div class="tool-body">
+    <span class="name">Eraser</span> <kbd>E</kbd>
+    <p>Makes pixels transparent again. You rarely need to select it: <kbd>right-drag</kbd> erases without switching tools, whatever tool you are holding.</p>
+  </div>
+</div>
+<div class="tool-row">
+  <div class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M5.5 12 12 5.5l6.5 6.5-6 6a1.9 1.9 0 0 1-2.6 0l-4.4-4.4a1.9 1.9 0 0 1 0-2.6zM9 8.5 12 5.5M19 15c.9 1.2 1.8 2.5 1.8 3.4a1.8 1.8 0 1 1-3.6 0c0-.9.9-2.2 1.8-3.4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg></div>
+  <div class="tool-body">
+    <span class="name">Flood fill</span> <kbd>G</kbd>
+    <p>Fills the connected area under the pointer. Transparent counts as a colour, so this is also how you flood the empty space around a shape.</p>
+  </div>
+</div>
+<div class="tool-row">
+  <div class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M13 7.5 4.8 15.7a2 2 0 0 0-.6 1.4V19h1.9a2 2 0 0 0 1.4-.6L15.7 11M12.4 4.6 19 11.2l1.7-1.7a2.4 2.4 0 0 0 0-3.4l-1.4-1.4a2.4 2.4 0 0 0-3.4 0z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg></div>
+  <div class="tool-body">
+    <span class="name">Eyedropper</span> <kbd>I</kbd>
+    <p>Picks the colour of a pixel. Hold <kbd>Alt</kbd> to borrow it without changing tools. If the colour belongs to a shading ramp, that ramp becomes the active one. Hold <kbd>Shift</kbd> to read the <a href="#reference">reference image</a> instead of the drawing.</p>
+  </div>
+</div>
+<div class="tool-row">
+  <div class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M6.8 17.2 17.2 6.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="5" cy="19" r="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+          <circle cx="19" cy="5" r="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+        </svg></div>
+  <div class="tool-body">
+    <span class="name">Line</span> <kbd>L</kbd>
+    <p>Drag from one end to the other. The line previews as you drag and lands when you let go.</p>
+  </div>
+</div>
+<div class="tool-row">
+  <div class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4.5 5.5h15v13h-15z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg></div>
+  <div class="tool-body">
+    <span class="name">Rectangle</span> <kbd>R</kbd>
+    <p>Drag out a corner-to-corner outline. Hold <kbd>Shift</kbd> to fill it instead.</p>
+  </div>
+</div>
+<div class="tool-row">
+  <div class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M12 3.8a8.2 8.2 0 0 0 0 16.4z" fill="currentColor" stroke="none"/>
+        </svg></div>
+  <div class="tool-body">
+    <span class="name">Shade</span> <kbd>D</kbd>
+    <p>The unusual one. Instead of painting a colour, it moves each pixel you touch one step along its <a href="#ramps">shading ramp</a> &mdash; drag to lighten, hold <kbd>Shift</kbd> to darken. Sculpt light and shadow onto flat colour without picking shades by hand. A colour that is not already in the ramp joins it at its nearest step, so this works on flat artwork and not only on pixels you shaded yourself. Empty squares stay empty.</p>
+  </div>
+</div>
+
+<h2 id="canvas">Drawing</h2>
+
+<ul>
+  <li><kbd>Cmd/Ctrl</kbd>+<kbd>Z</kbd> undoes, <kbd>Cmd/Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>
+    redoes. History is per icon and lasts for the session.</li>
+  <li><strong>Arrow keys shift the whole image</strong> by one pixel, wrapping round the
+    edges. Useful for centring something you drew slightly off.</li>
+  <li>You can draw without a mouse: <kbd>Shift</kbd>+arrows move a caret around the grid and
+    <kbd>Space</kbd> (or <kbd>Enter</kbd>) applies the current tool where it sits.</li>
+  <li><kbd>#</kbd> turns the grid overlay on and off. <kbd>Delete</kbd> or
+    <kbd>Backspace</kbd> clears the canvas, after asking.</li>
+</ul>
+
+<h2 id="colour">Colour</h2>
+
+<p>
+  The palette is a curated set that survives the display's steps of 15. Anything you choose
+  elsewhere &mdash; the hex box, the colour picker, an imported photo &mdash; is snapped to
+  the same grid, so what you see is what the device can actually show.
+</p>
+<ul>
+  <li><strong>Custom slots</strong> hold eight colours of your own. <em>Save to slot</em>
+    stores the active colour; <kbd>1</kbd>&ndash;<kbd>8</kbd> recall them.</li>
+  <li><strong>Recent</strong> fills itself with what you have actually painted with.</li>
+  <li><kbd>X</kbd> swaps back to the previous colour, for going to and fro between two.</li>
+</ul>
+
+<h3>Black is a special case</h3>
+<p>
+  Black and transparent look identical on the display. A black pixel <em>enclosed</em> by lit
+  pixels reads as a deliberate hole and is fine &mdash; an eye, a gap, an outline inside the
+  shape. A black pixel that touches the outside silently becomes part of the background and
+  changes the silhouette. <a href="#checks">Checks</a> watches for exactly this.
+</p>
+
+<h2 id="ramps">Shading ramps</h2>
+
+<p>
+  A ramp is a row of shades of one colour, from dark to light, generated for you: pick a base
+  colour, choose how many steps, and say whether highlights should run warmer or cooler.
+  Every shade is placed perceptually, so the steps look evenly spaced rather than merely
+  being evenly numbered, and each one is snapped to the display's grid.
+</p>
+<ul>
+  <li>Click any swatch in a ramp to paint with it.</li>
+  <li>The <strong>Shade</strong> tool walks pixels up and down the active ramp.</li>
+  <li><kbd>[</kbd> and <kbd>]</kbd> darken and lighten the single pixel under the pointer
+    without changing tools &mdash; the quickest way to touch up one edge.</li>
+</ul>
+<p>Ramps are saved with your gallery, so they are still there tomorrow.</p>
+
+<h2 id="symmetry">Symmetry</h2>
+
+<p>
+  Under the tools. Everything you draw is mirrored live, including flood fills and shading.
+  <kbd>M</kbd> cycles through the modes.
+</p>
+<div class="tool-row">
+  <div class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M6.3 17.7 17.7 6.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg></div>
+  <div class="tool-body"><span class="name">Off</span><p>Draw normally.</p></div>
+</div>
+<div class="tool-row">
+  <div class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3v18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.5 2.5"/>
+          <path d="M8.5 8 5 12l3.5 4M15.5 8l3.5 4-3.5 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg></div>
+  <div class="tool-body"><span class="name">Left to right</span><p>The usual one: faces, animals, anything front-on.</p></div>
+</div>
+<div class="tool-row">
+  <div class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M3 12h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.5 2.5"/>
+          <path d="M8 8.5 12 5l4 3.5M8 15.5 12 19l4-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg></div>
+  <div class="tool-body"><span class="name">Top to bottom</span><p>Reflections and horizontal bands.</p></div>
+</div>
+<div class="tool-row">
+  <div class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.5 2.5"/>
+          <path d="M15.5 5.5h3v3h-3zM5.5 15.5h3v3h-3z" fill="currentColor" stroke="none"/>
+        </svg></div>
+  <div class="tool-body"><span class="name">Both axes</span><p>Quarter the work; good for flowers and badges.</p></div>
+</div>
+<div class="tool-row">
+  <div class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2.5 2.5"/>
+        </svg></div>
+  <div class="tool-body"><span class="name">Eight-way</span><p>Also mirrors the diagonals, for snowflakes, stars and compass shapes.</p></div>
+</div>
+
+<h2 id="grid">Grid mode &mdash; the 15 &times; 15 trick</h2>
+
+<p>
+  A 16-wide grid has no middle column, so a symmetrical drawing can never sit dead centre.
+  Switching the <strong>Grid</strong> panel to one of the <strong>Odd 15 &times; 15</strong>
+  modes drops one row and one column, giving you a true centre line to mirror against. The
+  anchor decides which edge is given up.
+</p>
+<p>
+  The dropped row and column are still exported &mdash; the file stays 16 &times; 16 &mdash;
+  they are simply left empty, which the display shows as nothing. If you already drew
+  something there, YotoPix says how many pixels are affected and offers to drop them &mdash;
+  or to shift the whole image clear first, when there is somewhere for it to go.
+</p>
+
+<h2 id="checks">Checks</h2>
+
+<p>
+  A running list of things that will look wrong on the hardware but fine on your monitor.
+  Most warnings come with a one-click fix that applies to every pixel at fault.
+</p>
+<ul>
+  <li><strong>Art in the dropped row or column</strong> &mdash; in odd-grid mode, art that
+    will not be exported.</li>
+  <li><strong>Black touching the outside</strong> &mdash; will read as transparent and change
+    the silhouette.</li>
+  <li><strong>Pixels too dark to read</strong> &mdash; distinguishable on a bright screen,
+    not on the panel.</li>
+  <li><strong>Nothing drawn yet</strong>, and <strong>reaching all four edges</strong> &mdash;
+    a design with no margin loses its silhouette against the dark panel.</li>
+</ul>
+<p>
+  The <strong>Device preview</strong> panel shows the icon small and unlit-dark, which catches
+  things a 16&times;-magnified canvas hides.
+</p>
+
+<h2 id="reference">Reference tracing</h2>
+
+<p>
+  Load a picture <em>underneath</em> the grid and draw over it. It sits behind the
+  checkerboard, so empty squares still look empty, and it is never part of your drawing or
+  your export.
+</p>
+<ul>
+  <li>Opacity, scale and position are sliders; arrow keys nudge whichever one has focus.</li>
+  <li><kbd>`</kbd> shows and hides it while you work.</li>
+  <li>It is <strong>session-only</strong> &mdash; a photo is far too big to keep in the
+    gallery, so closing the tab forgets it.</li>
+</ul>
+
+<h3>Picking colours off the reference</h3>
+<p>
+  Hold <kbd>Shift</kbd> with the eyedropper to read the reference instead of your drawing
+  (<kbd>Alt</kbd>+<kbd>Shift</kbd> to do it without putting the pen down). You always get the
+  colour from the original image, so dimming it with the opacity slider changes what you see
+  and not what you pick. <strong>Shift-pick samples</strong> chooses what gets read:
+</p>
+<ul>
+  <li><strong>The whole square</strong> averages that entire grid square. Right for edges: a
+    blurry or textured square resolves to the one colour it should be.</li>
+  <li><strong>The exact spot</strong> reads a tiny patch under the pointer, for when a square
+    straddles two colours and you want one of them.</li>
+</ul>
+
+<h2 id="import">Import an image</h2>
+
+<p>
+  <strong>Import image</strong> under Export. Crop to a square, then watch the preview while
+  you adjust:
+</p>
+<ul>
+  <li><strong>Box average</strong> smooths detail down; <strong>nearest neighbour</strong>
+    keeps hard edges. Box for photos, nearest for pixel art that is already blocky.</li>
+  <li><strong>Alpha threshold</strong> decides how see-through a pixel must be before it
+    becomes properly transparent &mdash; there is no half-transparent on this display.</li>
+  <li><strong>Brightness</strong> and <strong>saturation</strong> push a washed-out photo into
+    something that survives being 16 pixels wide.</li>
+  <li><strong>Snap to palette colours</strong> matches every pixel to your palette.</li>
+</ul>
+<p>Importing replaces the canvas in one step, so a single undo puts it back.</p>
+
+<h2 id="paper">Paper to pixel</h2>
+
+<p>
+  For drawing away from a screen, and the easiest way to hand this to a child.
+</p>
+<ol>
+  <li>Open the <a href="./print.html">printable grid</a> and print it at 100%.</li>
+  <li>Colour the squares in. One square is one pixel.</li>
+  <li><strong>Leave a square blank for transparent.</strong> White crayon will not come back
+    &mdash; to the camera, and on the display, white paper and nothing are the same thing.</li>
+  <li>Photograph the whole sheet, including the four corner marks, in even light.</li>
+  <li><strong>Paper to pixel</strong> in the editor: drag the four handles onto the corner
+    marks and apply.</li>
+</ol>
+<p>
+  A slight angle is fine &mdash; that is what the four handles are for. Arrow keys nudge
+  whichever handle has focus, which is easier than dragging for the last pixel or two.
+</p>
+<p>
+  Four controls sit beside the preview. <strong>Paper threshold</strong> decides how light a
+  square has to be before it counts as blank paper &mdash; if the result comes back empty,
+  the drawing is being read as paper, so lower it; if bare paper is coming through as
+  colour, raise it. <strong>Correct the lighting</strong> white-balances against the paper
+  itself, which is what stops an indoor photo importing as cream.
+  <strong>Saturation</strong> pushes crayon back towards the colour it looked on the page,
+  and <strong>Snap to palette colours</strong> matches the result to your palette. Very pale
+  colours are the one thing that cannot be recovered.
+</p>
+
+<h2 id="saving">Saving, exporting and the gallery</h2>
+
+<ul>
+  <li>Your work saves itself to this browser as you draw. There is no save button and no
+    server &mdash; nothing you make here leaves your machine.</li>
+  <li><strong>Export PNG</strong> (<kbd>Cmd/Ctrl</kbd>+<kbd>S</kbd>) writes the 16 &times; 16
+    file to upload to Yoto.</li>
+  <li>The <strong>Gallery</strong> keeps every icon. <em>Duplicate</em>
+    (<kbd>Cmd/Ctrl</kbd>+<kbd>D</kbd>) is the way to make a variant.</li>
+  <li><strong>Back up</strong> writes a JSON file of everything &mdash; icons, ramps, custom
+    slots and recents &mdash; and <strong>Restore</strong> reads one back, replacing what is
+    in the gallery. Because the gallery lives in this browser, clearing site data would take
+    it with it, so keep a backup somewhere real.</li>
+</ul>
+
+<h2 id="keys">Every shortcut</h2>
+
+<div class="scroll">
+<table>
+  <tr><th>Key</th><th>Does</th></tr>
+  <tr><td><kbd>B</kbd> <kbd>E</kbd> <kbd>G</kbd> <kbd>I</kbd> <kbd>L</kbd> <kbd>R</kbd> <kbd>D</kbd></td>
+      <td>Pen, eraser, fill, eyedropper, line, rectangle, shade</td></tr>
+  <tr><td><kbd>Alt</kbd> held</td><td>Eyedropper, reverting to your tool afterwards</td></tr>
+  <tr><td>right-drag</td><td>Erase without switching tools</td></tr>
+  <tr><td><kbd>Shift</kbd> + eyedropper</td><td>Pick from the reference image</td></tr>
+  <tr><td><kbd>Shift</kbd> + rectangle</td><td>Fill it instead of outlining</td></tr>
+  <tr><td><kbd>Shift</kbd> + shade</td><td>Darken instead of lighten</td></tr>
+  <tr><td><kbd>1</kbd>&ndash;<kbd>8</kbd></td><td>Recall a custom slot</td></tr>
+  <tr><td><kbd>X</kbd></td><td>Swap to the previous colour</td></tr>
+  <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Darken / lighten the pixel under the pointer</td></tr>
+  <tr><td><kbd>M</kbd></td><td>Cycle symmetry</td></tr>
+  <tr><td>arrows</td><td>Shift the whole image, wrapping</td></tr>
+  <tr><td><kbd>Shift</kbd> + arrows</td><td>Move the drawing caret</td></tr>
+  <tr><td><kbd>Space</kbd> <kbd>Enter</kbd></td><td>Apply the current tool at the caret</td></tr>
+  <tr><td><kbd>#</kbd></td><td>Grid overlay on / off</td></tr>
+  <tr><td><kbd>`</kbd></td><td>Show / hide the reference image</td></tr>
+  <tr><td><kbd>Delete</kbd> <kbd>Backspace</kbd></td><td>Clear the canvas</td></tr>
+  <tr><td><kbd>Cmd/Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo &mdash; add <kbd>Shift</kbd> to redo</td></tr>
+  <tr><td><kbd>Cmd/Ctrl</kbd>+<kbd>S</kbd></td><td>Export PNG</td></tr>
+  <tr><td><kbd>Cmd/Ctrl</kbd>+<kbd>D</kbd></td><td>Duplicate the icon</td></tr>
+</table>
+</div>
+
+<footer>
+  YotoPix &middot; <a href="./index.html">Back to the editor</a> &middot;
+  <a href="./print.html">Printable grid</a>
+</footer>
+
+</div>
+</body>
+</html>

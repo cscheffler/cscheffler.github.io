@@ -85,6 +85,7 @@ const el = {
   refScale: $('ref-scale'),
   refX: $('ref-x'),
   refY: $('ref-y'),
+  refSample: [...document.querySelectorAll('input[name="ref-sample"]')],
   refToggle: $('ref-toggle'),
   refClear: $('ref-clear'),
   outRefOpacity: $('out-ref-opacity'),
@@ -612,7 +613,15 @@ el.deleteIcon.addEventListener('click', deleteIcon);
 
 el.backupExport.addEventListener('click', () => {
   try {
-    const filename = downloadBackup(app.icons, { slots: app.slots, recents: app.recents });
+    // Ramps go in the file too. They are palette objects the user built and
+    // named, exactly as much "their work" as the slots are, and the autosave
+    // snapshot has always kept them — a backup that dropped them would quietly
+    // be a worse copy than the one in localStorage it exists to protect.
+    const filename = downloadBackup(app.icons, {
+      slots: app.slots,
+      recents: app.recents,
+      ramps: app.ramps,
+    });
     toast(`Backed up ${app.icons.length} icons to ${filename}`);
   } catch (error) {
     toast(`Backup failed: ${error.message}`);
@@ -637,11 +646,18 @@ el.backupFile.addEventListener('change', async () => {
     if (palette) {
       app.slots = palette.slots;
       app.recents = palette.recents;
+      app.ramps = palette.ramps ?? [];
+      // The remembered ramp belonged to the gallery being replaced, so it is
+      // almost certainly a dangling id now.
+      app.activeRampId = app.ramps[0]?.id ?? null;
       slotsUI.set(app.slots, app.color);
     }
     history.clear();
     el.name.value = app.doc.name;
     renderGallery();
+    // refreshAll() repaints the document, not the palette, so the restored
+    // ramps need saying explicitly.
+    renderRamps();
     refreshAll();
     persistNow();
     toast(`Restored ${icons.length} icons`);
@@ -651,6 +667,26 @@ el.backupFile.addEventListener('change', async () => {
 });
 
 // ------------------------------------------------------------------ canvas
+
+/**
+ * Shift-eyedropper handler for the canvas. Reads the sample-method radios live
+ * rather than caching a value: that choice is a tool preference in the DOM, not
+ * state the reference module or `app` needs to know about (see `el.refSample`).
+ */
+function pickFromReference(x, y, u, v) {
+  if (!reference.has()) {
+    toast('No reference loaded. Shift-pick samples the reference image.');
+    return;
+  }
+  const point = el.refSample.find((r) => r.checked)?.value === 'point';
+  const hex = point ? reference.samplePoint(u, v) : reference.sampleCell(x, y);
+  if (hex) setColor(hex);
+  else if (!reference.get().visible) toast('The reference is hidden. Press ` to show it.');
+  // Named in the unit that was actually sampled, so the message matches what
+  // the panel says it is doing.
+  else if (point) toast('Nothing there — that spot is outside the reference.');
+  else toast('Nothing there — that cell is outside the reference.');
+}
 
 const view = createGridView({
   canvas: el.canvas,
@@ -670,6 +706,7 @@ const view = createGridView({
   },
   onChange: onDocChanged,
   onPick: (hex) => setColor(hex),
+  onPickReference: pickFromReference,
   onHover: (cell) => {
     lastCell = cell;
     el.coords.textContent = cell ? `${cell.x},${cell.y}` : '--,--';

@@ -14,6 +14,12 @@
 <header class="app-header">
   <h1 class="app-title">YotoPix</h1>
   <p class="app-sub">16 &times; 16 &middot; PNG &middot; steps of 15</p>
+  <!-- New tab: help is for reading while you draw, not instead of it. -->
+  <a class="help-link" href="./help.html" target="_blank" rel="noopener"
+     title="Help — tools, shortcuts and what the display can do">
+    <span aria-hidden="true">?</span>
+    <span class="sr-only">Help</span>
+  </a>
 </header>
 
 <main class="app">
@@ -39,11 +45,11 @@
         </svg>
         <span class="sr-only">Flood fill</span>
       </button>
-      <button class="tool" data-tool="eyedropper" role="radio" aria-checked="false" tabindex="-1" title="Eyedropper (I, or hold Alt)">
+      <button class="tool" data-tool="eyedropper" role="radio" aria-checked="false" tabindex="-1" title="Eyedropper (I, or hold Alt). Hold Shift to pick from the reference image.">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M13 7.5 4.8 15.7a2 2 0 0 0-.6 1.4V19h1.9a2 2 0 0 0 1.4-.6L15.7 11M12.4 4.6 19 11.2l1.7-1.7a2.4 2.4 0 0 0 0-3.4l-1.4-1.4a2.4 2.4 0 0 0-3.4 0z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
         </svg>
-        <span class="sr-only">Eyedropper</span>
+        <span class="sr-only">Eyedropper. Hold Shift to pick from the reference image.</span>
       </button>
       <button class="tool" data-tool="line" role="radio" aria-checked="false" tabindex="-1" title="Line (L)">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -258,13 +264,21 @@
           <span class="field-label">Down <output id="out-ref-y">0</output></span>
           <input type="range" id="ref-y" min="-16" max="16" step="0.25" value="0">
         </label>
+        <fieldset class="field-group">
+          <legend class="field-label">Shift-pick samples</legend>
+          <label class="check"><input type="radio" name="ref-sample" value="cell" checked><span>The whole square</span></label>
+          <label class="check"><input type="radio" name="ref-sample" value="point"><span>The exact spot</span></label>
+        </fieldset>
         <div class="custom-row">
           <button class="btn btn-sm" id="ref-toggle" aria-pressed="true">Hide</button>
           <button class="btn btn-sm" id="ref-clear">Remove</button>
         </div>
         <p class="hint">
           The <kbd>`</kbd> key shows and hides it. Arrow keys nudge whichever
-          slider has focus.
+          slider has focus. With the eyedropper, <kbd>Shift</kbd>-click picks a
+          colour from the reference rather than the drawing. The choice above
+          decides whether that reads the whole square or just the spot under
+          the pointer.
         </p>
       </div>
     </section>

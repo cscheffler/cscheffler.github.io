@@ -120,6 +120,48 @@ button {
   color: var(--text);
 }
 
+/*
+  The help affordance. Pushed to the far end of the header by margin-left:auto
+  rather than a spacer. The circle stays small so it does not compete with the
+  title or cost header height on a phone, but ::after widens the hit area to
+  the same 44px the tools use — a target you can hit, drawn at a size that does
+  not shout.
+*/
+.help-link {
+  position: relative;
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--hairline);
+  border-radius: 50%;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.help-link::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.help-link:hover,
+.help-link:focus-visible {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 .app-sub {
   font-family: var(--font-mono);
   font-size: 11px;

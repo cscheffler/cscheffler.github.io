@@ -72,16 +72,6 @@
   /* The quick-jump list: a plain wrapped row of links, no bullets. */
   nav.jump { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 4px; font-size: 13px; }
 
-  .note {
-    background: var(--panel);
-    border: 1px solid var(--hairline);
-    border-left: 3px solid var(--accent);
-    border-radius: 4px;
-    padding: 12px 14px;
-    margin: 0 0 18px;
-  }
-  .note p:last-child { margin-bottom: 0; }
-
   kbd {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -131,7 +121,7 @@
 </header>
 
 <nav class="jump">
-  <a href="#rule">The one rule</a>
+  <a href="#rule">Display limits</a>
   <a href="#tools">Tools</a>
   <a href="#canvas">Drawing</a>
   <a href="#colour">Colour</a>
@@ -146,21 +136,19 @@
   <a href="#keys">Every shortcut</a>
 </nav>
 
-<h2 id="rule">The one rule that matters</h2>
+<h2 id="rule">Limits of the Yoto display</h2>
 
-<div class="note">
-  <p>
-    A Yoto icon is <strong>16 &times; 16 pixels with no background</strong>. The display has no
-    backlight behind a transparent pixel, so transparent is not a colour &mdash; it is the
-    unlit panel. Draw the <em>shape</em> of the thing and leave everything around it empty. A
-    filled square with a picture inside it will read as a glowing block.
-  </p>
-  <p>
-    The display also resolves each colour channel in <strong>steps of 15</strong>, so every
-    colour here snaps to that grid. Two shades closer together than one step are the same
-    shade on the device.
-  </p>
-</div>
+<p>
+  A Yoto icon is <strong>16 &times; 16 pixels with no background</strong>. The display has no
+  backlight behind a transparent pixel, so transparent is not a colour &mdash; it is the
+  unlit panel. Draw the <em>shape</em> of the thing and leave everything around it empty. A
+  filled square with a picture inside it will read as a glowing block.
+</p>
+<p>
+  The display also resolves each colour channel in <strong>steps of 15</strong>, so every
+  colour here snaps to that grid. Two shades closer together than one step are the same
+  shade on the device.
+</p>
 
 <h2 id="tools">Tools</h2>
 

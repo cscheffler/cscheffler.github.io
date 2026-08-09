@@ -17,6 +17,14 @@ const CHECKER_CSS = 8;
 const CHECKER_LIGHT = '#E9E7E2';
 const CHECKER_DARK = '#D0CDC7';
 const ACCENT = '#FFB347';
+/**
+ * How solid the checkerboard stays when a reference image is showing under it.
+ * SPEC §15.1 requires the reference to sit BEHIND the checkerboard so a
+ * transparent cell still reads as transparent — which only means anything if
+ * the checker is translucent enough to let the reference through while its
+ * texture is still legible on top. Chosen by looking at it.
+ */
+const CHECKER_OVER_REFERENCE = 0.45;
 
 export function createGridView({
   canvas,
@@ -32,6 +40,7 @@ export function createGridView({
   onResize,
   onPick,
   getShade,
+  drawReference,
 }) {
   const ctx = canvas.getContext('2d', { alpha: false });
   let dpr = 1;
@@ -82,9 +91,15 @@ export function createGridView({
     return true;
   }
 
-  function drawChecker() {
+  /**
+   * Both tones are painted explicitly rather than relying on a background fill,
+   * so the whole pattern can be drawn at a reduced alpha over a reference image.
+   */
+  function drawChecker(alpha = 1) {
     const size = Math.max(2, Math.round(CHECKER_CSS * dpr));
     const n = Math.ceil(canvas.width / size);
+    ctx.save();
+    ctx.globalAlpha = alpha;
     ctx.fillStyle = CHECKER_LIGHT;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = CHECKER_DARK;
@@ -93,6 +108,7 @@ export function createGridView({
         ctx.fillRect(col * size, row * size, size, size);
       }
     }
+    ctx.restore();
   }
 
   function drawPixels(doc) {
@@ -284,7 +300,15 @@ export function createGridView({
     // The view can be constructed before a document is ready; drawing nothing
     // is better than throwing out of a resize observer.
     if (canvas.width === 0 || !doc) return;
-    drawChecker();
+
+    // An opaque base first: with a translucent checker over a reference, any
+    // leftovers from the previous frame would otherwise show through.
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = CHECKER_LIGHT;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const reference = drawReference?.(ctx, canvas.width) ?? false;
+    drawChecker(reference ? CHECKER_OVER_REFERENCE : 1);
     drawPixels(doc);
     drawPreview();
     if (showGrid) drawGrid();

@@ -22,6 +22,7 @@ import { createGallery } from './gallery.js';
 import { createImportUI } from './importui.js';
 import { createPaperUI } from './paperui.js';
 import { runLint, applyFix } from './lint.js';
+import { createReference } from './reference.js';
 import { buildExamples } from './examples.js';
 import {
   storageAvailable, load, createSaver, isQuotaError,
@@ -76,6 +77,20 @@ const el = {
   dialogDrop: $('deadzone-drop'),
   dialogCancel: $('deadzone-cancel'),
   lint: $('lint'),
+  refEmpty: $('ref-empty'),
+  refControls: $('ref-controls'),
+  refLoad: $('ref-load'),
+  refFile: $('ref-file'),
+  refOpacity: $('ref-opacity'),
+  refScale: $('ref-scale'),
+  refX: $('ref-x'),
+  refY: $('ref-y'),
+  refToggle: $('ref-toggle'),
+  refClear: $('ref-clear'),
+  outRefOpacity: $('out-ref-opacity'),
+  outRefScale: $('out-ref-scale'),
+  outRefX: $('out-ref-x'),
+  outRefY: $('out-ref-y'),
   importOpen: $('import-open'),
   importFile: $('import-file'),
   importDialog: $('import-dialog'),
@@ -109,6 +124,12 @@ const app = {
 };
 
 const history = createHistory();
+
+/**
+ * Session-only, and deliberately not in `app`: it is not part of the document,
+ * never reaches storage, and never reaches the exporter — SPEC §15.1.
+ */
+const reference = createReference();
 
 /** Cell under the pointer or the keyboard caret, for the bracket-key shading. */
 let lastCell = null;
@@ -657,6 +678,7 @@ const view = createGridView({
     el.stage.style.setProperty('--canvas-size', `${cssSize}px`);
   },
   getShade: (current, delta) => shadeStep(activeRamp(), current, delta),
+  drawReference: (ctx, span) => reference.draw(ctx, span),
 });
 
 // ------------------------------------------------------------------ history
@@ -906,6 +928,74 @@ el.stage.addEventListener('drop', (event) => {
   openImport(file);
 });
 
+// ------------------------------------------------------------- reference
+
+function renderReferenceUI() {
+  const loaded = reference.has();
+  el.refEmpty.hidden = loaded;
+  el.refControls.hidden = !loaded;
+  if (!loaded) return;
+
+  const state = reference.get();
+  el.outRefOpacity.textContent = `${state.opacity}%`;
+  el.outRefScale.textContent = `${state.scale}%`;
+  el.outRefX.textContent = String(state.x);
+  el.outRefY.textContent = String(state.y);
+  el.refToggle.textContent = state.visible ? 'Hide' : 'Show';
+  el.refToggle.setAttribute('aria-pressed', String(state.visible));
+}
+
+function syncReferenceFromControls() {
+  reference.set({
+    opacity: Number(el.refOpacity.value),
+    scale: Number(el.refScale.value),
+    x: Number(el.refX.value),
+    y: Number(el.refY.value),
+  });
+  renderReferenceUI();
+  view.render();
+}
+
+for (const input of [el.refOpacity, el.refScale, el.refX, el.refY]) {
+  input.addEventListener('input', syncReferenceFromControls);
+}
+
+el.refLoad.addEventListener('click', () => el.refFile.click());
+el.refFile.addEventListener('change', async () => {
+  const file = el.refFile.files?.[0];
+  el.refFile.value = '';
+  if (!file) return;
+  try {
+    await reference.load(file);
+    const state = reference.get();
+    el.refOpacity.value = String(state.opacity);
+    el.refScale.value = String(state.scale);
+    el.refX.value = String(state.x);
+    el.refY.value = String(state.y);
+    renderReferenceUI();
+    view.render();
+    toast('Reference loaded. ` shows and hides it.');
+  } catch (error) {
+    toast(`Could not read that image: ${error.message}`);
+  }
+});
+
+function toggleReference() {
+  if (!reference.has()) return;
+  reference.toggle();
+  renderReferenceUI();
+  view.render();
+}
+
+el.refToggle.addEventListener('click', toggleReference);
+
+el.refClear.addEventListener('click', () => {
+  reference.clear();
+  renderReferenceUI();
+  view.render();
+  toast('Reference removed');
+});
+
 // -------------------------------------------------------- paper to pixel
 
 const paperUI = createPaperUI({
@@ -1057,6 +1147,11 @@ window.addEventListener('keydown', (e) => {
   }
 
   switch (key) {
+    case '`':
+      e.preventDefault();
+      if (reference.has()) toggleReference();
+      else toast('No reference loaded yet.');
+      break;
     case 'm':
       setSymmetry(SYMMETRY_MODES[(SYMMETRY_MODES.indexOf(app.symmetry) + 1) % SYMMETRY_MODES.length]);
       break;
@@ -1095,6 +1190,7 @@ function boot() {
   renderGallery();
   renderGridUI();
   renderHistoryButtons();
+  renderReferenceUI();
   refreshAll();
   persistNow();
 }

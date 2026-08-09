@@ -205,6 +205,10 @@
         side, so a mirrored design will look off-centre — keep one anchor across a set.
       </p>
     </section>
+    <section class="panel">
+      <h2 class="panel-title">Checks</h2>
+      <div class="lint" id="lint" role="status" aria-live="polite"></div>
+    </section>
     </div>
 
     <div class="rail-col">
@@ -228,9 +232,43 @@
     </section>
 
     <section class="panel">
-      <h2 class="panel-title">Checks</h2>
-      <div class="lint" id="lint" role="status" aria-live="polite"></div>
+      <h2 class="panel-title">Reference</h2>
+      <div id="ref-empty">
+        <button class="btn btn-sm" id="ref-load">Load an image&hellip;</button>
+        <input type="file" id="ref-file" accept="image/*" hidden>
+        <p class="hint">
+          Trace over a photo or a sketch. It sits behind the grid, is never
+          exported, and is forgotten when you close the tab.
+        </p>
+      </div>
+      <div id="ref-controls" hidden>
+        <label class="field">
+          <span class="field-label">Opacity <output id="out-ref-opacity">45%</output></span>
+          <input type="range" id="ref-opacity" min="0" max="100" value="45">
+        </label>
+        <label class="field">
+          <span class="field-label">Scale <output id="out-ref-scale">100%</output></span>
+          <input type="range" id="ref-scale" min="20" max="400" value="100">
+        </label>
+        <label class="field">
+          <span class="field-label">Across <output id="out-ref-x">0</output></span>
+          <input type="range" id="ref-x" min="-16" max="16" step="0.25" value="0">
+        </label>
+        <label class="field">
+          <span class="field-label">Down <output id="out-ref-y">0</output></span>
+          <input type="range" id="ref-y" min="-16" max="16" step="0.25" value="0">
+        </label>
+        <div class="custom-row">
+          <button class="btn btn-sm" id="ref-toggle" aria-pressed="true">Hide</button>
+          <button class="btn btn-sm" id="ref-clear">Remove</button>
+        </div>
+        <p class="hint">
+          The <kbd>`</kbd> key shows and hides it. Arrow keys nudge whichever
+          slider has focus.
+        </p>
+      </div>
     </section>
+
 
     <section class="panel">
       <h2 class="panel-title">Export</h2>

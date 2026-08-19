@@ -37,6 +37,12 @@ button, input, select { font: inherit; color: inherit; }
 .segmented button[aria-selected="true"] { background: var(--panel); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 .segmented button:hover:not([aria-selected="true"]) { color: var(--text-primary); }
 
+.segmented--sm button { padding: 4px 9px; font-size: 12.5px; }
+.segmented[aria-disabled="true"] { opacity: 0.55; }
+.segmented button:disabled { cursor: not-allowed; }
+.segmented button[aria-checked="true"] { background: var(--panel); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+.segmented button:hover:not([aria-checked="true"]):not(:disabled) { color: var(--text-primary); }
+
 .btn {
   border: 1px solid var(--border); background: var(--panel); color: var(--text-primary);
   padding: 6px 11px; border-radius: 7px; cursor: pointer; font-size: 13px; white-space: nowrap;
@@ -300,12 +306,14 @@ dialog.dialog--help .dialog__foot { border-top: 1px solid var(--border); padding
           <div class="card__tools">
             <label class="field" for="target-select">Target</label>
             <select id="target-select"></select>
-            <label class="field" id="view2d-field" for="view2d-select" hidden>Show</label>
-            <select id="view2d-select" hidden>
-              <option value="model">Network</option>
-              <option value="target">Target</option>
-              <option value="error">Difference</option>
-            </select>
+            <span class="field" id="view2d-field" hidden>Show</span>
+            <div class="segmented segmented--sm" id="view2d-toggle" role="radiogroup"
+                 aria-labelledby="view2d-field" hidden>
+              <button type="button" role="radio" data-view="model" aria-checked="true">Network</button>
+              <button type="button" role="radio" data-view="target" aria-checked="false">Target</button>
+              <button type="button" role="radio" data-view="error" aria-checked="false">Difference</button>
+            </div>
+            <span class="hint" id="view2d-note" hidden>pick a target to compare against</span>
             <label class="field" id="contrib-field"><input type="checkbox" id="toggle-contributions"> Unit contributions</label>
             <label class="field" id="yauto-field"><input type="checkbox" id="toggle-yauto" checked> Auto&nbsp;y</label>
           </div>
@@ -4650,7 +4658,7 @@ dialog.dialog--help .dialog__foot { border-top: 1px solid var(--border); padding
     el.activationSelect.value = net().activation;
     el.toggleContrib.checked = state.showContributions;
     el.toggleYauto.checked = state.yRange.auto;
-    el.view2dSelect.value = state.view2d;
+    applyView2dUi();
     params.setNetwork(net());
     arch.render(net());
     inspector.setNetwork(net());
@@ -4845,6 +4853,30 @@ dialog.dialog--help .dialog__foot { border-top: 1px solid var(--border); padding
     scheduleRender();
   }
 
+  /* The toggle only means anything with something to compare against, so with no target
+   * it is forced to the network view and disabled rather than silently doing nothing —
+   * which is what the old dropdown did when you picked "Target" with no target set. */
+  function applyView2dUi() {
+    var enabled = !!currentTarget();
+    if (!enabled) state.view2d = 'model';
+    el.view2dButtons.forEach(function (b) {
+      var on = b.getAttribute('data-view') === state.view2d;
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      b.disabled = !enabled;
+      b.tabIndex = (enabled && on) ? 0 : -1;
+    });
+    el.view2dToggle.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+    el.view2dNote.hidden = !(state.mode === 2 && !enabled);
+  }
+
+  function setView2d(v) {
+    if (['model', 'target', 'error'].indexOf(v) === -1) return;
+    if (!currentTarget()) return;
+    state.view2d = v;
+    applyView2dUi();
+    bump(); persist(); scheduleRender();
+  }
+
   function syncModeUi() {
     var two = state.mode === 2;
     el.tabs.forEach(function (b) {
@@ -4856,10 +4888,11 @@ dialog.dialog--help .dialog__foot { border-top: 1px solid var(--border); padding
     el.canvas2d.hidden = !two;
     el.colorbar.hidden = !two;
     el.view2dField.hidden = !two;
-    el.view2dSelect.hidden = !two;
+    el.view2dToggle.hidden = !two;
     el.contribField.hidden = two;
     el.yautoField.hidden = two;
     fillTargets();
+    applyView2dUi();
     el.tryit.innerHTML = tryItHtml(state.mode);
     el.readout.textContent = 'Hover the plot to read values.';
   }
@@ -4976,7 +5009,9 @@ dialog.dialog--help .dialog__foot { border-top: 1px solid var(--border); padding
     el.errorBadge = $('error-badge');
     el.vizTitle = $('viz-title');
     el.targetSelect = $('target-select');
-    el.view2dSelect = $('view2d-select');
+    el.view2dToggle = $('view2d-toggle');
+    el.view2dButtons = Array.prototype.slice.call($('view2d-toggle').querySelectorAll('button'));
+    el.view2dNote = $('view2d-note');
     el.view2dField = $('view2d-field');
     el.contribField = $('contrib-field');
     el.yautoField = $('yauto-field');
@@ -5102,11 +5137,24 @@ dialog.dialog--help .dialog__foot { border-top: 1px solid var(--border); padding
 
     el.targetSelect.addEventListener('change', function () {
       state.targetId[state.mode] = el.targetSelect.value;
+      applyView2dUi();
       bump(); persist(); scheduleRender();
     });
-    el.view2dSelect.addEventListener('change', function () {
-      state.view2d = el.view2dSelect.value;
-      bump(); persist(); scheduleRender();
+    el.view2dButtons.forEach(function (b) {
+      b.addEventListener('click', function () { setView2d(b.getAttribute('data-view')); });
+    });
+    /* arrow keys move between options, as a radiogroup should */
+    el.view2dToggle.addEventListener('keydown', function (ev) {
+      var i = el.view2dButtons.indexOf(document.activeElement);
+      if (i === -1) return;
+      var step = (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') ? 1
+               : (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') ? -1 : 0;
+      if (!step) return;
+      ev.preventDefault();
+      var next = el.view2dButtons[(i + step + el.view2dButtons.length) % el.view2dButtons.length];
+      if (next.disabled) return;
+      next.focus();
+      setView2d(next.getAttribute('data-view'));
     });
     el.toggleContrib.addEventListener('change', function () {
       state.showContributions = el.toggleContrib.checked;
@@ -5318,7 +5366,7 @@ dialog.dialog--help .dialog__foot { border-top: 1px solid var(--border); padding
     el.activationSelect.value = net().activation;
     el.toggleContrib.checked = state.showContributions;
     el.toggleYauto.checked = state.yRange.auto;
-    el.view2dSelect.value = state.view2d;
+    applyView2dUi();
     params.setNetwork(net());
     params.setTheme(state.theme);
     inspector.setNetwork(net());

@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binomial likelihood of p</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg:        #ffffff;
+    --surface:   #f7f7f5;
+    --ink:       #1b1b1a;
+    --muted:     #6b6b66;
+    --line:      #d9d9d4;
+    --grid:      #ececE7;
+    --accent:    #2f6f8f;
+    --accent-soft: rgba(47,111,143,0.35);
+    --highlight: #b4542a;
+    --focus:     #2f6f8f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg:        #16171a;
+      --surface:   #1e2024;
+      --ink:       #e8e8e4;
+      --muted:     #9b9b95;
+      --line:      #34363b;
+      --grid:      #26282d;
+      --accent:    #6fb3d2;
+      --accent-soft: rgba(111,179,210,0.35);
+      --highlight: #e08a5c;
+      --focus:     #6fb3d2;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.25rem 1rem 2.5rem; }
+
+  .widget-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 0.75rem; margin-bottom: 0.25rem;
+  }
+  .widget-header h1 {
+    font-size: 1.25rem; font-weight: 600; margin: 0; line-height: 1.3;
+  }
+  .lede { color: var(--muted); margin: 0 0 1.25rem; font-size: 0.95rem; }
+
+  /* ---- help button (canonical) ---- */
+  .help-btn {
+    flex: 0 0 auto;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--muted); background: transparent; color: var(--muted);
+    font: inherit; font-size: 16px; line-height: 1;
+    display: grid; place-items: center; cursor: pointer;
+    padding: 0; transition: color .12s, border-color .12s, background-color .12s;
+  }
+  .help-btn:hover, .help-btn:focus-visible {
+    color: var(--ink); border-color: var(--ink); background: var(--surface);
+  }
+  .help-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .help-dialog {
+    max-width: 34rem; max-height: 80vh; width: calc(100% - 2rem);
+    padding: 1.5rem; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); color: var(--ink);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+    overflow: auto; position: relative;
+  }
+  .help-dialog::backdrop { background: rgba(0,0,0,0.45); }
+  .help-dialog h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin: 1.4rem 0 .35rem; }
+  .help-dialog h2:first-of-type { margin-top: 0; }
+  .help-dialog p, .help-dialog li { font-size: 0.94rem; }
+  .help-dialog p { margin: .35rem 0; }
+  .help-dialog ul { margin: .35rem 0; padding-left: 1.15rem; }
+  .help-dialog li { margin: .2rem 0; }
+  .help-dialog code { background: var(--surface); padding: 0.05em 0.3em; border-radius: 3px;
+    font-size: 0.88em; }
+  .help-close {
+    position: absolute; top: .6rem; right: .6rem;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid transparent; background: transparent; color: var(--muted);
+    font-size: 20px; line-height: 1; cursor: pointer; display: grid; place-items: center;
+  }
+  .help-close:hover, .help-close:focus-visible { color: var(--ink); background: var(--surface); }
+  .help-close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- plot ---- */
+  .plot-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: .5rem; margin-bottom: .6rem;
+  }
+  #plot { display: block; width: 100%; height: auto; touch-action: pan-y; }
+
+  .plot-meta {
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+    gap: .35rem 1.25rem; margin: 0 0 1.4rem; padding: 0 .15rem;
+  }
+  .summary {
+    display: flex; flex-wrap: wrap; gap: .35rem 1.25rem;
+    color: var(--muted); font-size: .88rem; margin: 0;
+  }
+  .summary b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .toggle {
+    display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap;
+    color: var(--muted); font-size: .88rem; cursor: pointer;
+  }
+  .toggle input { accent-color: var(--accent); margin: 0; cursor: pointer; }
+  .toggle:hover { color: var(--ink); }
+  .toggle input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- controls ---- */
+  .control { margin-bottom: 1.1rem; }
+  .control-label {
+    display: flex; align-items: baseline; gap: .45rem; margin-bottom: .3rem;
+  }
+  .control-label .name { font-weight: 600; font-size: .95rem; }
+  .control-label .desc { color: var(--muted); font-size: .85rem; }
+  .control-label .desc::before { content: "\2014\00a0"; }
+  .control-row { display: flex; align-items: center; gap: .75rem; }
+  input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); height: 1.6rem; }
+  input[type="range"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  .num-input {
+    flex: 0 0 auto; width: 5.5rem; padding: .35rem .5rem;
+    font: inherit; font-size: .95rem; font-variant-numeric: tabular-nums;
+    color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 5px;
+  }
+  .num-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px;
+    border-color: var(--focus); }
+  .num-input.invalid { border-color: var(--highlight); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="widget-header">
+    <h1>The Binomial likelihood &mdash; Binomial(<i>k</i> | <i>n</i>, <i>p</i>)</h1>
+    <button id="help-btn" class="help-btn" aria-label="Help" title="Help">?</button>
+  </header>
+  <p class="lede">
+    The same expression as the Binomial distribution, but read the other way round: the data
+    <i>k</i> and <i>n</i> are now fixed and <i>p</i> varies. Move the sliders and watch which values
+    of <i>p</i> make the observed data more or less plausible.
+  </p>
+
+  <div class="plot-card">
+    <canvas id="plot" role="img"
+            aria-label="Binomial likelihood plotted as a continuous curve against p"></canvas>
+  </div>
+  <div class="plot-meta">
+    <p class="summary" id="summary"></p>
+    <label class="toggle" for="y-auto">
+      <input type="checkbox" id="y-auto" checked>
+      auto-scale vertical axis
+    </label>
+  </div>
+
+  <div class="control">
+    <div class="control-label">
+      <label class="name" for="k-range"><i>k</i></label>
+      <span class="desc">number of successes observed</span>
+    </div>
+    <div class="control-row">
+      <input type="range" id="k-range" min="0" max="9" step="1" value="6"
+             aria-label="k, number of successes observed">
+      <input type="text" id="k-num" class="num-input" value="6"
+             inputmode="numeric" autocomplete="off" spellcheck="false"
+             aria-label="k, number of successes observed (exact value)">
+    </div>
+  </div>
+
+  <div class="control">
+    <div class="control-label">
+      <label class="name" for="n-range"><i>n</i></label>
+      <span class="desc">number of trials</span>
+    </div>
+    <div class="control-row">
+      <input type="range" id="n-range" min="1" max="200" step="1" value="9"
+             aria-label="n, number of trials">
+      <input type="text" id="n-num" class="num-input" value="9"
+             inputmode="numeric" autocomplete="off" spellcheck="false"
+             aria-label="n, number of trials (exact value)">
+    </div>
+  </div>
+
+</div>
+
+<dialog id="help-dialog" class="help-dialog">
+  <button class="help-close" aria-label="Close help">&times;</button>
+
+  <h2>What this shows</h2>
+  <p>
+    The Binomial likelihood: Binomial(<i>k</i> | <i>n</i>, <i>p</i>) plotted against <i>p</i>, with
+    the data held fixed. It answers &ldquo;given that I saw <i>k</i> successes in <i>n</i> trials,
+    how plausible is each possible value of <i>p</i>?&rdquo; &mdash; the second half of the
+    globe-tossing story in Chapter 2.
+  </p>
+  <p>
+    It is the <em>same expression</em> as in the Binomial distribution widget. Fix <i>n</i> and
+    <i>p</i> and vary <i>k</i>, and you get a probability distribution over counts. Fix <i>k</i> and
+    <i>n</i> and vary <i>p</i>, and you get this: a likelihood function. The difference is only
+    which symbol you treat as the variable.
+  </p>
+  <p>
+    Two consequences worth keeping straight. <i>p</i> is continuous, so this is a smooth curve,
+    where the distribution over whole-number <i>k</i> was a set of separate dots. And this curve is
+    <em>not</em> a probability distribution over <i>p</i>: its area is not 1, so its height alone
+    says nothing about how probable a value of <i>p</i> is. Turning it into one requires a prior and
+    Bayes' theorem.
+  </p>
+
+  <h2>How to use it</h2>
+  <ul>
+    <li><b><i>k</i></b> &mdash; how many successes were observed. It slides the peak: more successes
+      make larger values of <i>p</i> more plausible. <i>k</i> can never exceed <i>n</i>, so lowering
+      <i>n</i> drags <i>k</i> down with it.</li>
+    <li><b><i>n</i></b> &mdash; how many trials were run. More data makes the curve narrower and
+      lower, concentrating plausibility near one region of <i>p</i>.</li>
+    <li>Each slider has a text box beside it for typing an exact value; the arrow keys nudge it,
+      and Shift makes the step ten times bigger.</li>
+    <li>Hover over (or tap) the plot to read off <i>p</i> and the likelihood there.</li>
+    <li>The dashed line marks <i>p&#770;</i> = <i>k</i>/<i>n</i>, the value of <i>p</i> that makes
+      the observed data most likely.</li>
+    <li><b>auto-scale vertical axis</b> &mdash; on by default, so the peak always fills the plot.
+      Switch it off to freeze the axis at its current maximum, which is what to do when comparing
+      the heights of two different datasets. A peak above a frozen axis is marked with a caret at
+      the top edge; hovering still reads its true value.</li>
+  </ul>
+
+  <h2>Things to try</h2>
+  <ul>
+    <li>The globe-tossing data: <i>k</i> = 6, <i>n</i> = 9. The curve peaks at
+      <i>p&#770;</i> = 0.667, but note how much height there still is at <i>p</i> = 0.5 &mdash; this
+      data is a long way from ruling that out.</li>
+    <li>Now keep the proportion and add data: 6/9, then 12/18, then 24/36. The peak stays at 0.667
+      while the curve narrows sharply. Same estimate, steadily more confidence &mdash; and that
+      narrowing is the whole reason sample size matters.</li>
+    <li>Switch <b>auto-scale off</b> before doing that. Without it the axis quietly rescales each
+      time and hides the fact that the peak is also dropping.</li>
+    <li>Set <i>k</i> = 0, or <i>k</i> = <i>n</i>. The curve stops having an interior peak and piles
+      up against an endpoint: the data are perfectly consistent with <i>p</i> = 0 (or 1), but
+      hardly rule out neighbouring values when <i>n</i> is small.</li>
+    <li>Compare <i>k</i> = 1, <i>n</i> = 2 with <i>k</i> = 50, <i>n</i> = 100. Both have
+      <i>p&#770;</i> = 0.5, and the curves could hardly look less alike.</li>
+  </ul>
+
+  <h2>Notes</h2>
+  <ul>
+    <li>The curve is evaluated once per horizontal pixel, in log space &mdash;
+      log <i>n</i>! &minus; log <i>k</i>! &minus; log(<i>n</i>&minus;<i>k</i>)!
+      + <i>k</i> log <i>p</i> + (<i>n</i>&minus;<i>k</i>) log(1&minus;<i>p</i>) &mdash; and
+      exponentiated at the end, so the binomial coefficient never overflows.</li>
+    <li>The area under this curve is exactly 1/(<i>n</i>+1), whatever <i>k</i> is, which is another
+      way of seeing that it is not a probability distribution over <i>p</i>. It is reported below
+      the plot so you can watch it shrink as <i>n</i> grows.</li>
+    <li>The vertical scale changes meaning as <i>n</i> changes, so heights are only comparable
+      between datasets when the axis is frozen.</li>
+    <li>The URL updates as you change the inputs, so you can copy it from the address bar and share
+      a particular <i>k</i> and <i>n</i> with someone else. A frozen axis travels with the link too,
+      as <code>&amp;y=</code>, so everyone opening it sees the same scale.</li>
+  </ul>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------------------------------------------ state */
+
+  var DEFAULTS = { k: 6, n: 9, yFixed: null };   // yFixed null = axis auto-scales
+  var LIMITS   = { kMin: 0, nMin: 1, nMax: 200 };
+  var state    = { k: DEFAULTS.k, n: DEFAULTS.n, yFixed: DEFAULTS.yFixed };
+  var hover    = null;   // p currently hovered, or null
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  // Render numbers ourselves rather than letting the browser's locale decide:
+  // always "." for the decimal point and "," between thousands.
+  function fmtNum(v) {
+    var parts = String(v).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  }
+
+  // Accept what a person might reasonably type, including a decimal comma from
+  // a comma-locale keyboard, and reject anything that is not a plain number.
+  function parseNum(raw) {
+    var t = String(raw).trim().replace(/\s/g, "");
+    if (!t) return NaN;
+    if (t.indexOf(",") >= 0) {
+      t = (t.indexOf(".") >= 0) ? t.replace(/,/g, "")     // 1,234.5 -> thousands separators
+                                : t.replace(/,/g, ".");   // 0,5     -> decimal comma
+    }
+    return /^[+-]?(\d+\.?\d*|\.\d+)$/.test(t) ? parseFloat(t) : NaN;
+  }
+
+  /* -------------------------------------------------------- binomial maths */
+
+  var logFactTable = [0];
+  function logFact(m) {
+    for (var i = logFactTable.length; i <= m; i++) {
+      logFactTable[i] = logFactTable[i - 1] + Math.log(i);
+    }
+    return logFactTable[m];
+  }
+
+  // Binomial(k | n, p), via logs so the coefficient never overflows.
+  function binomPmf(k, n, p) {
+    if (k < 0 || k > n) return 0;
+    if (p <= 0) return k === 0 ? 1 : 0;
+    if (p >= 1) return k === n ? 1 : 0;
+    var lp = logFact(n) - logFact(k) - logFact(n - k)
+           + k * Math.log(p) + (n - k) * Math.log1p(-p);
+    return Math.exp(lp);
+  }
+
+  /* -------------------------------------------------------------- plotting */
+
+  var canvas = document.getElementById("plot");
+  var ctx    = canvas.getContext("2d");
+  var geom   = null;   // last-drawn geometry, for hit-testing
+
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  // The axis maximum is rounded up to one of these, so that dividing it into five
+  // ticks still gives round labels. No gap in the ladder is wider than 1.5x: a
+  // sparser one (1, 2, 5, 10) doubles the axis whenever a peak lands just above a
+  // step, leaving half the plot empty.
+  var NICE_STEPS = [1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10];
+  function niceCeil(v) {
+    if (!(v > 0)) return 1;
+    var e = Math.floor(Math.log10(v));
+    var f = v / Math.pow(10, e);
+    for (var i = 0; i < NICE_STEPS.length; i++) {
+      if (f <= NICE_STEPS[i] + 1e-9) return NICE_STEPS[i] * Math.pow(10, e);
+    }
+    return 10 * Math.pow(10, e);
+  }
+
+  function fmtTick(v) {
+    if (v === 0) return "0";
+    if (v < 0.0001) return v.toExponential(0);
+    var d = v >= 0.1 ? 2 : v >= 0.01 ? 3 : 4;
+    var s = v.toFixed(d);
+    if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, "");
+    return s;
+  }
+
+  function fmtProb(v) {
+    if (v === 0) return "0";
+    if (v >= 0.0001) return v.toFixed(4);
+    return v.toExponential(2);
+  }
+
+  function draw() {
+    var cssW = canvas.clientWidth;
+    if (!cssW) return;
+    var cssH = clamp(Math.round(cssW * 0.58), 240, 400);
+    var dpr  = window.devicePixelRatio || 1;
+
+    canvas.width  = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    canvas.style.height = cssH + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    var ink = cssVar("--ink"), muted = cssVar("--muted"), grid = cssVar("--grid");
+    var line = cssVar("--line"), accent = cssVar("--accent"),
+        hl = cssVar("--highlight"), bg = cssVar("--bg");
+
+    var narrow = cssW < 420;
+    var padL = narrow ? 50 : 58, padR = 14, padT = 14, padB = narrow ? 38 : 44;
+    var plotW = cssW - padL - padR;
+    var plotH = cssH - padT - padB;
+    if (plotW <= 10 || plotH <= 10) return;
+
+    var k = state.k, n = state.n;
+
+    // The maximum sits exactly at p-hat = k/n, so take the scale from there rather
+    // than from the sampled curve, which could miss the peak between pixels.
+    var pHat = k / n;
+    var peak = binomPmf(k, n, pHat);
+    var autoMax = niceCeil(peak * 1.08);
+    if (autoMax > 1) autoMax = 1;
+    var yMax = (state.yFixed !== null) ? state.yFixed : autoMax;
+
+    var xFor = function (p) { return padL + p * plotW; };
+    var yFor = function (v) { return padT + plotH * (1 - v / yMax); };
+    var y0   = padT + plotH;
+
+    ctx.font = (narrow ? 10 : 11) + "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.textBaseline = "middle";
+
+    // horizontal grid + y ticks
+    var ySteps = 5;
+    ctx.lineWidth = 1;
+    for (var i = 0; i <= ySteps; i++) {
+      var v = yMax * i / ySteps;
+      var y = Math.round(yFor(v)) + 0.5;
+      ctx.strokeStyle = i === 0 ? line : grid;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+      ctx.fillStyle = muted; ctx.textAlign = "right";
+      ctx.fillText(fmtTick(v), padL - 8, yFor(v));
+    }
+
+    // y axis line
+    ctx.strokeStyle = line;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(padL) + 0.5, padT);
+    ctx.lineTo(Math.round(padL) + 0.5, y0);
+    ctx.stroke();
+
+    // x ticks along p in [0, 1]
+    var xStep = narrow ? 0.25 : 0.1;
+    ctx.textAlign = "center"; ctx.fillStyle = muted;
+    for (var t = 0; t <= 1.0000001; t += xStep) {
+      var xt = xFor(t);
+      ctx.strokeStyle = line;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(xt) + 0.5, y0);
+      ctx.lineTo(Math.round(xt) + 0.5, y0 + 4);
+      ctx.stroke();
+      ctx.fillStyle = muted;
+      ctx.fillText(fmtTick(Math.round(t * 100) / 100), xt, y0 + 14);
+    }
+
+    // axis titles
+    ctx.fillStyle = muted; ctx.textAlign = "center";
+    ctx.fillText("p  (probability of success)", padL + plotW / 2, cssH - (narrow ? 8 : 10));
+    ctx.save();
+    ctx.translate(narrow ? 11 : 13, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = "center";
+    ctx.fillText("likelihood", 0, 0);
+    ctx.restore();
+
+    // the curve: one sample per pixel, clipped so a frozen axis cannot draw outside
+    var steps = Math.max(2, Math.round(plotW));
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(padL, padT, plotW, plotH);
+    ctx.clip();
+
+    ctx.beginPath();
+    for (i = 0; i <= steps; i++) {
+      var pp = i / steps;
+      var xv = xFor(pp), yv = yFor(binomPmf(k, n, pp));
+      if (i === 0) ctx.moveTo(xv, yv); else ctx.lineTo(xv, yv);
+    }
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    // a light wash under the curve, to read it as a function rather than a boundary
+    ctx.lineTo(xFor(1), y0);
+    ctx.lineTo(xFor(0), y0);
+    ctx.closePath();
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = accent;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // p-hat, the value of p that makes the data most likely
+    ctx.strokeStyle = muted;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(xFor(pHat), y0);
+    ctx.lineTo(xFor(pHat), Math.max(yFor(peak), padT));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // the label rides just above the top of its own line, so the two read as one mark
+    ctx.fillStyle = muted;
+    ctx.textAlign = pHat > 0.92 ? "right" : (pHat < 0.08 ? "left" : "center");
+    ctx.fillText("p̂",
+      clamp(xFor(pHat), padL + 6, padL + plotW - 6),
+      clamp(yFor(peak) - 9, padT + 6, y0 - 8));
+
+    // a peak above a frozen axis gets a caret at the top edge
+    if (peak > yMax) {
+      ctx.fillStyle = hl;
+      var xo = xFor(pHat), yo = padT + 1;
+      ctx.beginPath();
+      ctx.moveTo(xo, yo);
+      ctx.lineTo(xo - 4, yo + 6);
+      ctx.lineTo(xo + 4, yo + 6);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    geom = { padL: padL, padT: padT, plotW: plotW, plotH: plotH,
+             y0: y0, k: k, n: n, xFor: xFor, yFor: yFor, w: cssW, h: cssH,
+             narrow: narrow, yMax: yMax, autoMax: autoMax, pHat: pHat, peak: peak };
+
+    if (hover !== null) drawHover(hover, ink, hl, bg, line);
+  }
+
+  function drawHover(p, ink, hl, bg, line) {
+    var g = geom;
+    var v = binomPmf(g.k, g.n, p);
+    var x = g.xFor(p);
+    var y = Math.max(g.yFor(v), g.padT + 4);   // clamp so an off-scale point still reads
+
+    ctx.strokeStyle = hl;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(x, g.y0); ctx.lineTo(x, y); ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = hl;
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+
+    var lines = ["p = " + p.toFixed(3), "L = " + fmtProb(v)];
+    ctx.font = (g.narrow ? 11 : 12) + "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    var tw = 0;
+    for (var i = 0; i < lines.length; i++) tw = Math.max(tw, ctx.measureText(lines[i]).width);
+    var padX = 8, padY = 6, lh = 15;
+    var bw = tw + padX * 2, bh = lines.length * lh + padY * 2;
+    var bx = clamp(x + 12, g.padL, g.padL + g.plotW - bw);
+    var by = clamp(y - bh - 10, g.padT, g.y0 - bh);
+
+    ctx.fillStyle = bg;
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 1;
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 5); }
+    else { ctx.beginPath(); ctx.rect(bx, by, bw, bh); }
+    ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = ink;
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    for (i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], bx + padX, by + padY + lh * i + lh / 2);
+    }
+  }
+
+  /* --------------------------------------------------------------- summary */
+
+  var summaryEl = document.getElementById("summary");
+  function renderSummary() {
+    var k = state.k, n = state.n;
+    var pHat = k / n;
+    var peak = binomPmf(k, n, pHat);
+    var area = 1 / (n + 1);   // the area under this curve, for any k
+    summaryEl.innerHTML =
+      "<span>most likely <b>p̂ = " + fmtNum(Math.round(pHat * 1000) / 1000) + "</b></span>" +
+      "<span>peak <b>L = " + fmtProb(peak) + "</b></span>" +
+      "<span>area <b>1/(n+1) = " + fmtProb(area) + "</b></span>";
+  }
+
+  /* -------------------------------------------------------------- controls */
+
+  var kRange = document.getElementById("k-range");
+  var kNum   = document.getElementById("k-num");
+  var nRange = document.getElementById("n-range");
+  var nNum   = document.getElementById("n-num");
+  var yAuto  = document.getElementById("y-auto");
+
+  function syncControls() {
+    kRange.max   = String(state.n);      // k can never exceed n
+    kRange.value = String(state.k);
+    nRange.value = String(state.n);
+    kNum.value = fmtNum(state.k);
+    nNum.value = fmtNum(state.n);
+    yAuto.checked = (state.yFixed === null);
+    kNum.classList.remove("invalid");
+    nNum.classList.remove("invalid");
+  }
+
+  function setState(partial, opts) {
+    var changed = false;
+    if (partial.n !== undefined) {
+      var n = clamp(Math.round(partial.n), LIMITS.nMin, LIMITS.nMax);
+      if (n !== state.n) { state.n = n; changed = true; }
+    }
+    if (partial.k !== undefined) {
+      var k = clamp(Math.round(partial.k), LIMITS.kMin, state.n);
+      if (k !== state.k) { state.k = k; changed = true; }
+    }
+    if (state.k > state.n) { state.k = state.n; changed = true; }   // n shrank past k
+    if (partial.yFixed !== undefined) {
+      var y = (partial.yFixed === null) ? null
+            : Math.round(clamp(partial.yFixed, 1e-9, 1) * 1e9) / 1e9;
+      if (y !== state.yFixed) { state.yFixed = y; changed = true; }
+    }
+    if (!(opts && opts.silentControls)) syncControls();
+    if (changed || (opts && opts.force)) {
+      draw();
+      renderSummary();
+      scheduleHashWrite();
+    }
+  }
+
+  // Locking freezes the axis at whatever it currently reads, which is what makes
+  // "hold this scale and now add data" work.
+  yAuto.addEventListener("change", function () {
+    setState({ yFixed: yAuto.checked ? null : (geom ? geom.yMax : null) });
+  });
+
+  kRange.addEventListener("input", function () { setState({ k: +kRange.value }); });
+  nRange.addEventListener("input", function () { setState({ n: +nRange.value }); });
+
+  function wireNumber(el, key) {
+    // While typing, apply valid values but leave the raw text alone, so keystrokes
+    // are never rewritten under the cursor.
+    el.addEventListener("input", function () {
+      var v = parseNum(el.value);
+      var min = (key === "k") ? LIMITS.kMin : LIMITS.nMin;
+      var max = (key === "k") ? state.n : LIMITS.nMax;
+      if (isNaN(v) || v < min || v > max) { el.classList.add("invalid"); return; }
+      el.classList.remove("invalid");
+      var partial = {}; partial[key] = v;
+      setState(partial, { silentControls: true });
+      kRange.max = String(state.n);
+      (key === "k" ? kRange : nRange).value = String(state[key]);
+    });
+    // On commit (Enter or blur), normalise the text to the value actually in use.
+    el.addEventListener("change", function () {
+      var v = parseNum(el.value);
+      if (!isNaN(v)) { var partial = {}; partial[key] = v; setState(partial); }
+      el.value = fmtNum(state[key]);
+      el.classList.remove("invalid");
+    });
+    el.addEventListener("blur", function () {
+      el.value = fmtNum(state[key]);
+      el.classList.remove("invalid");
+    });
+    // Arrow keys nudge, the way a native number input would; Shift for a bigger step.
+    el.addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      e.preventDefault();
+      var cur = parseNum(el.value);
+      if (isNaN(cur)) cur = state[key];
+      var step = e.shiftKey ? 10 : 1;
+      var partial = {};
+      partial[key] = cur + (e.key === "ArrowUp" ? step : -step);
+      setState(partial);
+      el.value = fmtNum(state[key]);
+      el.classList.remove("invalid");
+    });
+  }
+  wireNumber(kNum, "k");
+  wireNumber(nNum, "n");
+
+  /* ----------------------------------------------------------------- hover */
+
+  function pAtPointer(evt) {
+    if (!geom) return null;
+    var rect = canvas.getBoundingClientRect();
+    var x = evt.clientX - rect.left, y = evt.clientY - rect.top;
+    if (x < geom.padL || x > geom.padL + geom.plotW) return null;
+    if (y < geom.padT || y > geom.y0 + 6) return null;
+    return Math.round(clamp((x - geom.padL) / geom.plotW, 0, 1) * 1000) / 1000;
+  }
+
+  canvas.addEventListener("pointermove", function (e) {
+    var p = pAtPointer(e);
+    if (p !== hover) { hover = p; draw(); }
+  });
+  canvas.addEventListener("pointerleave", function () {
+    if (hover !== null) { hover = null; draw(); }
+  });
+  canvas.addEventListener("pointerdown", function (e) {
+    var p = pAtPointer(e);
+    if (p !== hover) { hover = p; draw(); }
+  });
+
+  /* ------------------------------------------------------ URL fragment state */
+
+  function readHash() {
+    var raw = location.hash.replace(/^#/, "");
+    if (!raw) return { k: DEFAULTS.k, n: DEFAULTS.n, yFixed: DEFAULTS.yFixed };
+    var q = new URLSearchParams(raw);
+    var k = parseFloat(q.get("k"));
+    var n = parseFloat(q.get("n"));
+    var y = parseFloat(q.get("y"));
+    var nOut = isFinite(n) ? clamp(Math.round(n), LIMITS.nMin, LIMITS.nMax) : DEFAULTS.n;
+    return {
+      n: nOut,
+      k: isFinite(k) ? clamp(Math.round(k), LIMITS.kMin, nOut) : Math.min(DEFAULTS.k, nOut),
+      yFixed: (isFinite(y) && y > 0 && y <= 1) ? Math.round(y * 1e9) / 1e9 : DEFAULTS.yFixed
+    };
+  }
+
+  function currentHash() {
+    return "#k=" + state.k + "&n=" + state.n +
+           (state.yFixed !== null ? "&y=" + state.yFixed : "");
+  }
+
+  var hashTimer = null;
+  function scheduleHashWrite() {
+    if (hashTimer) clearTimeout(hashTimer);
+    hashTimer = setTimeout(function () {
+      hashTimer = null;
+      var h = currentHash();
+      if (location.hash !== h) {
+        try { history.replaceState(null, "", h); }
+        catch (err) { location.hash = h; }   // e.g. opened from file:// in some browsers
+      }
+    }, 150);
+  }
+
+  window.addEventListener("hashchange", function () {
+    var s = readHash();
+    setState({ n: s.n, k: s.k, yFixed: s.yFixed }, { force: true });
+  });
+
+  /* ------------------------------------------------------------------ help */
+
+  var dlg = document.getElementById("help-dialog");
+  document.getElementById("help-btn").addEventListener("click", function () { dlg.showModal(); });
+  dlg.querySelector(".help-close").addEventListener("click", function () { dlg.close(); });
+  dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
+
+  /* ------------------------------------------------------------------ init */
+
+  var initial = readHash();
+  state.n = initial.n;
+  state.k = initial.k;
+  state.yFixed = initial.yFixed;
+  syncControls();
+  renderSummary();
+  draw();
+
+  if (window.ResizeObserver) {
+    var lastW = canvas.clientWidth;
+    new ResizeObserver(function () {
+      var w = canvas.clientWidth;
+      if (w !== lastW) { lastW = w; draw(); }
+    }).observe(canvas.parentElement);
+  } else {
+    window.addEventListener("resize", draw);
+  }
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    if (mq.addEventListener) mq.addEventListener("change", draw);
+    else if (mq.addListener) mq.addListener(draw);
+  }
+})();
+</script>
+</body>
+</html>

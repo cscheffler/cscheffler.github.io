@@ -883,11 +883,16 @@
     ctx.save();
     ctx.font = "10px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
     ctx.fillStyle = P.muted;
-    // Under a -90 degree rotation the glyphs grow towards screen-right, so a "top"
-    // baseline here would push them straight off the edge of the canvas.
-    ctx.translate(s.w - 10, padT + plotH / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    // Rotated +90 rather than -90, so the title reads downwards: turn this panel
+    // anticlockwise to lay it out horizontally and the text comes out reading
+    // left to right, like the one on the strip above. The anchor is the corner
+    // that becomes the top left under that same turn — which is also the part of
+    // the panel the curve never reaches, since a large s² carries little density.
+    // With this rotation the glyph bodies grow towards screen-left, so a "top"
+    // baseline keeps them inside the canvas.
+    ctx.translate(s.w - 4, padT + 4);
+    ctx.rotate(Math.PI / 2);
+    ctx.textAlign = "left"; ctx.textBaseline = "top";
     ctx.fillText("marginal of s²  —  Inv-Gamma", 0, 0);
     ctx.restore();
   }

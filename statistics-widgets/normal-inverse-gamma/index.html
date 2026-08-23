@@ -1,0 +1,1175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Normal-Inverse-Gamma distribution</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg:        #ffffff;
+    --surface:   #f7f7f5;
+    --ink:       #1b1b1a;
+    --muted:     #6b6b66;
+    --line:      #d9d9d4;
+    --grid:      #ececE7;
+    --accent:    #2f6f8f;
+    --highlight: #b4542a;
+    --focus:     #2f6f8f;
+    --fit:       0;      /* 1 when the one-screen layout below is in force */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg:        #16171a;
+      --surface:   #1e2024;
+      --ink:       #e8e8e4;
+      --muted:     #9b9b95;
+      --line:      #34363b;
+      --grid:      #26282d;
+      --accent:    #6fb3d2;
+      --highlight: #e08a5c;
+      --focus:     #6fb3d2;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.25rem 1rem 2.5rem; }
+
+  .widget-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 0.75rem; margin-bottom: 0.25rem;
+  }
+  .widget-header h1 { font-size: 1.25rem; font-weight: 600; margin: 0; line-height: 1.3; }
+  .widget-header h1 .formula { white-space: nowrap; }   /* never break mid-expression */
+  .lede { color: var(--muted); margin: 0 0 1.25rem; font-size: 0.95rem; }
+
+  /* ---- help button (canonical) ---- */
+  .help-btn {
+    flex: 0 0 auto;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--muted); background: transparent; color: var(--muted);
+    font: inherit; font-size: 16px; line-height: 1;
+    display: grid; place-items: center; cursor: pointer;
+    padding: 0; transition: color .12s, border-color .12s, background-color .12s;
+  }
+  .help-btn:hover, .help-btn:focus-visible {
+    color: var(--ink); border-color: var(--ink); background: var(--surface);
+  }
+  .help-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .help-dialog {
+    max-width: 34rem; max-height: 80vh; width: calc(100% - 2rem);
+    padding: 1.5rem; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); color: var(--ink);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+    overflow: auto; position: relative;
+  }
+  .help-dialog::backdrop { background: rgba(0,0,0,0.45); }
+  .help-dialog h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin: 1.4rem 0 .35rem; }
+  .help-dialog h2:first-of-type { margin-top: 0; }
+  .help-dialog p, .help-dialog li { font-size: 0.94rem; }
+  .help-dialog p { margin: .35rem 0; }
+  .help-dialog ul { margin: .35rem 0; padding-left: 1.15rem; }
+  .help-dialog li { margin: .2rem 0; }
+  .help-dialog code { background: var(--surface); padding: 0.05em 0.3em; border-radius: 3px;
+    font-size: 0.88em; }
+  .help-close {
+    position: absolute; top: .6rem; right: .6rem;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid transparent; background: transparent; color: var(--muted);
+    font-size: 20px; line-height: 1; cursor: pointer; display: grid; place-items: center;
+  }
+  .help-close:hover, .help-close:focus-visible { color: var(--ink); background: var(--surface); }
+  .help-close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- controls ---- */
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0 1.6rem; margin-bottom: .2rem; }
+  .control { margin-bottom: .8rem; }
+  .control-label { display: flex; align-items: baseline; gap: .45rem; margin-bottom: .25rem; }
+  .control-label .name { font-weight: 600; font-size: .95rem; }
+  .control-label .desc { color: var(--muted); font-size: .85rem; }
+  .control-label .desc::before { content: "\2014\00a0"; }
+  .control-row { display: flex; align-items: center; gap: .75rem; }
+  input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); height: 1.6rem; }
+  input[type="range"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  .num-input {
+    flex: 0 0 auto; width: 5rem; padding: .35rem .5rem;
+    font: inherit; font-size: .95rem; font-variant-numeric: tabular-nums;
+    color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 5px;
+  }
+  .num-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px;
+    border-color: var(--focus); }
+  .num-input.invalid { border-color: var(--highlight); }
+
+  .toggles { display: flex; flex-wrap: wrap; gap: .3rem 1.4rem; margin: .1rem 0 1.1rem; }
+  .toggle {
+    display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap;
+    color: var(--muted); font-size: .88rem; cursor: pointer;
+  }
+  .toggle input { accent-color: var(--accent); margin: 0; cursor: pointer; }
+  .toggle:hover { color: var(--ink); }
+  .toggle input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .toggle select {
+    font: inherit; font-size: .88rem; padding: .1rem .3rem;
+    color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 4px;
+  }
+
+  /* ---- plots ---- */
+  .plot-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: .5rem; margin-bottom: .35rem;
+  }
+  .plot-card canvas { display: block; width: 100%; height: auto; touch-action: pan-y; }
+
+  .cap { color: var(--muted); font-size: .87rem; margin: 0 0 1rem; padding: 0 .15rem;
+    display: flex; flex-wrap: wrap; gap: .2rem 1.2rem; }
+  .cap b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---- one-screen layout ----
+     Landscape and roomy enough: the joint takes the space, with each marginal
+     butted against the axis it belongs to. Anything smaller — a phone, a
+     sidebar, a short or portrait window — stacks and scrolls. */
+  @media (min-width: 64rem) and (min-height: 36rem) and (min-aspect-ratio: 3/2) {
+    :root { --fit: 1; }
+    html, body { height: 100%; }
+    .wrap {
+      max-width: 160rem; height: 100vh; height: 100dvh;
+      display: flex; flex-direction: column;
+      padding: .85rem 1.1rem .9rem;
+    }
+    .widget-header { margin-bottom: .1rem; }
+    .lede { max-width: 64rem; margin-bottom: .6rem; }
+    .controls { grid-template-columns: repeat(4, 1fr); margin-bottom: 0; }
+    .control { margin-bottom: .45rem; }
+    .toggles { margin: 0 0 .5rem; }
+
+    .board {
+      flex: 1 1 auto; min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 9.5rem;   /* wide enough for the key's labels */
+      grid-template-rows: 5.6rem 1fr auto;   /* tall enough for the key */
+      column-gap: .6rem;
+    }
+    .cell-mm   { grid-area: 1 / 1; }
+    .cell-cbar { grid-area: 1 / 2; }
+    .cell-joint{ grid-area: 2 / 1; }
+    .cell-vm   { grid-area: 2 / 2; }
+    .cap       { grid-area: 3 / 1 / 4 / 3; }
+
+    .board .plot-card { min-height: 0; position: relative; margin-bottom: .3rem; }
+    /* A canvas is a replaced element, so the four offsets would not stretch it —
+       it is pinned here and given its exact size by the script instead. */
+    .board .plot-card canvas { position: absolute; top: .5rem; left: .5rem; }
+    .cap { margin-bottom: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="widget-header">
+    <h1>The Normal-Inverse-Gamma &mdash;
+      <span class="formula"><i>m</i>, <i>s</i>&sup2; ~ NIG(&mu;<sub>0</sub>, &nu;<sub>0</sub>,
+      &alpha;<sub>0</sub>, &beta;<sub>0</sub>)</span></h1>
+    <button id="help-btn" class="help-btn" aria-label="Help" title="Help">?</button>
+  </header>
+  <p class="lede">
+    A joint distribution over a mean and a variance at the same time. It is not two independent
+    beliefs side by side: the spread of <i>m</i> is tied to <i>s</i>&sup2;, which is what gives the
+    contours their funnel shape.
+  </p>
+
+  <div class="controls">
+    <div class="control">
+      <div class="control-label">
+        <label class="name" for="mu-range">&mu;<sub>0</sub></label>
+        <span class="desc">where <i>m</i> is centred</span>
+      </div>
+      <div class="control-row">
+        <input type="range" id="mu-range" min="-10" max="10" step="0.1" value="0"
+               aria-label="mu zero, where m is centred">
+        <input type="text" id="mu-num" class="num-input" value="0"
+               inputmode="decimal" autocomplete="off" spellcheck="false"
+               aria-label="mu zero (exact value)">
+      </div>
+    </div>
+
+    <div class="control">
+      <div class="control-label">
+        <label class="name" for="nu-range">&nu;<sub>0</sub></label>
+        <span class="desc">how tightly, in pseudo-observations</span>
+      </div>
+      <div class="control-row">
+        <input type="range" id="nu-range" min="0.1" max="50" step="0.1" value="1"
+               aria-label="nu zero, how tightly m is tied to mu zero">
+        <input type="text" id="nu-num" class="num-input" value="1"
+               inputmode="decimal" autocomplete="off" spellcheck="false"
+               aria-label="nu zero (exact value)">
+      </div>
+    </div>
+
+    <div class="control">
+      <div class="control-label">
+        <label class="name" for="a-range">&alpha;<sub>0</sub></label>
+        <span class="desc">shape of <i>s</i>&sup2;</span>
+      </div>
+      <div class="control-row">
+        <input type="range" id="a-range" min="0.5" max="50" step="0.1" value="3"
+               aria-label="alpha zero, shape of the variance">
+        <input type="text" id="a-num" class="num-input" value="3"
+               inputmode="decimal" autocomplete="off" spellcheck="false"
+               aria-label="alpha zero (exact value)">
+      </div>
+    </div>
+
+    <div class="control">
+      <div class="control-label">
+        <label class="name" for="b-range">&beta;<sub>0</sub></label>
+        <span class="desc">scale of <i>s</i>&sup2;</span>
+      </div>
+      <div class="control-row">
+        <input type="range" id="b-range" min="0.1" max="50" step="0.1" value="2"
+               aria-label="beta zero, scale of the variance">
+        <input type="text" id="b-num" class="num-input" value="2"
+               inputmode="decimal" autocomplete="off" spellcheck="false"
+               aria-label="beta zero (exact value)">
+      </div>
+    </div>
+  </div>
+
+  <div class="toggles">
+    <label class="toggle" for="auto-view">
+      <input type="checkbox" id="auto-view" checked>
+      auto-scale axes
+    </label>
+    <label class="toggle" for="cmap">
+      colour map
+      <select id="cmap">
+        <option value="0">cividis</option>
+        <option value="1">viridis</option>
+      </select>
+    </label>
+    <label class="toggle" for="show-contours">
+      <input type="checkbox" id="show-contours" checked>
+      contours at 50%, 80%, 95%
+    </label>
+  </div>
+
+  <div class="board">
+    <div class="plot-card cell-mm">
+      <canvas id="mm" role="img"
+              aria-label="The marginal distribution of m, a Student-t curve, above the joint"></canvas>
+    </div>
+    <div class="plot-card cell-cbar">
+      <canvas id="cbar" role="img" aria-label="Key: the colour ramp from less likely to more likely, and what each contour weight means"></canvas>
+    </div>
+    <div class="plot-card cell-joint">
+      <canvas id="joint" role="img"
+              aria-label="Heat map of the Normal-Inverse-Gamma density over m horizontally and s squared vertically, with contours"></canvas>
+    </div>
+    <div class="plot-card cell-vm">
+      <canvas id="vm" role="img"
+              aria-label="The marginal distribution of s squared, an inverse-gamma curve, beside the joint"></canvas>
+    </div>
+    <p class="cap" id="cap"></p>
+  </div>
+</div>
+
+<dialog id="help-dialog" class="help-dialog">
+  <button class="help-close" aria-label="Close help">&times;</button>
+
+  <h2>What this shows</h2>
+  <p>
+    The Normal-Inverse-Gamma is the conjugate prior for a Normal likelihood when <em>both</em> the
+    mean and the variance are unknown. It is a distribution over a pair, and it factors as
+  </p>
+  <p style="text-align:center">
+    <i>s</i>&sup2; ~ Inv-Gamma(&alpha;<sub>0</sub>, &beta;<sub>0</sub>),&nbsp;&nbsp;
+    <i>m</i> | <i>s</i>&sup2; ~ Normal(&mu;<sub>0</sub>, <i>s</i>&sup2;/&nu;<sub>0</sub>)
+  </p>
+  <p>
+    Read that second line carefully: the variance of <i>m</i> is <i>s</i>&sup2;/&nu;<sub>0</sub>,
+    so it depends on <i>s</i>&sup2;. High up the plot, where the variance is large, <i>m</i> is
+    loosely pinned; low down it is tightly pinned. That is the funnel, and it is the whole point of
+    the distribution &mdash; how sure you are about the mean depends on how noisy you think the data
+    are.
+  </p>
+  <p>
+    The strip above shows the marginal of <i>m</i> once <i>s</i>&sup2; is integrated out: a Student
+    <i>t</i> with 2&alpha;<sub>0</sub> degrees of freedom, centred on &mu;<sub>0</sub>. The strip on
+    the right shows the marginal of <i>s</i>&sup2;, which is the Inverse-Gamma itself.
+  </p>
+
+  <h2>How to use it</h2>
+  <ul>
+    <li><b>&mu;<sub>0</sub></b> slides the whole thing left and right. Nothing about its shape
+      changes.</li>
+    <li><b>&nu;<sub>0</sub></b> is how many pseudo-observations the prior on the mean is worth.
+      Raising it squeezes the funnel horizontally without touching the marginal of
+      <i>s</i>&sup2;.</li>
+    <li><b>&alpha;<sub>0</sub></b> and <b>&beta;<sub>0</sub></b> shape the variance.
+      &beta;<sub>0</sub>/(&alpha;<sub>0</sub>+1) is the most likely <i>s</i>&sup2;;
+      &beta;<sub>0</sub>/(&alpha;<sub>0</sub>&minus;1) is its mean, when &alpha;<sub>0</sub> &gt; 1.
+      Raising both together at a fixed ratio concentrates the variance without moving it.</li>
+    <li><b>auto-scale axes</b> &mdash; on by default. Switch it off to freeze the current window,
+      which is what to do before changing a parameter if you want to compare like with like. The
+      frozen window travels with the URL.</li>
+    <li><b>colour map</b> &mdash; cividis by default; viridis is there to compare. See the notes.</li>
+    <li><b>contours</b> enclose 50%, 80% and 95% of the probability mass, innermost first, drawn
+      with the thickest line for the innermost so they are told apart without relying on
+      position alone.</li>
+  </ul>
+
+  <h2>Things to try</h2>
+  <ul>
+    <li>Start at the defaults and look at the shape. It is not an ellipse: it leans and flares
+      upward. Slice it at a low <i>s</i>&sup2; and <i>m</i> is confined to a narrow band; slice it
+      near the top and the same <i>m</i> range is wide open.</li>
+    <li>Turn <b>auto-scale axes</b> off, then raise <b>&nu;<sub>0</sub></b> from 1 to 10. The funnel
+      narrows sharply while the strip on the right does not move at all. &nu;<sub>0</sub> is
+      information about the mean only.</li>
+    <li>Now put &nu;<sub>0</sub> back and raise <b>&alpha;<sub>0</sub></b> and
+      <b>&beta;<sub>0</sub></b> together, say (3,2) &rarr; (30,20) &rarr; (300,200) by typing in the
+      boxes. The variance concentrates on 2/3, the funnel stops flaring, and the top strip
+      approaches a Normal &mdash; a <i>t</i> with many degrees of freedom.</li>
+    <li>Drop <b>&alpha;<sub>0</sub></b> to 0.5. The tail on <i>s</i>&sup2; becomes very heavy, the
+      window has to open up to hold the mass, and the <i>t</i> on top gets fat tails. This is what
+      a vague prior on the variance actually looks like.</li>
+    <li>Compare the two colour maps on the same picture. If you have normal colour vision they look
+      different; the point of cividis is that they do not look meaningfully different to someone
+      with red-green colour blindness.</li>
+  </ul>
+
+  <h2>Notes</h2>
+  <ul>
+    <li>The density is
+      p(<i>m</i>, <i>s</i>&sup2;) &prop;
+      (<i>s</i>&sup2;)<sup>&minus;&alpha;<sub>0</sub>&minus;3/2</sup>
+      exp[&minus;(2&beta;<sub>0</sub> + &nu;<sub>0</sub>(<i>m</i>&minus;&mu;<sub>0</sub>)&sup2;)
+      / (2<i>s</i>&sup2;)], evaluated in log space with a Lanczos log &Gamma;. Both marginals were
+      checked against numerical integration of the joint and agree to about 1 part in 10<sup>13</sup>.</li>
+    <li><b>Why cividis rather than viridis.</b> Both are perceptually uniform and monotonic in
+      lightness, so both survive being printed in greyscale. Cividis goes further: it was built
+      specifically so that a viewer with deuteranopia or protanopia &mdash; the common forms of
+      red-green colour blindness, around 1 in 12 men &mdash; sees essentially the same image as a
+      viewer without. Viridis is good on this; cividis is optimised for it, which is why it is the
+      default here. Viridis is one control away if you prefer it.</li>
+    <li>Colour runs from zero to the largest density in view on a square-root scale. A linear
+      ramp, which is what <code>imshow</code> uses by default, leaves almost the whole panel one
+      flat colour here: the window is chosen to hold nearly all the mass, so most of it sits far
+      below the peak. The equivalent in <code>matplotlib</code> is
+      <code>norm=PowerNorm(0.5)</code>.</li>
+    <li>The window is chosen to hold about 99% of the mass: <i>s</i>&sup2; runs from 0 to the 99th
+      percentile of the Inverse-Gamma, and <i>m</i> spans &mu;<sub>0</sub> &plusmn; 3.2 conditional
+      standard deviations taken at the 90th percentile of <i>s</i>&sup2;. The exact fraction held is
+      reported under the plot, and the contour levels are found from the density values on the
+      rendered grid, so a contour is only drawn when the window really does contain that much
+      mass.</li>
+    <li>The URL updates as you change the inputs, so you can copy it from the address bar and share
+      an exact configuration, frozen window included.</li>
+  </ul>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------------------------------------------ state */
+
+  var DEFAULTS = { mu: 0, nu: 1, a: 3, b: 2, cm: 0, ct: 1,
+                   m0: null, m1: null, v1: null };   // null view = auto
+  var LIMITS = { muMin: -10, muMax: 10, nuMin: 0.1, nuMax: 50,
+                 aMin: 0.5, aMax: 50, bMin: 0.1, bMax: 50 };
+  var state = {};
+  for (var kk in DEFAULTS) state[kk] = DEFAULTS[kk];
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function round3(v) { return Math.round(v * 1000) / 1000; }
+
+  // Render numbers ourselves rather than letting the browser's locale decide:
+  // always "." for the decimal point and "," between thousands.
+  function fmtNum(v) {
+    var parts = String(v).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  }
+  function parseNum(raw) {
+    var t = String(raw).trim().replace(/\s/g, "");
+    if (!t) return NaN;
+    if (t.indexOf(",") >= 0) {
+      t = (t.indexOf(".") >= 0) ? t.replace(/,/g, "") : t.replace(/,/g, ".");
+    }
+    return /^[+-]?(\d+\.?\d*|\.\d+)$/.test(t) ? parseFloat(t) : NaN;
+  }
+
+  /* ----------------------------------------------------------------- maths */
+
+  var LANCZOS = [
+    676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.13857109526572012,
+    9.9843695780195716e-6, 1.5056327351493116e-7
+  ];
+  function lgamma(z) {
+    if (z < 0.5) {   // reflection: gamma(z) gamma(1-z) = pi / sin(pi z)
+      return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * z))) - lgamma(1 - z);
+    }
+    z -= 1;
+    var x = 0.99999999999980993;
+    for (var i = 0; i < LANCZOS.length; i++) x += LANCZOS[i] / (z + i + 1);
+    var t = z + LANCZOS.length - 0.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+  }
+  var LN2PI = Math.log(2 * Math.PI);
+
+  // Regularised lower incomplete gamma: series below the crossover, continued
+  // fraction above it, as in Numerical Recipes.
+  function gammaP(a, x) {
+    if (x <= 0) return 0;
+    if (x < a + 1) {
+      var ap = a, sum = 1 / a, del = sum;
+      for (var i = 0; i < 500; i++) {
+        ap++; del *= x / ap; sum += del;
+        if (Math.abs(del) < Math.abs(sum) * 1e-15) break;
+      }
+      return sum * Math.exp(-x + a * Math.log(x) - lgamma(a));
+    }
+    var b0 = x + 1 - a, c = 1e300, d = 1 / b0, h = d;
+    for (var j = 1; j <= 500; j++) {
+      var an = -j * (j - a);
+      b0 += 2;
+      d = an * d + b0; if (Math.abs(d) < 1e-300) d = 1e-300;
+      c = b0 + an / c; if (Math.abs(c) < 1e-300) c = 1e-300;
+      d = 1 / d;
+      var delta = d * c; h *= delta;
+      if (Math.abs(delta - 1) < 1e-15) break;
+    }
+    return 1 - Math.exp(-x + a * Math.log(x) - lgamma(a)) * h;
+  }
+
+  // If V ~ Inv-Gamma(a, b) then b/V ~ Gamma(a, 1), so F(v) = Q(a, b/v).
+  function igCdf(v, a, b) { return v <= 0 ? 0 : 1 - gammaP(a, b / v); }
+  function igQuantile(q, a, b) {
+    var lo = 1e-12, hi = 1e12;
+    for (var i = 0; i < 200; i++) {
+      var mid = Math.sqrt(lo * hi);          // bisect in log space: v spans decades
+      if (igCdf(mid, a, b) < q) lo = mid; else hi = mid;
+      if (hi / lo < 1 + 1e-12) break;
+    }
+    return Math.sqrt(lo * hi);
+  }
+  function igPdf(v, a, b) {
+    if (v <= 0) return 0;
+    return Math.exp(a * Math.log(b) - lgamma(a) - (a + 1) * Math.log(v) - b / v);
+  }
+
+  // The marginal of m: Student t with 2a degrees of freedom, centred mu,
+  // squared scale b/(a nu).
+  function tPdf(m, mu, nu, a, b) {
+    var df = 2 * a, sc2 = b / (a * nu), z = (m - mu) / Math.sqrt(sc2);
+    return Math.exp(lgamma((df + 1) / 2) - lgamma(df / 2)) /
+           Math.sqrt(Math.PI * df * sc2) * Math.pow(1 + z * z / df, -(df + 1) / 2);
+  }
+
+  /* ------------------------------------------------------------- colour maps */
+
+  // Exact 32-stop samples of matplotlib's tables, linearly interpolated.
+  var MAPS = [
+    "00224e00285b002e6a0533711c396f293f6e33446d3c4a6c45506c4d556c555b6d5c616e6467706b6d7272727478" +
+    "7877807f78888578908b78979177a09875a89e73b0a571b9ab6dc2b369cbb965d3c05fdcc859e6d051efd748f8df3cfee838",
+    "440154470d6048186a482374472e7c4538824241863e4a893a548c365d8d32658e2e6d8e2b758e287d8e25848e22" +
+    "8c8d1f948c1e9c8920a38625ab822eb37c3aba7648c16e58c7656ccd5a7fd34e93d741a8db34c0df25d5e21aeae51afde725"
+  ];
+  var LUT = MAPS.map(function (hex) {
+    var n = hex.length / 6, arr = new Uint8Array(n * 3);
+    for (var i = 0; i < n; i++) {
+      arr[i * 3]     = parseInt(hex.substr(i * 6, 2), 16);
+      arr[i * 3 + 1] = parseInt(hex.substr(i * 6 + 2, 2), 16);
+      arr[i * 3 + 2] = parseInt(hex.substr(i * 6 + 4, 2), 16);
+    }
+    return arr;
+  });
+  // t in [0,1] -> [r,g,b], written into out
+  function mapColour(lut, t, out) {
+    var n = lut.length / 3;
+    var f = clamp(t, 0, 1) * (n - 1);
+    var i = Math.floor(f), g = f - i;
+    if (i >= n - 1) { i = n - 2; g = 1; }
+    var o = i * 3, o2 = o + 3;
+    out[0] = lut[o]     + (lut[o2]     - lut[o])     * g;
+    out[1] = lut[o + 1] + (lut[o2 + 1] - lut[o + 1]) * g;
+    out[2] = lut[o + 2] + (lut[o2 + 2] - lut[o + 2]) * g;
+  }
+
+  /* -------------------------------------------------------- drawing helpers */
+
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  function fitMode() { return cssVar("--fit") === "1"; }
+  function palette() {
+    return {
+      ink: cssVar("--ink"), muted: cssVar("--muted"), grid: cssVar("--grid"),
+      line: cssVar("--line"), accent: cssVar("--accent"), hl: cssVar("--highlight"),
+      bg: cssVar("--bg"), surface: cssVar("--surface")
+    };
+  }
+
+  function fmtTick(v) {
+    if (v === 0) return "0";
+    var av = Math.abs(v);
+    if (av < 0.0001 || av >= 1e6) return v.toExponential(0);
+    var d = av >= 100 ? 0 : av >= 10 ? 1 : av >= 1 ? 2 : av >= 0.1 ? 2 : 3;
+    var s = v.toFixed(d);
+    if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, "");
+    return s;
+  }
+  function fmtVal(v) {
+    if (!isFinite(v)) return "∞";
+    if (v === 0) return "0";
+    var av = Math.abs(v);
+    if (av >= 1000 || av < 0.001) return v.toExponential(2);
+    return v.toFixed(3);
+  }
+  function niceStep(range, target) {
+    var raw = range / target, e = Math.floor(Math.log10(raw)), f = raw / Math.pow(10, e);
+    var m = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+    return m * Math.pow(10, e);
+  }
+
+  var cvJoint = document.getElementById("joint");
+  var cvMM    = document.getElementById("mm");
+  var cvVM    = document.getElementById("vm");
+  var cvCbar  = document.getElementById("cbar");
+
+  // Shared, so the marginals line up with the axes they belong to.
+  var padL = 56, padT = 10, padB = 36, padR = 12;
+
+  // putImageData writes raw device pixels and ignores the context transform, so
+  // on a 2x display it would drop the image at half scale into the corner. Paint
+  // into this untransformed scratch canvas instead and let drawImage, which does
+  // respect the transform, place and scale it.
+  var scratch = document.createElement("canvas");
+  function blit(ctx, img, x, y, w, h) {
+    if (scratch.width !== img.width) scratch.width = img.width;
+    if (scratch.height !== img.height) scratch.height = img.height;
+    var sctx = scratch.getContext("2d");
+    sctx.putImageData(img, 0, 0);
+    ctx.drawImage(scratch, x, y, w, h);
+  }
+
+  function panelBox(cv) {
+    if (!fitMode()) return { w: cv.clientWidth, h: 0 };
+    var card = cv.parentElement, cs = getComputedStyle(card);
+    // Before styles have fully resolved these can come back empty, and an
+    // undefended parseFloat would turn the whole box into NaN.
+    var px = function (x) { return parseFloat(x) || 0; };
+    return {
+      w: card.clientWidth  - px(cs.paddingLeft) - px(cs.paddingRight),
+      h: card.clientHeight - px(cs.paddingTop)  - px(cs.paddingBottom)
+    };
+  }
+
+  function prep(cv, aspect, minH, maxH) {
+    var cssW, cssH;
+    var box = fitMode() ? panelBox(cv) : null;
+    if (box && box.w > 40 && box.h > 30) {
+      cssW = box.w; cssH = box.h;
+      cv.style.width = cssW + "px";
+      cv.style.height = cssH + "px";
+    } else {
+      // Either the stacked layout, or the one-screen layout before it has settled.
+      // Size from the width rather than giving up: a plot of the wrong height gets
+      // corrected on the next observation, a blank one is what the user is left with.
+      cv.style.width = "";
+      cssW = cv.clientWidth || (cv.parentElement ? cv.parentElement.clientWidth : 0);
+      if (!(cssW > 0)) return null;
+      cssH = clamp(Math.round(cssW * aspect), minH, maxH);
+      cv.style.height = cssH + "px";
+    }
+    var dpr = window.devicePixelRatio || 1;
+    cv.width  = Math.round(cssW * dpr);
+    cv.height = Math.round(cssH * dpr);
+    var c = cv.getContext("2d");
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, cssW, cssH);
+    return { ctx: c, w: cssW, h: cssH, narrow: cssW < 380 };
+  }
+
+  /* ------------------------------------------------------------ the window */
+
+  var view = null;   // { m0, m1, v0, v1 }
+
+  function autoView() {
+    var a = state.a, b = state.b, nu = state.nu, mu = state.mu;
+    // The 99th percentile alone is not a usable window: at alpha = 0.6 the
+    // inverse-gamma tail is so heavy that it sits 800 medians up the page and the
+    // entire bulk collapses into the bottom row of pixels. Capping the height at
+    // nine medians keeps the picture readable; the mass that falls outside is
+    // reported under the plot rather than hidden.
+    var v1 = Math.min(igQuantile(0.99, a, b), 9 * igQuantile(0.5, a, b));
+    var half = 3.2 * Math.sqrt(Math.min(igQuantile(0.90, a, b), v1) / nu);
+    return { m0: mu - half, m1: mu + half, v0: 0, v1: v1 };
+  }
+
+  function currentView() {
+    if (state.m0 !== null && state.m1 !== null && state.v1 !== null) {
+      return { m0: state.m0, m1: state.m1, v0: 0, v1: state.v1 };
+    }
+    return autoView();
+  }
+
+  /* ------------------------------------------------------------- the joint */
+
+  var gJoint = null;
+
+  function drawJoint() {
+    var s = prep(cvJoint, 0.66, 220, 460);
+    if (!s) return;
+    var ctx = s.ctx, P = palette();
+    var plotW = Math.round(s.w - padL - padR), plotH = Math.round(s.h - padT - padB);
+    if (plotW <= 10 || plotH <= 10) return;
+    var y0 = padT + plotH;
+    view = currentView();
+    var m0 = view.m0, m1 = view.m1, v0 = view.v0, v1 = view.v1;
+    var mu = state.mu, nu = state.nu, a = state.a, b = state.b;
+
+    var C = 0.5 * Math.log(nu) - 0.5 * LN2PI + a * Math.log(b) - lgamma(a);
+    var dm = (m1 - m0) / plotW, dv = (v1 - v0) / plotH;
+
+    // The density factors into a per-row part and a per-column part, so the inner
+    // loop is one subtract, one multiply and one exp.
+    var d2 = new Float64Array(plotW);
+    for (var i = 0; i < plotW; i++) {
+      var mm = m0 + (i + 0.5) * dm - mu;
+      d2[i] = mm * mm;
+    }
+
+    var dens = new Float64Array(plotW * plotH);
+    var peak = 0;
+    for (var j = 0; j < plotH; j++) {
+      var v = v0 + (plotH - 0.5 - j) * dv;          // row 0 is the top = largest v
+      var row = j * plotW;
+      if (v <= 0) continue;
+      var A = C + (-a - 1.5) * Math.log(v) - b / v;
+      var B = nu / (2 * v);
+      for (var k = 0; k < plotW; k++) {
+        var p = Math.exp(A - B * d2[k]);
+        dens[row + k] = p;
+        if (p > peak) peak = p;
+      }
+    }
+
+    // paint, through a 256-entry ramp so the inner loop is a table lookup
+    var ramp = new Uint8Array(256 * 3), rgb = [0, 0, 0], ri;
+    for (ri = 0; ri < 256; ri++) {
+      mapColour(LUT[state.cm], ri / 255, rgb);
+      ramp[ri * 3] = rgb[0]; ramp[ri * 3 + 1] = rgb[1]; ramp[ri * 3 + 2] = rgb[2];
+    }
+    var img = ctx.createImageData(plotW, plotH);
+    var data = img.data;
+    // Square-root scale. Linear is what imshow does by default, but the window
+    // is chosen to hold ~99% of the mass, so nearly all of it sits far below the
+    // peak and a linear ramp paints the panel one flat colour.
+    var inv = peak > 0 ? 1 / peak : 0;
+    for (var q = 0; q < dens.length; q++) {
+      var ci = (Math.sqrt(dens[q] * inv) * 255) | 0;
+      if (ci > 255) ci = 255;
+      ci *= 3;
+      var o = q * 4;
+      data[o] = ramp[ci]; data[o + 1] = ramp[ci + 1]; data[o + 2] = ramp[ci + 2];
+      data[o + 3] = 255;
+    }
+    blit(ctx, img, padL, padT, plotW, plotH);
+
+    var xFor = function (m) { return padL + (m - m0) / (m1 - m0) * plotW; };
+    var yFor = function (vv) { return padT + plotH * (1 - (vv - v0) / (v1 - v0)); };
+
+    // Mass and contour levels come from a coarser grid: sorting a third of a
+    // million densities on every slider tick would not keep up, and the contours
+    // are smoother for being traced on a grid rather than on pixels.
+    var CX = Math.max(24, Math.min(320, Math.round(plotW / 3)));
+    var CY = Math.max(20, Math.min(220, Math.round(plotH / 3)));
+    var cdm = (m1 - m0) / CX, cdv = (v1 - v0) / CY;
+    var cg = new Float64Array(CX * CY), mass = 0;
+    for (var cj = 0; cj < CY; cj++) {
+      var cv = v0 + (CY - 0.5 - cj) * cdv;
+      if (cv <= 0) continue;
+      var cA = C + (-a - 1.5) * Math.log(cv) - b / cv, cB = nu / (2 * cv);
+      for (var ck = 0; ck < CX; ck++) {
+        var cmm = m0 + (ck + 0.5) * cdm - mu;
+        var pv = Math.exp(cA - cB * cmm * cmm);
+        cg[cj * CX + ck] = pv;
+        mass += pv;
+      }
+    }
+    mass *= cdm * cdv;
+
+    var TARGETS = [0.5, 0.8, 0.95];
+    var levels = [null, null, null];
+    if (state.ct) {
+      var sorted = Float64Array.from(cg);
+      sorted.sort();                                   // ascending
+      var cell = cdm * cdv, acc = 0, li = 0;
+      // Walk down from the densest cell. The 50% level is crossed first, then
+      // 80%, then 95% — assigning them in that order is the whole trick.
+      for (var z = sorted.length - 1; z >= 0 && li < TARGETS.length; z--) {
+        acc += sorted[z] * cell;
+        while (li < TARGETS.length && acc >= TARGETS[li]) { levels[li] = sorted[z]; li++; }
+      }
+    }
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(padL, padT, plotW, plotH); ctx.clip();
+    var sx = plotW / (CX - 1), sy = plotH / (CY - 1);
+    for (var L = 0; L < levels.length; L++) {
+      if (!(levels[L] > 0)) continue;
+      var segs = marchingSquares(cg, CX, CY, levels[L]);
+      if (!segs.length) continue;
+      ctx.beginPath();
+      for (var t2 = 0; t2 < segs.length; t2 += 4) {
+        ctx.moveTo(padL + segs[t2] * sx, padT + segs[t2 + 1] * sy);
+        ctx.lineTo(padL + segs[t2 + 2] * sx, padT + segs[t2 + 3] * sy);
+      }
+      var lw = [2.2, 1.6, 1.1][L];
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = lw + 1.6; ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.95)"; ctx.lineWidth = lw; ctx.stroke();
+    }
+    ctx.restore();
+
+    drawAxes(ctx, s, P, plotW, plotH, y0, xFor, yFor, m0, m1, v0, v1);
+
+    gJoint = { padL: padL, padT: padT, plotW: plotW, plotH: plotH, y0: y0,
+               xFor: xFor, yFor: yFor, peak: peak, mass: mass, levels: levels };
+  }
+
+  function drawAxes(ctx, s, P, plotW, plotH, y0, xFor, yFor, m0, m1, v0, v1) {
+    ctx.font = (s.narrow ? 10 : 11) + "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 1;
+
+    var stepY = niceStep(v1 - v0, s.narrow ? 3 : 5);
+    ctx.fillStyle = P.muted; ctx.textAlign = "right";
+    ctx.strokeStyle = P.line;
+    for (var vv = Math.ceil(v0 / stepY) * stepY; vv <= v1 + 1e-9; vv += stepY) {
+      var yy = Math.round(yFor(vv)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(padL - 4, yy); ctx.lineTo(padL, yy); ctx.stroke();
+      ctx.fillText(fmtTick(vv), padL - 8, yFor(vv));
+    }
+    var stepX = niceStep(m1 - m0, s.narrow ? 3 : 6);
+    ctx.textAlign = "center";
+    for (var mm = Math.ceil(m0 / stepX) * stepX; mm <= m1 + 1e-9; mm += stepX) {
+      var xx = Math.round(xFor(mm)) + 0.5;
+      ctx.strokeStyle = P.line;
+      ctx.beginPath(); ctx.moveTo(xx, y0); ctx.lineTo(xx, y0 + 4); ctx.stroke();
+      ctx.fillStyle = P.muted;
+      ctx.fillText(fmtTick(mm), xFor(mm), y0 + 13);
+    }
+    ctx.strokeStyle = P.line;
+    ctx.strokeRect(Math.round(padL) + 0.5, Math.round(padT) + 0.5, plotW, plotH);
+
+    ctx.fillStyle = P.muted; ctx.textAlign = "center";
+    ctx.fillText("m  (the mean)", padL + plotW / 2, s.h - (s.narrow ? 7 : 9));
+    ctx.save();
+    ctx.translate(s.narrow ? 11 : 13, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = "center";
+    ctx.fillText("s²  (the variance)", 0, 0);
+    ctx.restore();
+  }
+
+  // Marching squares over a row-major grid, emitting flat [x0,y0,x1,y1,...] in
+  // pixel coordinates relative to the plot area.
+  function marchingSquares(g, nx, ny, level) {
+    var out = [];
+    for (var j = 0; j < ny - 1; j++) {
+      var r0 = j * nx, r1 = r0 + nx;
+      for (var i = 0; i < nx - 1; i++) {
+        var a = g[r0 + i], b = g[r0 + i + 1], c = g[r1 + i + 1], d = g[r1 + i];
+        var key = (a > level ? 1 : 0) | (b > level ? 2 : 0) |
+                  (c > level ? 4 : 0) | (d > level ? 8 : 0);
+        if (key === 0 || key === 15) continue;
+        var tx = i + (level - a) / (b - a),     ty = j;              // top edge
+        var rx = i + 1,                          ry = j + (level - b) / (c - b);
+        var bx = i + (level - d) / (c - d),      by = j + 1;
+        var lx = i,                              ly = j + (level - a) / (d - a);
+        switch (key) {
+          case 1: case 14: out.push(lx, ly, tx, ty); break;
+          case 2: case 13: out.push(tx, ty, rx, ry); break;
+          case 3: case 12: out.push(lx, ly, rx, ry); break;
+          case 4: case 11: out.push(rx, ry, bx, by); break;
+          case 6: case 9:  out.push(tx, ty, bx, by); break;
+          case 7: case 8:  out.push(lx, ly, bx, by); break;
+          case 5:
+            if ((a + b + c + d) / 4 > level) { out.push(lx, ly, tx, ty, rx, ry, bx, by); }
+            else { out.push(lx, ly, bx, by, tx, ty, rx, ry); }
+            break;
+          case 10:
+            if ((a + b + c + d) / 4 > level) { out.push(tx, ty, rx, ry, lx, ly, bx, by); }
+            else { out.push(lx, ly, tx, ty, rx, ry, bx, by); }
+            break;
+        }
+      }
+    }
+    return out;
+  }
+
+  /* ----------------------------------------------------------- the marginals */
+
+  function drawMM() {
+    var s = prep(cvMM, 0.14, 54, 90);
+    if (!s || !view) return;
+    var ctx = s.ctx, P = palette();
+    var plotW = s.w - padL - padR, plotH = s.h - 6 - 6;
+    if (plotW <= 10 || plotH <= 8) return;
+    var m0 = view.m0, m1 = view.m1;
+    var steps = Math.max(2, Math.round(plotW)), i, mx = 0;
+    var vals = new Float64Array(steps + 1);
+    for (i = 0; i <= steps; i++) {
+      vals[i] = tPdf(m0 + (m1 - m0) * i / steps, state.mu, state.nu, state.a, state.b);
+      if (vals[i] > mx) mx = vals[i];
+    }
+    if (!(mx > 0)) return;
+    ctx.beginPath();
+    for (i = 0; i <= steps; i++) {
+      var x = padL + plotW * i / steps, y = 6 + plotH * (1 - vals[i] / mx);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = P.ink; ctx.lineWidth = 1.6; ctx.lineJoin = "round"; ctx.stroke();
+    ctx.lineTo(padL + plotW, 6 + plotH); ctx.lineTo(padL, 6 + plotH); ctx.closePath();
+    ctx.globalAlpha = 0.1; ctx.fillStyle = P.ink; ctx.fill(); ctx.globalAlpha = 1;
+
+    ctx.font = "10px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.fillStyle = P.muted; ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.fillText("marginal of m  —  Student t, " + fmtNum(round3(2 * state.a)) + " df",
+                 padL + 4, 6);
+  }
+
+  function drawVM() {
+    var s = prep(cvVM, 0.5, 200, 320);
+    if (!s || !view) return;
+    var ctx = s.ctx, P = palette();
+    var plotW = s.w - 8 - 8, plotH = s.h - padT - padB;
+    if (plotW <= 8 || plotH <= 10) return;
+    var v0 = view.v0, v1 = view.v1;
+    var steps = Math.max(2, Math.round(plotH)), i, mx = 0;
+    var vals = new Float64Array(steps + 1);
+    for (i = 0; i <= steps; i++) {
+      vals[i] = igPdf(v0 + (v1 - v0) * i / steps, state.a, state.b);
+      if (vals[i] > mx) mx = vals[i];
+    }
+    if (!(mx > 0)) return;
+    ctx.beginPath();
+    for (i = 0; i <= steps; i++) {
+      var y = padT + plotH * (1 - i / steps), x = 8 + plotW * (vals[i] / mx);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = P.ink; ctx.lineWidth = 1.6; ctx.lineJoin = "round"; ctx.stroke();
+    ctx.lineTo(8, padT); ctx.lineTo(8, padT + plotH); ctx.closePath();
+    ctx.globalAlpha = 0.1; ctx.fillStyle = P.ink; ctx.fill(); ctx.globalAlpha = 1;
+
+    ctx.save();
+    ctx.font = "10px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.fillStyle = P.muted;
+    // Under a -90 degree rotation the glyphs grow towards screen-right, so a "top"
+    // baseline here would push them straight off the edge of the canvas.
+    ctx.translate(s.w - 10, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("marginal of s²  —  Inv-Gamma", 0, 0);
+    ctx.restore();
+  }
+
+  // The corner panel. It used to be a colour bar reading "0 .. peak", which told a
+  // student nothing they could act on — a density over (m, s²) has no units they
+  // can read off. It now says what the colours mean in words and what the three
+  // contour weights stand for.
+  function drawKey() {
+    var s = prep(cvCbar, 0.55, 54, 90);
+    if (!s) return;
+    var ctx = s.ctx, P = palette();
+    var x0 = 6, w = Math.round(s.w - 12);
+    if (w <= 20) return;
+
+    // the colour ramp, in plain words
+    var barH = 8, y = 4;
+    var img = ctx.createImageData(w, barH), rgb = [0, 0, 0];
+    for (var x = 0; x < w; x++) {
+      mapColour(LUT[state.cm], x / (w - 1), rgb);
+      for (var yy = 0; yy < barH; yy++) {
+        var o = (yy * w + x) * 4;
+        img.data[o] = rgb[0]; img.data[o + 1] = rgb[1];
+        img.data[o + 2] = rgb[2]; img.data[o + 3] = 255;
+      }
+    }
+    blit(ctx, img, x0, y, w, barH);
+    ctx.strokeStyle = P.line; ctx.lineWidth = 1;
+    ctx.strokeRect(x0 + 0.5, y + 0.5, w - 1, barH - 1);
+
+    ctx.font = "9px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.fillStyle = P.muted; ctx.textBaseline = "top";
+    ctx.textAlign = "left";  ctx.fillText("less likely", x0, y + barH + 3);
+    ctx.textAlign = "right"; ctx.fillText("more likely", x0 + w, y + barH + 3);
+
+    if (!state.ct) return;
+    // what the three contour weights mean
+    var names = ["50%", "80%", "95%"], widths = [2.2, 1.6, 1.1];
+    var ry = y + barH + 17;
+    ctx.font = "10px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.textBaseline = "middle";
+    for (var i = 0; i < 3; i++) {
+      if (!(gJoint && gJoint.levels[i])) continue;
+      var cy = ry + i * 12 + 5;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(0,0,0,0.45)"; ctx.lineWidth = widths[i] + 1.6;
+      ctx.beginPath(); ctx.moveTo(x0 + 1, cy); ctx.lineTo(x0 + 19, cy); ctx.stroke();
+      ctx.strokeStyle = P.ink; ctx.lineWidth = widths[i];
+      ctx.beginPath(); ctx.moveTo(x0 + 1, cy); ctx.lineTo(x0 + 19, cy); ctx.stroke();
+      ctx.fillStyle = P.muted; ctx.textAlign = "left";
+      ctx.fillText(names[i] + " of mass", x0 + 24, cy);
+    }
+  }
+
+  /* --------------------------------------------------------------- caption */
+
+  var capEl = document.getElementById("cap");
+  function renderCaption() {
+    var a = state.a, b = state.b, nu = state.nu;
+    var mode = b / (a + 1);
+    var mean = a > 1 ? b / (a - 1) : null;
+    var scale = Math.sqrt(b / (a * nu));
+    var parts = [
+      "<span><i>s</i>² mode <b>" + fmtVal(mode) + "</b></span>",
+      "<span><i>s</i>² mean <b>" +
+        (mean === null ? "undefined (needs &alpha;<sub>0</sub> &gt; 1)" : fmtVal(mean)) +
+        "</b></span>",
+      "<span><i>m</i> marginal: <i>t</i> with <b>" + fmtNum(round3(2 * a)) +
+        "</b> df, scale <b>" + fmtVal(scale) + "</b></span>"
+    ];
+    if (gJoint) {
+      parts.push("<span>window holds <b>" +
+                 Math.min(100, gJoint.mass * 100).toFixed(1) +
+                 "%</b> of the mass</span>");
+      if (state.ct) {
+        var drawn = [];
+        var names = ["50", "80", "95"];
+        for (var i = 0; i < 3; i++) if (gJoint.levels[i]) drawn.push(names[i]);
+        parts.push("<span>contours <b>" +
+          (drawn.length ? drawn.join(", ") + "%" : "none fit the window") + "</b></span>");
+      }
+    }
+    capEl.innerHTML = parts.join("");
+  }
+
+  /* -------------------------------------------------------------- controls */
+
+  var els = {
+    mu: [document.getElementById("mu-range"), document.getElementById("mu-num")],
+    nu: [document.getElementById("nu-range"), document.getElementById("nu-num")],
+    a:  [document.getElementById("a-range"),  document.getElementById("a-num")],
+    b:  [document.getElementById("b-range"),  document.getElementById("b-num")]
+  };
+  var autoEl = document.getElementById("auto-view");
+  var cmapEl = document.getElementById("cmap");
+  var ctEl   = document.getElementById("show-contours");
+
+  function bounds(key) {
+    if (key === "mu") return [LIMITS.muMin, LIMITS.muMax];
+    if (key === "nu") return [LIMITS.nuMin, LIMITS.nuMax];
+    if (key === "a")  return [LIMITS.aMin, LIMITS.aMax];
+    return [LIMITS.bMin, LIMITS.bMax];
+  }
+
+  function syncControls() {
+    for (var k in els) {
+      els[k][0].value = String(state[k]);
+      els[k][1].value = fmtNum(state[k]);
+      els[k][1].classList.remove("invalid");
+    }
+    autoEl.checked = (state.m0 === null);
+    cmapEl.value = String(state.cm);
+    ctEl.checked = !!state.ct;
+  }
+
+  function setState(partial, opts) {
+    var changed = false, v, k;
+    for (k in els) {
+      if (partial[k] === undefined) continue;
+      var lim = bounds(k);
+      v = round3(clamp(partial[k], lim[0], lim[1]));
+      if (v !== state[k]) { state[k] = v; changed = true; }
+    }
+    var others = ["cm", "ct", "m0", "m1", "v1"];
+    for (var i = 0; i < others.length; i++) {
+      k = others[i];
+      if (partial[k] === undefined) continue;
+      v = partial[k];
+      if (v !== state[k]) { state[k] = v; changed = true; }
+    }
+    if (!(opts && opts.silentControls)) syncControls();
+    if (changed || (opts && opts.force)) {
+      render();
+      renderCaption();
+      scheduleHashWrite();
+    }
+  }
+
+  function render() { drawJoint(); drawMM(); drawVM(); drawKey(); }
+
+  for (var key in els) {
+    (function (k) {
+      els[k][0].addEventListener("input", function () {
+        var p = {}; p[k] = +els[k][0].value; setState(p);
+      });
+      var el = els[k][1];
+      // While typing, apply valid values but leave the raw text alone, so keystrokes
+      // are never rewritten under the cursor.
+      el.addEventListener("input", function () {
+        var lim = bounds(k), val = parseNum(el.value);
+        if (isNaN(val) || val < lim[0] || val > lim[1]) { el.classList.add("invalid"); return; }
+        el.classList.remove("invalid");
+        var p = {}; p[k] = val;
+        setState(p, { silentControls: true });
+        els[k][0].value = String(state[k]);
+      });
+      el.addEventListener("change", function () {
+        var val = parseNum(el.value);
+        if (!isNaN(val)) { var p = {}; p[k] = val; setState(p); }
+        el.value = fmtNum(state[k]); el.classList.remove("invalid");
+      });
+      el.addEventListener("blur", function () {
+        el.value = fmtNum(state[k]); el.classList.remove("invalid");
+      });
+      // Arrow keys nudge by the slider's own step; Shift for a bigger step.
+      el.addEventListener("keydown", function (e) {
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        e.preventDefault();
+        var cur = parseNum(el.value);
+        if (isNaN(cur)) cur = state[k];
+        var p = {};
+        p[k] = round3(cur + (e.key === "ArrowUp" ? 1 : -1) * 0.1 * (e.shiftKey ? 10 : 1));
+        setState(p);
+        el.value = fmtNum(state[k]); el.classList.remove("invalid");
+      });
+    })(key);
+  }
+
+  // Freezing keeps whatever window is on screen, which is what makes
+  // "hold this view and now change a parameter" work.
+  autoEl.addEventListener("change", function () {
+    if (autoEl.checked) {
+      setState({ m0: null, m1: null, v1: null });
+    } else {
+      var w = currentView();
+      setState({ m0: round3(w.m0), m1: round3(w.m1), v1: round3(w.v1) });
+    }
+  });
+  cmapEl.addEventListener("change", function () { setState({ cm: +cmapEl.value ? 1 : 0 }); });
+  ctEl.addEventListener("change", function () { setState({ ct: ctEl.checked ? 1 : 0 }); });
+
+  /* ------------------------------------------------------ URL fragment state */
+
+  function readHash() {
+    var out = {};
+    for (var k in DEFAULTS) out[k] = DEFAULTS[k];
+    var raw = location.hash.replace(/^#/, "");
+    if (!raw) return out;
+    var q = new URLSearchParams(raw);
+    var keys = ["mu", "nu", "a", "b"];
+    for (var i = 0; i < keys.length; i++) {
+      var val = parseFloat(q.get(keys[i]));
+      if (isFinite(val)) {
+        var lim = bounds(keys[i]);
+        out[keys[i]] = round3(clamp(val, lim[0], lim[1]));
+      }
+    }
+    var cm = parseFloat(q.get("cm")); if (isFinite(cm)) out.cm = cm ? 1 : 0;
+    var ct = q.get("ct"); if (ct !== null) out.ct = parseFloat(ct) ? 1 : 0;
+    var m0 = parseFloat(q.get("m0")), m1 = parseFloat(q.get("m1")),
+        v1 = parseFloat(q.get("v1"));
+    if (isFinite(m0) && isFinite(m1) && isFinite(v1) && m1 > m0 && v1 > 0) {
+      out.m0 = m0; out.m1 = m1; out.v1 = v1;
+    }
+    return out;
+  }
+
+  function currentHash() {
+    var h = "#mu=" + state.mu + "&nu=" + state.nu + "&a=" + state.a + "&b=" + state.b;
+    if (state.cm) h += "&cm=1";
+    if (!state.ct) h += "&ct=0";
+    if (state.m0 !== null) h += "&m0=" + state.m0 + "&m1=" + state.m1 + "&v1=" + state.v1;
+    return h;
+  }
+
+  var hashTimer = null;
+  function scheduleHashWrite() {
+    if (hashTimer) clearTimeout(hashTimer);
+    hashTimer = setTimeout(function () {
+      hashTimer = null;
+      var h = currentHash();
+      if (location.hash !== h) {
+        try { history.replaceState(null, "", h); }
+        catch (err) { location.hash = h; }   // e.g. opened from file:// in some browsers
+      }
+    }, 150);
+  }
+
+  window.addEventListener("hashchange", function () {
+    setState(readHash(), { force: true });
+  });
+
+  /* ------------------------------------------------------------------ help */
+
+  var dlg = document.getElementById("help-dialog");
+  document.getElementById("help-btn").addEventListener("click", function () { dlg.showModal(); });
+  dlg.querySelector(".help-close").addEventListener("click", function () { dlg.close(); });
+  dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
+
+  /* ------------------------------------------------------------------ init */
+
+  var initial = readHash();
+  for (var ik in initial) state[ik] = initial[ik];
+  syncControls();
+
+  // Installed before the first render, so that a render bailing out can never
+  // leave the widget with nothing watching for its chance to try again.
+  if (window.ResizeObserver) {
+    var card = cvJoint.parentElement;
+    var lastBox = "";   // empty, so the observer's initial callback always draws
+    new ResizeObserver(function () {
+      var box = card.clientWidth + "x" + card.clientHeight;
+      if (box !== lastBox) { lastBox = box; render(); renderCaption(); }
+    }).observe(card);
+  }
+  window.addEventListener("resize", function () { render(); renderCaption(); });
+  // A reload can run this script before layout and style have settled, which is
+  // how a plot can come up blank on refresh but not on a fresh navigation.
+  window.addEventListener("load", function () { render(); renderCaption(); });
+  if (window.requestAnimationFrame) {
+    requestAnimationFrame(function () { render(); renderCaption(); });
+  }
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    var repaint = function () { render(); renderCaption(); };
+    if (mq.addEventListener) mq.addEventListener("change", repaint);
+    else if (mq.addListener) mq.addListener(repaint);
+  }
+
+  render();
+  renderCaption();
+})();
+</script>
+</body>
+</html>

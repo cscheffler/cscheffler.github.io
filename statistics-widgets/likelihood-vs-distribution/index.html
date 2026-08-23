@@ -1,0 +1,1088 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Distribution or likelihood?</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg:        #ffffff;
+    --surface:   #f7f7f5;
+    --ink:       #1b1b1a;
+    --muted:     #6b6b66;
+    --line:      #d9d9d4;
+    --grid:      #ececE7;
+    --accent:    #2f6f8f;
+    --accent-soft: rgba(47,111,143,0.35);
+    --highlight: #b4542a;
+    --hl-soft:   rgba(180,84,42,0.35);
+    --focus:     #2f6f8f;
+    --fit:       0;      /* 1 when the one-screen layout below is in force */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg:        #16171a;
+      --surface:   #1e2024;
+      --ink:       #e8e8e4;
+      --muted:     #9b9b95;
+      --line:      #34363b;
+      --grid:      #26282d;
+      --accent:    #6fb3d2;
+      --accent-soft: rgba(111,179,210,0.35);
+      --highlight: #e08a5c;
+      --hl-soft:   rgba(224,138,92,0.35);
+      --focus:     #6fb3d2;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.25rem 1rem 2.5rem; }
+
+  .widget-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 0.75rem; margin-bottom: 0.25rem;
+  }
+  .widget-header h1 { font-size: 1.25rem; font-weight: 600; margin: 0; line-height: 1.3; }
+  .widget-header h1 .formula { white-space: nowrap; }   /* never break mid-expression */
+  .lede { color: var(--muted); margin: 0 0 1.25rem; font-size: 0.95rem; }
+
+  /* ---- help button (canonical) ---- */
+  .help-btn {
+    flex: 0 0 auto;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--muted); background: transparent; color: var(--muted);
+    font: inherit; font-size: 16px; line-height: 1;
+    display: grid; place-items: center; cursor: pointer;
+    padding: 0; transition: color .12s, border-color .12s, background-color .12s;
+  }
+  .help-btn:hover, .help-btn:focus-visible {
+    color: var(--ink); border-color: var(--ink); background: var(--surface);
+  }
+  .help-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .help-dialog {
+    max-width: 34rem; max-height: 80vh; width: calc(100% - 2rem);
+    padding: 1.5rem; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); color: var(--ink);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+    overflow: auto; position: relative;
+  }
+  .help-dialog::backdrop { background: rgba(0,0,0,0.45); }
+  .help-dialog h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin: 1.4rem 0 .35rem; }
+  .help-dialog h2:first-of-type { margin-top: 0; }
+  .help-dialog p, .help-dialog li { font-size: 0.94rem; }
+  .help-dialog p { margin: .35rem 0; }
+  .help-dialog ul { margin: .35rem 0; padding-left: 1.15rem; }
+  .help-dialog li { margin: .2rem 0; }
+  .help-dialog code { background: var(--surface); padding: 0.05em 0.3em; border-radius: 3px;
+    font-size: 0.88em; }
+  .help-close {
+    position: absolute; top: .6rem; right: .6rem;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid transparent; background: transparent; color: var(--muted);
+    font-size: 20px; line-height: 1; cursor: pointer; display: grid; place-items: center;
+  }
+  .help-close:hover, .help-close:focus-visible { color: var(--ink); background: var(--surface); }
+  .help-close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- controls ---- */
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0 1.6rem; margin-bottom: .2rem; }
+  .control { margin-bottom: .8rem; }
+  .control-label { display: flex; align-items: baseline; gap: .45rem; margin-bottom: .25rem; }
+  .control-label .name { font-weight: 600; font-size: .95rem; }
+  .control-label .desc { color: var(--muted); font-size: .85rem; }
+  .control-label .desc::before { content: "\2014\00a0"; }
+  .control-row { display: flex; align-items: center; gap: .75rem; }
+  input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); height: 1.6rem; }
+  input[type="range"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  .num-input {
+    flex: 0 0 auto; width: 5rem; padding: .35rem .5rem;
+    font: inherit; font-size: .95rem; font-variant-numeric: tabular-nums;
+    color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 5px;
+  }
+  .num-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px;
+    border-color: var(--focus); }
+  .num-input.invalid { border-color: var(--highlight); }
+  .row-p .control-label .name, .row-p input[type="range"] { accent-color: var(--highlight); }
+  .row-p input[type="range"] { accent-color: var(--highlight); }
+
+  .toggle {
+    display: inline-flex; align-items: center; gap: .4rem;
+    color: var(--muted); font-size: .88rem; cursor: pointer;
+  }
+  .toggle input { accent-color: var(--accent); margin: 0; cursor: pointer; }
+  .toggle:hover { color: var(--ink); }
+  .toggle input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .toggle-row { margin: .1rem 0 1.1rem; }
+
+  /* ---- plots ---- */
+  .plot-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: .5rem; margin-bottom: .35rem;
+  }
+  .plot-card canvas { display: block; width: 100%; height: auto; touch-action: pan-y; }
+
+  .cap { color: var(--muted); font-size: .87rem; margin: 0 0 1rem; padding: 0 .15rem; }
+  .cap b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .cap .tag {
+    display: inline-block; font-weight: 600; font-size: .78rem;
+    text-transform: uppercase; letter-spacing: .05em; margin-right: .4rem;
+  }
+  .cap .tag.row { color: var(--highlight); }
+  .cap .tag.col { color: var(--accent); }
+
+  .note {
+    border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+    padding: .5rem .65rem; color: var(--muted); font-size: .87rem; margin: 0 0 1rem;
+  }
+  .note b { color: var(--ink); font-weight: 600; }
+
+  /* ---- one-screen layout ----
+     Landscape and roomy enough: the surface takes the space, with each slice
+     panel butted against the row or column it was cut from. Anything smaller —
+     a phone, a sidebar, a short or portrait window — stacks and scrolls. */
+  @media (min-width: 64rem) and (min-height: 36rem) and (min-aspect-ratio: 3/2) {
+    :root { --fit: 1; }
+    html, body { height: 100%; }
+    .wrap {
+      max-width: 160rem; height: 100vh; height: 100dvh;
+      display: flex; flex-direction: column;
+      padding: .85rem 1.1rem .9rem;
+    }
+    .widget-header { margin-bottom: .1rem; }
+    .lede { max-width: 64rem; margin-bottom: .6rem; }
+    .controls { grid-template-columns: repeat(4, 1fr); margin-bottom: 0; }
+    .control { margin-bottom: .45rem; }
+    .toggle-row { margin: 0 0 .5rem; }
+
+    .board {
+      flex: 1 1 auto; min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr minmax(11rem, 18rem);
+      grid-template-rows: 1fr auto minmax(7rem, .55fr) auto;
+      column-gap: 1rem;
+    }
+    .cell-surf { grid-area: 1 / 1; }
+    .cell-lik  { grid-area: 1 / 2; }
+    .cap-surf  { grid-area: 2 / 1; }
+    .cell-pmf  { grid-area: 3 / 1; }
+    .cap-pmf   { grid-area: 4 / 1; }
+    .side2     { grid-area: 2 / 2 / 5 / 3; min-height: 0; overflow: auto; }
+    .side2 .cap { margin-bottom: .4rem; }
+    .side2 .note { margin: 0; }
+
+    .board .plot-card { min-height: 0; position: relative; margin-bottom: .3rem; }
+    /* A canvas is a replaced element, so the four offsets would not stretch it —
+       it is pinned here and given its exact size by the script instead. */
+    .board .plot-card canvas { position: absolute; top: .5rem; left: .5rem; }
+    .board .cap { margin-bottom: .1rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="widget-header">
+    <h1>Distribution or likelihood? &mdash;
+      <span class="formula">Binomial(<i>x</i> | <i>n</i>, <i>p</i>)</span></h1>
+    <button id="help-btn" class="help-btn" aria-label="Help" title="Help">?</button>
+  </header>
+  <p class="lede">
+    One expression, two jobs. Hold <i>p</i> fixed and vary the count: a probability distribution
+    over <i>x</i>, discrete, summing to 1. Hold <i>x</i> fixed and vary the parameter: a likelihood
+    for <i>p</i>, continuous, and <em>not</em> a distribution &mdash; its area is 1/(<i>n</i>+1).
+  </p>
+
+  <div class="controls">
+    <div class="control">
+      <div class="control-label">
+        <label class="name" for="n-range"><i>n</i></label>
+        <span class="desc">trials</span>
+      </div>
+      <div class="control-row">
+        <input type="range" id="n-range" min="1" max="100" step="1" value="9"
+               aria-label="n, number of trials">
+        <input type="text" id="n-num" class="num-input" value="9"
+               inputmode="numeric" autocomplete="off" spellcheck="false"
+               aria-label="n, number of trials (exact value)">
+      </div>
+    </div>
+
+    <div class="control">
+      <div class="control-label">
+        <label class="name" for="x-range"><i>x</i></label>
+        <span class="desc">which column &mdash; the count</span>
+      </div>
+      <div class="control-row">
+        <input type="range" id="x-range" min="0" max="9" step="1" value="6"
+               aria-label="x, which column of the surface to slice">
+        <input type="text" id="x-num" class="num-input" value="6"
+               inputmode="numeric" autocomplete="off" spellcheck="false"
+               aria-label="x, the count (exact value)">
+      </div>
+    </div>
+
+    <div class="control row-p">
+      <div class="control-label">
+        <label class="name" for="p-range"><i>p</i></label>
+        <span class="desc">which row &mdash; the parameter</span>
+      </div>
+      <div class="control-row">
+        <input type="range" id="p-range" min="0" max="1" step="0.01" value="0.5"
+               aria-label="p, which row of the surface to slice">
+        <input type="text" id="p-num" class="num-input" value="0.5"
+               inputmode="decimal" autocomplete="off" spellcheck="false"
+               aria-label="p, the parameter (exact value)">
+      </div>
+    </div>
+
+    <div class="control">
+      <div class="control-label"><span class="name">&nbsp;</span></div>
+      <div class="control-row">
+        <label class="toggle" for="norm">
+          <input type="checkbox" id="norm">
+          force the likelihood to area 1
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="board">
+
+    <div class="plot-card cell-surf">
+      <canvas id="surf" role="img"
+              aria-label="Binomial probability shown for every count x across and every p up the page"></canvas>
+    </div>
+    <p class="cap cap-surf" id="cap-surf"></p>
+
+    <div class="plot-card cell-lik">
+      <canvas id="lik" role="img"
+              aria-label="The chosen column read down the page: the Binomial likelihood as a function of p"></canvas>
+    </div>
+    <div class="side2">
+      <p class="cap cap-lik" id="cap-lik"></p>
+      <p class="note">
+        <b>Why it matters.</b> The column is a <em>function</em> of <i>p</i>, not a distribution
+        over <i>p</i>. Making it into one takes a prior &mdash; that is Bayes' rule.
+      </p>
+    </div>
+
+    <div class="plot-card cell-pmf">
+      <canvas id="pmf" role="img"
+              aria-label="The chosen row read across: the Binomial probability mass function over x"></canvas>
+    </div>
+    <p class="cap cap-pmf" id="cap-pmf"></p>
+
+  </div>
+</div>
+
+<dialog id="help-dialog" class="help-dialog">
+  <button class="help-close" aria-label="Close help">&times;</button>
+
+  <h2>What this shows</h2>
+  <p>
+    Binomial(<i>x</i> | <i>n</i>, <i>p</i>) takes two arguments, and which one you hold fixed changes
+    what kind of object it is. The big panel shows the value at every combination: <i>x</i> runs
+    across in discrete bands, one per possible count, and <i>p</i> runs continuously up the page.
+    Darker means larger.
+  </p>
+  <p>
+    Cut it <span style="color:var(--highlight)"><b>along a row</b></span>, at one value of <i>p</i>,
+    and you get the panel underneath: a probability distribution over the <i>n</i>+1 possible counts.
+    It is discrete, so it is drawn as dots, and it sums to exactly 1.
+  </p>
+  <p>
+    Cut it <span style="color:var(--accent)"><b>down a column</b></span>, at one value of <i>x</i>,
+    and you get the panel on the right: the likelihood function for <i>p</i>. It is continuous, so
+    it is drawn as a curve, and the area under it is 1/(<i>n</i>+1) &mdash; the same number for every
+    <i>x</i>, and never 1. It is a perfectly good function of <i>p</i>, but it is not a probability
+    distribution over <i>p</i>, and nothing about it is trying to be.
+  </p>
+  <p>
+    That is the distinction that matters when you compute a posterior. The likelihood does not tell
+    you how plausible each <i>p</i> is; it tells you how well each <i>p</i> explains the data you
+    saw. Turning that into a distribution over <i>p</i> takes a prior, and Bayes' rule.
+  </p>
+
+  <h2>How to use it</h2>
+  <ul>
+    <li><b><i>n</i></b> &mdash; the number of trials, 1 to 100. It sets how many bands the surface
+      has. At small <i>n</i> the discreteness of <i>x</i> is unmissable.</li>
+    <li><b><i>x</i></b> &mdash; which column to cut. This is the data: the count you actually
+      observed. The column, and the curve it produces, are marked in blue.</li>
+    <li><b><i>p</i></b> &mdash; which row to cut. This is the parameter. The row, and the dots it
+      produces, are marked in orange.</li>
+    <li><b>force the likelihood to area 1</b> &mdash; draws the column slice multiplied by
+      <i>n</i>+1, dashed, so that its area becomes 1. Read the caption when you do.</li>
+    <li>Clicking or dragging on the surface moves both cuts at once.</li>
+  </ul>
+
+  <h2>Things to try</h2>
+  <ul>
+    <li>Drag <b><i>x</i></b> from 0 to <i>n</i> and watch the area reported under the right-hand
+      panel. The curve changes shape completely &mdash; it slides across, it gets taller and
+      narrower near the ends &mdash; and the area never moves off 1/(<i>n</i>+1). Nothing is
+      normalising it; it just happens to integrate to that, for every <i>x</i>.</li>
+    <li>Now drag <b><i>p</i></b> and watch the sum reported under the bottom panel. It is 1 at
+      every row, because that is what a distribution over <i>x</i> has to do.</li>
+    <li>Set <i>x</i> = 0. The likelihood is (1&minus;<i>p</i>)<sup><i>n</i></sup>, largest at
+      <i>p</i> = 0 and falling away. If it were a distribution over <i>p</i>, it would be saying
+      <i>p</i> = 0 is the most probable value; as a likelihood it says only that <i>p</i> = 0
+      explains "no successes" better than anything else does. Those are different claims, and the
+      second is the one the maths supports.</li>
+    <li>Turn on <b>force the likelihood to area 1</b>. The shape does not change at all &mdash; it
+      is the same curve, multiplied by <i>n</i>+1. What you get is Beta(<i>x</i>+1,
+      <i>n</i>&minus;<i>x</i>+1), which is the posterior you would obtain from a <em>uniform</em>
+      prior. So the rescaling that makes a likelihood into a distribution is not free: it is what
+      Bayes' rule does, and it needs a prior to do it.</li>
+    <li>Raise <i>n</i> to 60 or so. The bands get thin and the surface starts to look continuous in
+      both directions &mdash; but the bottom panel is still dots. There are only ever <i>n</i>+1
+      possible counts, however many that is.</li>
+  </ul>
+
+  <h2>Notes</h2>
+  <ul>
+    <li>&Sigma;<sub><i>x</i></sub> Binomial(<i>x</i> | <i>n</i>, <i>p</i>) = 1 is the binomial
+      theorem. &int;<sub>0</sub><sup>1</sup> Binomial(<i>x</i> | <i>n</i>, <i>p</i>) d<i>p</i> =
+      C(<i>n</i>,<i>x</i>) B(<i>x</i>+1, <i>n</i>&minus;<i>x</i>+1) = 1/(<i>n</i>+1) follows from
+      the definition of the Beta function; the <i>x</i>-dependence cancels exactly. Both are
+      reported live, and both are computed rather than asserted.</li>
+    <li>Shading is on a fixed scale so that the two readings stay comparable, with a gamma applied
+      so mid-range values do not vanish. The corners, where <i>p</i> = 0 with <i>x</i> = 0 and
+      <i>p</i> = 1 with <i>x</i> = <i>n</i>, both have value 1 and saturate.</li>
+    <li>The likelihood panel shares its vertical axis with the surface, so the curve lines up with
+      the column it was cut from; the count panel shares its horizontal axis for the same reason.
+      The dashed line marks p&#770; = <i>x</i>/<i>n</i>, where the likelihood peaks.</li>
+    <li>Everything is computed in log space, so large <i>n</i> is no harder than small.</li>
+    <li>The URL updates as you change the inputs, so you can copy it from the address bar and share
+      an exact configuration.</li>
+  </ul>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------------------------------------------ state */
+
+  var DEFAULTS = { n: 9, x: 6, p: 0.5, z: 0 };   // z = 1 -> show the area-1 version
+  var LIMITS   = { nMin: 1, nMax: 100 };
+  var state    = { n: DEFAULTS.n, x: DEFAULTS.x, p: DEFAULTS.p, z: DEFAULTS.z };
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function round3(v) { return Math.round(v * 1000) / 1000; }
+
+  // Render numbers ourselves rather than letting the browser's locale decide:
+  // always "." for the decimal point and "," between thousands.
+  function fmtNum(v) {
+    var parts = String(v).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  }
+
+  // Accept what a person might reasonably type, including a decimal comma from
+  // a comma-locale keyboard, and reject anything that is not a plain number.
+  function parseNum(raw) {
+    var t = String(raw).trim().replace(/\s/g, "");
+    if (!t) return NaN;
+    if (t.indexOf(",") >= 0) {
+      t = (t.indexOf(".") >= 0) ? t.replace(/,/g, "")     // 1,234.5 -> thousands separators
+                                : t.replace(/,/g, ".");   // 0,5     -> decimal comma
+    }
+    return /^[+-]?(\d+\.?\d*|\.\d+)$/.test(t) ? parseFloat(t) : NaN;
+  }
+
+  /* ----------------------------------------------------------------- maths */
+
+  var logFactTable = [0];
+  function logFact(m) {
+    for (var i = logFactTable.length; i <= m; i++) {
+      logFactTable[i] = logFactTable[i - 1] + Math.log(i);
+    }
+    return logFactTable[m];
+  }
+
+  // Binomial(x | n, p), via logs so the coefficient never overflows.
+  function binomPmf(x, n, p) {
+    if (x < 0 || x > n) return 0;
+    if (p <= 0) return x === 0 ? 1 : 0;
+    if (p >= 1) return x === n ? 1 : 0;
+    return Math.exp(logFact(n) - logFact(x) - logFact(n - x)
+                    + x * Math.log(p) + (n - x) * Math.log1p(-p));
+  }
+
+  // Sum along a row, computed rather than asserted to be 1.
+  function rowSum(n, p) {
+    var s = 0;
+    for (var x = 0; x <= n; x++) s += binomPmf(x, n, p);
+    return s;
+  }
+
+  // Area down a column, by Simpson's rule. Exactly 1/(n+1), but worth computing
+  // so that the number on screen is measured rather than quoted.
+  function colArea(n, x) {
+    var N = 2000, s = 0, i;
+    for (i = 0; i <= N; i++) {
+      var w = (i === 0 || i === N) ? 1 : (i % 2 ? 4 : 2);
+      s += w * binomPmf(x, n, i / N);
+    }
+    return s * (1 / N) / 3;
+  }
+
+  /* -------------------------------------------------------- drawing helpers */
+
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  // The breakpoint is defined once, in the stylesheet, and read back here — a
+  // second copy of the query in JS is a copy that will drift out of step.
+  function fitMode() { return cssVar("--fit") === "1"; }
+
+  function palette() {
+    return {
+      ink: cssVar("--ink"), muted: cssVar("--muted"), grid: cssVar("--grid"),
+      line: cssVar("--line"), accent: cssVar("--accent"), soft: cssVar("--accent-soft"),
+      hl: cssVar("--highlight"), hlSoft: cssVar("--hl-soft"),
+      bg: cssVar("--bg"), surface: cssVar("--surface")
+    };
+  }
+
+  function hexRgb(h) {
+    h = h.replace("#", "");
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    return [parseInt(h.slice(0, 2), 16) || 0,
+            parseInt(h.slice(2, 4), 16) || 0,
+            parseInt(h.slice(4, 6), 16) || 0];
+  }
+
+  var NICE_STEPS = [1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10];
+  function niceCeil(v) {
+    if (!(v > 0)) return 1;
+    var e = Math.floor(Math.log10(v));
+    var f = v / Math.pow(10, e);
+    for (var i = 0; i < NICE_STEPS.length; i++) {
+      if (f <= NICE_STEPS[i] + 1e-9) return NICE_STEPS[i] * Math.pow(10, e);
+    }
+    return 10 * Math.pow(10, e);
+  }
+
+  function fmtTick(v) {
+    if (v === 0) return "0";
+    if (v < 0.0001 || v >= 1e6) return v.toExponential(0);
+    var d = v >= 10 ? 1 : v >= 0.1 ? 2 : v >= 0.01 ? 3 : 4;
+    var s = v.toFixed(d);
+    if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, "");
+    return s;
+  }
+  function fmt4(v) {
+    if (v === 0) return "0";
+    if (v >= 0.0001) return v.toFixed(4);
+    return v.toExponential(2);
+  }
+
+  function xTickStep(n, maxTicks) {
+    var raw = n / maxTicks;
+    var cands = [1, 2, 5, 10, 20, 25, 50, 100];
+    for (var i = 0; i < cands.length; i++) if (cands[i] >= raw) return cands[i];
+    return cands[cands.length - 1];
+  }
+
+  var cvSurf = document.getElementById("surf");
+  var cvLik  = document.getElementById("lik");
+  var cvPmf  = document.getElementById("pmf");
+
+  // Shared geometry, so the three panels line up with each other.
+  var padL = 52, padT = 12, padB = 38, padR = 14;
+
+  function panelBox(cv) {
+    if (!fitMode()) return { w: cv.clientWidth, h: 0 };
+    var card = cv.parentElement, cs = getComputedStyle(card);
+    // Before styles have fully resolved these can come back empty, and an
+    // undefended parseFloat would turn the whole box into NaN.
+    var px = function (v) { return parseFloat(v) || 0; };
+    return {
+      w: card.clientWidth  - px(cs.paddingLeft) - px(cs.paddingRight),
+      h: card.clientHeight - px(cs.paddingTop)  - px(cs.paddingBottom)
+    };
+  }
+
+  function prep(cv, aspect, minH, maxH) {
+    var cssW, cssH;
+    var box = fitMode() ? panelBox(cv) : null;
+    if (box && box.w > 60 && box.h > 60) {
+      cssW = box.w; cssH = box.h;
+      cv.style.width = cssW + "px";
+      cv.style.height = cssH + "px";
+    } else {
+      // Either the stacked layout, or the one-screen layout before it has settled.
+      // Size from the width rather than giving up: a plot of the wrong height gets
+      // corrected on the next observation, a blank one is what the user is left with.
+      cv.style.width = "";
+      cssW = cv.clientWidth || (cv.parentElement ? cv.parentElement.clientWidth : 0);
+      if (!(cssW > 0)) return null;
+      cssH = clamp(Math.round(cssW * aspect), minH, maxH);
+      cv.style.height = cssH + "px";
+    }
+    var dpr = window.devicePixelRatio || 1;
+    cv.width  = Math.round(cssW * dpr);
+    cv.height = Math.round(cssH * dpr);
+    var c = cv.getContext("2d");
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, cssW, cssH);
+    return { ctx: c, w: cssW, h: cssH, narrow: cssW < 380 };
+  }
+
+  /* ----------------------------------------------------- the surface bitmap */
+
+  // Redrawing 40,000 shaded cells on every pointer move would not keep up, and
+  // the surface only depends on n and its own size — so it is cached.
+  var bmp = null, bmpKey = "";
+
+  function surfaceBitmap(n, w, h, P) {
+    var key = n + "|" + w + "|" + h + "|" + P.surface + "|" + P.ink;
+    if (key === bmpKey && bmp) return bmp;
+
+    var off = document.createElement("canvas");
+    off.width = w; off.height = h;
+    var octx = off.getContext("2d");
+    var img = octx.createImageData(w, h);
+    var d = img.data;
+
+    var bgc = hexRgb(P.surface), fgc = hexRgb(P.ink);
+    // Scale to the height of the central ridge rather than to the global maximum,
+    // which is 1 in the two corners and would leave everything else washed out.
+    var mid = Math.max(0, Math.min(n, Math.round(n / 2)));
+    var vMax = binomPmf(mid, n, n === 0 ? 0.5 : mid / n) || 1;
+
+    var col = new Float64Array(n + 1);
+    for (var y = 0; y < h; y++) {
+      var p = 1 - (y + 0.5) / h;
+      for (var k = 0; k <= n; k++) col[k] = binomPmf(k, n, p);
+      var rowOff = y * w * 4;
+      for (var xp = 0; xp < w; xp++) {
+        var band = Math.min(n, Math.floor(xp * (n + 1) / w));
+        var a = col[band] / vMax;
+        if (a > 1) a = 1;
+        a = Math.pow(a, 0.62) * 0.8;       // gamma, and never quite solid
+        var o = rowOff + xp * 4;
+        d[o]     = Math.round(bgc[0] + (fgc[0] - bgc[0]) * a);
+        d[o + 1] = Math.round(bgc[1] + (fgc[1] - bgc[1]) * a);
+        d[o + 2] = Math.round(bgc[2] + (fgc[2] - bgc[2]) * a);
+        d[o + 3] = 255;
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    bmp = off; bmpKey = key;
+    return off;
+  }
+
+  /* ---------------------------------------------------------- the surface */
+
+  var gSurf = null;
+
+  function drawSurf() {
+    var s = prep(cvSurf, 0.62, 200, 420);
+    if (!s) return;
+    var ctx = s.ctx, P = palette(), n = state.n;
+    var plotW = s.w - padL - padR, plotH = s.h - padT - padB;
+    if (plotW <= 10 || plotH <= 10) return;
+    var y0 = padT + plotH;
+    var xFor = function (k) { return padL + (k + 0.5) * (plotW / (n + 1)); };
+    var yFor = function (p) { return padT + plotH * (1 - p); };
+    var band = plotW / (n + 1);
+
+    ctx.drawImage(surfaceBitmap(n, Math.max(1, Math.round(plotW)),
+                                Math.max(1, Math.round(plotH)), P),
+                  padL, padT, plotW, plotH);
+
+    ctx.font = (s.narrow ? 10 : 11) + "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 1;
+
+    // p axis
+    ctx.strokeStyle = P.line;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(padL) + 0.5, padT); ctx.lineTo(Math.round(padL) + 0.5, y0);
+    ctx.stroke();
+    ctx.fillStyle = P.muted; ctx.textAlign = "right";
+    for (var t = 0; t <= 1.0000001; t += 0.25) {
+      ctx.fillText(fmtTick(Math.round(t * 100) / 100), padL - 8, yFor(t));
+      ctx.strokeStyle = P.line;
+      ctx.beginPath();
+      ctx.moveTo(padL - 4, Math.round(yFor(t)) + 0.5); ctx.lineTo(padL, Math.round(yFor(t)) + 0.5);
+      ctx.stroke();
+    }
+
+    // x axis
+    var step = xTickStep(n, s.narrow ? 5 : 10);
+    ctx.textAlign = "center";
+    for (var k = 0; k <= n; k += step) {
+      ctx.strokeStyle = P.line;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(xFor(k)) + 0.5, y0); ctx.lineTo(Math.round(xFor(k)) + 0.5, y0 + 4);
+      ctx.stroke();
+      ctx.fillStyle = P.muted;
+      ctx.fillText(String(k), xFor(k), y0 + 13);
+    }
+    ctx.fillStyle = P.muted; ctx.textAlign = "center";
+    ctx.fillText("x  (a count — one band per possible value)", padL + plotW / 2,
+                 s.h - (s.narrow ? 7 : 9));
+    ctx.save();
+    ctx.translate(s.narrow ? 11 : 13, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = "center";
+    ctx.fillText("p  (continuous)", 0, 0);
+    ctx.restore();
+
+    // the column that becomes the likelihood
+    var bx = padL + state.x * band;
+    ctx.strokeStyle = P.accent;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(Math.round(bx) + 1, padT + 1, Math.max(2, band - 2), plotH - 2);
+
+    // the row that becomes the pmf
+    var ry = Math.round(yFor(state.p)) + 0.5;
+    ctx.strokeStyle = P.hl;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padL, ry); ctx.lineTo(padL + plotW, ry);
+    ctx.stroke();
+
+    gSurf = { padL: padL, padT: padT, plotW: plotW, plotH: plotH, y0: y0, band: band, n: n };
+  }
+
+  /* ------------------------------------------- the column, read down the page */
+
+  function drawLik() {
+    var s = prep(cvLik, 1.1, 200, 420);
+    if (!s) return;
+    var ctx = s.ctx, P = palette(), n = state.n, x = state.x;
+    var lpadL = 18, lpadR = 18;
+    var plotW = s.w - lpadL - lpadR, plotH = s.h - padT - padB;
+    if (plotW <= 10 || plotH <= 10) return;
+    var y0 = padT + plotH;
+
+    var peak = binomPmf(x, n, n === 0 ? 0.5 : x / n);
+    var scale = state.z ? (n + 1) : 1;
+    var vMax = niceCeil(peak * scale * 1.08);
+    var xFor = function (v) { return lpadL + (v / vMax) * plotW; };
+    var yFor = function (p) { return padT + plotH * (1 - p); };
+
+    ctx.font = (s.narrow ? 10 : 11) + "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 1;
+
+    // gridlines across, at the same p values the surface labels
+    for (var t = 0; t <= 1.0000001; t += 0.25) {
+      var gy = Math.round(yFor(t)) + 0.5;
+      ctx.strokeStyle = P.grid;
+      ctx.beginPath(); ctx.moveTo(lpadL, gy); ctx.lineTo(lpadL + plotW, gy); ctx.stroke();
+    }
+    ctx.strokeStyle = P.line;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(lpadL) + 0.5, padT); ctx.lineTo(Math.round(lpadL) + 0.5, y0);
+    ctx.lineTo(lpadL + plotW, y0);
+    ctx.stroke();
+
+    // value axis along the bottom
+    ctx.textAlign = "center"; ctx.fillStyle = P.muted;
+    for (var i = 0; i <= 2; i++) {
+      var v = vMax * i / 2;
+      ctx.fillText(fmtTick(v), clamp(xFor(v), lpadL + 8, lpadL + plotW - 8), y0 + 13);
+    }
+    ctx.fillText("likelihood", lpadL + plotW / 2, s.h - (s.narrow ? 7 : 9));
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(lpadL, padT, plotW, plotH);
+    ctx.clip();
+
+    function curve(mult, colour, width, dash) {
+      var steps = Math.max(2, Math.round(plotH));
+      ctx.beginPath();
+      for (var j = 0; j <= steps; j++) {
+        var pp = 1 - j / steps;
+        var vv = binomPmf(x, n, pp) * mult;
+        var xx = xFor(vv), yy = padT + (plotH * j / steps);
+        if (j === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
+      }
+      ctx.strokeStyle = colour; ctx.lineWidth = width; ctx.lineJoin = "round";
+      ctx.setLineDash(dash || []);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      return steps;
+    }
+
+    // the likelihood itself, washed back to the axis
+    curve(1, P.accent, 2.2, []);
+    ctx.lineTo(lpadL, y0); ctx.lineTo(lpadL, padT); ctx.closePath();
+    ctx.globalAlpha = 0.13; ctx.fillStyle = P.accent; ctx.fill(); ctx.globalAlpha = 1;
+
+    if (state.z) curve(n + 1, P.accent, 1.6, [6, 4]);
+
+    // p-hat, where the likelihood peaks
+    if (n > 0) {
+      var ph = x / n;
+      ctx.strokeStyle = P.muted;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(lpadL, Math.round(yFor(ph)) + 0.5);
+      ctx.lineTo(lpadL + plotW, Math.round(yFor(ph)) + 0.5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+
+    if (n > 0) {
+      ctx.fillStyle = P.muted;
+      ctx.textAlign = "right";
+      ctx.font = "italic " + (s.narrow ? 10 : 11) +
+                 "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+      ctx.fillText("p̂", lpadL + plotW - 3,
+                   clamp(yFor(x / n) - 9, padT + 7, y0 - 7));
+    }
+  }
+
+  /* ------------------------------------------ the row, read across the page */
+
+  function drawPmf() {
+    var s = prep(cvPmf, 0.34, 150, 240);
+    if (!s) return;
+    var ctx = s.ctx, P = palette(), n = state.n, p = state.p;
+    var plotW = s.w - padL - padR, plotH = s.h - padT - padB;
+    if (plotW <= 10 || plotH <= 10) return;
+    var y0 = padT + plotH;
+    var band = plotW / (n + 1);
+    var xFor = function (k) { return padL + (k + 0.5) * band; };
+
+    var pmf = new Array(n + 1), maxP = 0, k;
+    for (k = 0; k <= n; k++) { pmf[k] = binomPmf(k, n, p); if (pmf[k] > maxP) maxP = pmf[k]; }
+    var yMax = Math.min(1, niceCeil(maxP * 1.08));
+    var yFor = function (v) { return padT + plotH * (1 - v / yMax); };
+
+    ctx.font = (s.narrow ? 10 : 11) + "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 1;
+
+    for (var i = 0; i <= 2; i++) {
+      var v = yMax * i / 2;
+      var y = Math.round(yFor(v)) + 0.5;
+      ctx.strokeStyle = i === 0 ? P.line : P.grid;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+      ctx.fillStyle = P.muted; ctx.textAlign = "right";
+      ctx.fillText(fmtTick(v), padL - 8, yFor(v));
+    }
+    ctx.strokeStyle = P.line;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(padL) + 0.5, padT); ctx.lineTo(Math.round(padL) + 0.5, y0);
+    ctx.stroke();
+
+    var step = xTickStep(n, s.narrow ? 5 : 10);
+    ctx.textAlign = "center";
+    for (k = 0; k <= n; k += step) {
+      ctx.strokeStyle = P.line;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(xFor(k)) + 0.5, y0); ctx.lineTo(Math.round(xFor(k)) + 0.5, y0 + 4);
+      ctx.stroke();
+      ctx.fillStyle = P.muted;
+      ctx.fillText(String(k), xFor(k), y0 + 13);
+    }
+    ctx.fillStyle = P.muted; ctx.textAlign = "center";
+    ctx.fillText("x  (a count)", padL + plotW / 2, s.h - (s.narrow ? 7 : 9));
+    ctx.save();
+    ctx.translate(s.narrow ? 11 : 13, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = "center";
+    ctx.fillText("probability", 0, 0);
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(padL, padT, plotW, plotH); ctx.clip();
+
+    var r = clamp(band * 0.28, 1.6, 4.5);
+    ctx.strokeStyle = P.hlSoft;
+    ctx.lineWidth = clamp(band * 0.10, 0.75, 1.5);
+    ctx.beginPath();
+    for (k = 0; k <= n; k++) {
+      if (pmf[k] <= 0) continue;
+      ctx.moveTo(xFor(k), y0); ctx.lineTo(xFor(k), yFor(pmf[k]));
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = P.hl;
+    ctx.beginPath();
+    for (k = 0; k <= n; k++) {
+      if (pmf[k] <= 0) continue;
+      var xs = xFor(k), ys = yFor(pmf[k]);
+      ctx.moveTo(xs + r, ys);
+      ctx.arc(xs, ys, r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+
+    // the cell the two cuts have in common
+    var xv = xFor(state.x), yv = yFor(pmf[state.x]);
+    ctx.strokeStyle = P.accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(xv, yv, r + 2.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  /* --------------------------------------------------------------- captions */
+
+  var capSurf = document.getElementById("cap-surf");
+  var capLik  = document.getElementById("cap-lik");
+  var capPmf  = document.getElementById("cap-pmf");
+
+  function renderCaptions() {
+    var n = state.n, x = state.x, p = state.p;
+    var here = binomPmf(x, n, p);
+
+    capSurf.innerHTML =
+      "Binomial(<i>x</i> | <i>n</i>, <i>p</i>) at every combination &mdash; discrete across, " +
+      "continuous up. At <i>x</i> = <b>" + x + "</b>, <i>p</i> = <b>" + fmtNum(p) +
+      "</b> it is <b>" + fmt4(here) + "</b>.";
+
+    var area = colArea(n, x);
+    capLik.innerHTML =
+      "<span class=\"tag col\">down the column</span>" +
+      "the likelihood for <i>p</i>, given <i>x</i> = <b>" + x + "</b>. Continuous, and its area is " +
+      "<b>" + fmt4(area) + "</b> = 1/(<i>n</i>+1) &mdash; the same for every <i>x</i>, never 1. " +
+      (state.z
+        ? "Dashed: &times; (<i>n</i>+1) = Beta(" + (x + 1) + ", " + (n - x + 1) +
+          "), area 1 &mdash; the posterior from a <em>uniform</em> prior."
+        : "So it is not a distribution over <i>p</i>.");
+
+    capPmf.innerHTML =
+      "<span class=\"tag row\">across the row</span>" +
+      "the distribution over counts, given <i>p</i> = <b>" + fmtNum(p) + "</b>. Discrete, over " +
+      "<b>" + (n + 1) + "</b> possible values, and it sums to <b>" + rowSum(n, p).toFixed(4) +
+      "</b>. The ringed dot is where the two cuts meet.";
+  }
+
+  /* -------------------------------------------------------------- controls */
+
+  var nRange = document.getElementById("n-range"), nNum = document.getElementById("n-num");
+  var xRange = document.getElementById("x-range"), xNum = document.getElementById("x-num");
+  var pRange = document.getElementById("p-range"), pNum = document.getElementById("p-num");
+  var normEl = document.getElementById("norm");
+
+  var RANGES = { n: nRange, x: xRange, p: pRange };
+  var NUMS   = { n: nNum,   x: xNum,   p: pNum };
+  var STEPS  = { n: 1, x: 1, p: 0.01 };
+
+  function bounds(key) {
+    if (key === "n") return [LIMITS.nMin, LIMITS.nMax];
+    if (key === "x") return [0, state.n];
+    return [0, 1];
+  }
+
+  function syncControls() {
+    xRange.max = String(state.n);
+    var keys = ["n", "x", "p"], i;
+    for (i = 0; i < keys.length; i++) {
+      RANGES[keys[i]].value = String(state[keys[i]]);
+      NUMS[keys[i]].value = fmtNum(state[keys[i]]);
+      NUMS[keys[i]].classList.remove("invalid");
+    }
+    normEl.checked = !!state.z;
+  }
+
+  function setState(partial, opts) {
+    var changed = false, v;
+    if (partial.n !== undefined) {          // n first, so x can be clamped against it
+      v = clamp(Math.round(partial.n), LIMITS.nMin, LIMITS.nMax);
+      if (v !== state.n) { state.n = v; changed = true; }
+    }
+    if (partial.x !== undefined) {
+      v = clamp(Math.round(partial.x), 0, state.n);
+      if (v !== state.x) { state.x = v; changed = true; }
+    }
+    if (state.x > state.n) { state.x = state.n; changed = true; }
+    if (partial.p !== undefined) {
+      v = Math.round(clamp(partial.p, 0, 1) * 1000) / 1000;
+      if (v !== state.p) { state.p = v; changed = true; }
+    }
+    if (partial.z !== undefined) {
+      v = partial.z ? 1 : 0;
+      if (v !== state.z) { state.z = v; changed = true; }
+    }
+    if (!(opts && opts.silentControls)) syncControls();
+    if (changed || (opts && opts.force)) {
+      renderCaptions();
+      render();
+      scheduleHashWrite();
+    }
+  }
+
+  function render() { drawSurf(); drawLik(); drawPmf(); }
+
+  function wireRange(el, key) {
+    el.addEventListener("input", function () {
+      var partial = {}; partial[key] = +el.value;
+      setState(partial);
+    });
+  }
+  wireRange(nRange, "n"); wireRange(xRange, "x"); wireRange(pRange, "p");
+  normEl.addEventListener("change", function () { setState({ z: normEl.checked ? 1 : 0 }); });
+
+  function wireNumber(key) {
+    var el = NUMS[key];
+    // While typing, apply valid values but leave the raw text alone, so keystrokes
+    // are never rewritten under the cursor.
+    el.addEventListener("input", function () {
+      var lim = bounds(key), val = parseNum(el.value);
+      if (isNaN(val) || val < lim[0] || val > lim[1]) { el.classList.add("invalid"); return; }
+      el.classList.remove("invalid");
+      var partial = {}; partial[key] = val;
+      setState(partial, { silentControls: true });
+      RANGES[key].value = String(state[key]);
+    });
+    // On commit (Enter or blur), normalise the text to the value actually in use.
+    el.addEventListener("change", function () {
+      var val = parseNum(el.value);
+      if (!isNaN(val)) { var partial = {}; partial[key] = val; setState(partial); }
+      el.value = fmtNum(state[key]);
+      el.classList.remove("invalid");
+    });
+    el.addEventListener("blur", function () {
+      el.value = fmtNum(state[key]);
+      el.classList.remove("invalid");
+    });
+    // Arrow keys nudge by the slider's own step; Shift for a bigger step.
+    el.addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      e.preventDefault();
+      var cur = parseNum(el.value);
+      if (isNaN(cur)) cur = state[key];
+      var step = STEPS[key] * (e.shiftKey ? 10 : 1);
+      var partial = {};
+      partial[key] = round3(cur + (e.key === "ArrowUp" ? step : -step));
+      setState(partial);
+      el.value = fmtNum(state[key]);
+      el.classList.remove("invalid");
+    });
+  }
+  wireNumber("n"); wireNumber("x"); wireNumber("p");
+
+  /* --------------------------------------------------------------- pointer */
+
+  // Dragging on the surface moves both cuts at once, which is the quickest way
+  // to feel that the two panels are two readings of the same thing.
+  function cutAt(evt) {
+    var g = gSurf;
+    if (!g) return null;
+    var rect = cvSurf.getBoundingClientRect();
+    var cx = evt.clientX - rect.left, cy = evt.clientY - rect.top;
+    if (cx < g.padL || cx > g.padL + g.plotW) return null;
+    if (cy < g.padT || cy > g.y0) return null;
+    return {
+      x: clamp(Math.floor((cx - g.padL) / g.band), 0, g.n),
+      p: Math.round(clamp(1 - (cy - g.padT) / g.plotH, 0, 1) * 100) / 100
+    };
+  }
+  var dragging = false;
+  cvSurf.addEventListener("pointerdown", function (e) {
+    var c = cutAt(e);
+    if (!c) return;
+    dragging = true;
+    cvSurf.setPointerCapture(e.pointerId);
+    setState(c);
+  });
+  cvSurf.addEventListener("pointermove", function (e) {
+    if (!dragging) return;
+    var c = cutAt(e);
+    if (c) setState(c);
+  });
+  cvSurf.addEventListener("pointerup", function () { dragging = false; });
+  cvSurf.addEventListener("pointercancel", function () { dragging = false; });
+
+  /* ------------------------------------------------------ URL fragment state */
+
+  function readHash() {
+    var out = { n: DEFAULTS.n, x: DEFAULTS.x, p: DEFAULTS.p, z: DEFAULTS.z };
+    var raw = location.hash.replace(/^#/, "");
+    if (!raw) return out;
+    var q = new URLSearchParams(raw);
+    var n = parseFloat(q.get("n")), x = parseFloat(q.get("x"));
+    var p = parseFloat(q.get("p")), z = parseFloat(q.get("z"));
+    if (isFinite(n)) out.n = clamp(Math.round(n), LIMITS.nMin, LIMITS.nMax);
+    out.x = isFinite(x) ? clamp(Math.round(x), 0, out.n) : Math.min(out.x, out.n);
+    if (isFinite(p)) out.p = Math.round(clamp(p, 0, 1) * 1000) / 1000;
+    if (isFinite(z)) out.z = z ? 1 : 0;
+    return out;
+  }
+
+  function currentHash() {
+    return "#n=" + state.n + "&x=" + state.x + "&p=" + state.p + (state.z ? "&z=1" : "");
+  }
+
+  var hashTimer = null;
+  function scheduleHashWrite() {
+    if (hashTimer) clearTimeout(hashTimer);
+    hashTimer = setTimeout(function () {
+      hashTimer = null;
+      var h = currentHash();
+      if (location.hash !== h) {
+        try { history.replaceState(null, "", h); }
+        catch (err) { location.hash = h; }   // e.g. opened from file:// in some browsers
+      }
+    }, 150);
+  }
+
+  window.addEventListener("hashchange", function () {
+    setState(readHash(), { force: true });
+  });
+
+  /* ------------------------------------------------------------------ help */
+
+  var dlg = document.getElementById("help-dialog");
+  document.getElementById("help-btn").addEventListener("click", function () { dlg.showModal(); });
+  dlg.querySelector(".help-close").addEventListener("click", function () { dlg.close(); });
+  dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
+
+  /* ------------------------------------------------------------------ init */
+
+  var initial = readHash();
+  state.n = initial.n; state.x = initial.x; state.p = initial.p; state.z = initial.z;
+  syncControls();
+  renderCaptions();
+
+  // Installed before the first render, so that a render bailing out can never
+  // leave the widget with nothing watching for its chance to try again.
+  if (window.ResizeObserver) {
+    var card = cvSurf.parentElement;
+    var lastBox = "";   // empty, so the observer's initial callback always draws
+    new ResizeObserver(function () {
+      var box = card.clientWidth + "x" + card.clientHeight;
+      if (box !== lastBox) { lastBox = box; render(); }
+    }).observe(card);
+  }
+  window.addEventListener("resize", render);   // also fires on zoom
+  // A reload can run this script before layout and style have settled, which is
+  // how a plot can come up blank on refresh but not on a fresh navigation.
+  window.addEventListener("load", render);
+  if (window.requestAnimationFrame) requestAnimationFrame(render);
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    var repaint = function () { bmpKey = ""; render(); };   // the bitmap is palette-specific
+    if (mq.addEventListener) mq.addEventListener("change", repaint);
+    else if (mq.addListener) mq.addListener(repaint);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

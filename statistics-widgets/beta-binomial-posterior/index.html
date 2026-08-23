@@ -1,0 +1,1224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prior × likelihood → posterior</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg:        #ffffff;
+    --surface:   #f7f7f5;
+    --ink:       #1b1b1a;
+    --muted:     #6b6b66;
+    --line:      #d9d9d4;
+    --grid:      #ececE7;
+    --accent:    #2f6f8f;
+    --accent-soft: rgba(47,111,143,0.35);
+    --highlight: #b4542a;
+    --focus:     #2f6f8f;
+    --prior-fill: rgba(107,107,102,0.14);
+    --post-fill:  rgba(47,111,143,0.13);
+    --inspect:    rgba(27,27,26,0.45);
+    --fit:       0;      /* 1 when the one-screen layout below is in force */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg:        #16171a;
+      --surface:   #1e2024;
+      --ink:       #e8e8e4;
+      --muted:     #9b9b95;
+      --line:      #34363b;
+      --grid:      #26282d;
+      --accent:    #6fb3d2;
+      --accent-soft: rgba(111,179,210,0.35);
+      --highlight: #e08a5c;
+      --focus:     #6fb3d2;
+      --prior-fill: rgba(155,155,149,0.16);
+      --post-fill:  rgba(111,179,210,0.15);
+      --inspect:    rgba(232,232,228,0.45);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.25rem 1rem 2.5rem; }
+
+  .widget-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 0.75rem; margin-bottom: 0.25rem;
+  }
+  .widget-header h1 { font-size: 1.25rem; font-weight: 600; margin: 0; line-height: 1.3; }
+  .widget-header h1 .formula { white-space: nowrap; }   /* never break mid-expression */
+  .lede { color: var(--muted); margin: 0 0 1.25rem; font-size: 0.95rem; }
+
+  /* ---- help button (canonical) ---- */
+  .help-btn {
+    flex: 0 0 auto;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--muted); background: transparent; color: var(--muted);
+    font: inherit; font-size: 16px; line-height: 1;
+    display: grid; place-items: center; cursor: pointer;
+    padding: 0; transition: color .12s, border-color .12s, background-color .12s;
+  }
+  .help-btn:hover, .help-btn:focus-visible {
+    color: var(--ink); border-color: var(--ink); background: var(--surface);
+  }
+  .help-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .help-dialog {
+    max-width: 34rem; max-height: 80vh; width: calc(100% - 2rem);
+    padding: 1.5rem; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); color: var(--ink);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+    overflow: auto; position: relative;
+  }
+  .help-dialog::backdrop { background: rgba(0,0,0,0.45); }
+  .help-dialog h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin: 1.4rem 0 .35rem; }
+  .help-dialog h2:first-of-type { margin-top: 0; }
+  .help-dialog p, .help-dialog li { font-size: 0.94rem; }
+  .help-dialog p { margin: .35rem 0; }
+  .help-dialog ul { margin: .35rem 0; padding-left: 1.15rem; }
+  .help-dialog li { margin: .2rem 0; }
+  .help-dialog code { background: var(--surface); padding: 0.05em 0.3em; border-radius: 3px;
+    font-size: 0.88em; }
+  .help-close {
+    position: absolute; top: .6rem; right: .6rem;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid transparent; background: transparent; color: var(--muted);
+    font-size: 20px; line-height: 1; cursor: pointer; display: grid; place-items: center;
+  }
+  .help-close:hover, .help-close:focus-visible { color: var(--ink); background: var(--surface); }
+  .help-close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- controls ---- */
+  .group-label {
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--muted); margin: 0 0 .4rem; padding-bottom: .25rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .group-label + .group-label { margin-top: 1rem; }
+  .group { margin-bottom: 1rem; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0 1.6rem; }
+  .control { margin-bottom: .9rem; }
+  .control-label { display: flex; align-items: baseline; gap: .45rem; margin-bottom: .25rem; }
+  .control-label .name { font-weight: 600; font-size: .95rem; }
+  .control-label .desc { color: var(--muted); font-size: .85rem; }
+  .control-label .desc::before { content: "\2014\00a0"; }
+  .control-row { display: flex; align-items: center; gap: .75rem; }
+  input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); height: 1.6rem; }
+  input[type="range"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  input[type="range"]:disabled { opacity: .45; }
+  .num-input {
+    flex: 0 0 auto; width: 5rem; padding: .35rem .5rem;
+    font: inherit; font-size: .95rem; font-variant-numeric: tabular-nums;
+    color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 5px;
+  }
+  .num-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px;
+    border-color: var(--focus); }
+  .num-input.invalid { border-color: var(--highlight); }
+
+  /* ---- the view selector ---- */
+  .seg { display: flex; flex-direction: column; border: 1px solid var(--line);
+    border-radius: 6px; overflow: hidden; }
+  .seg button {
+    text-align: left; padding: .38rem .6rem; font: inherit; font-size: .85rem;
+    background: var(--bg); color: var(--muted); border: 0; border-top: 1px solid var(--line);
+    cursor: pointer;
+  }
+  .seg button:first-child { border-top: 0; }
+  .seg button:hover { color: var(--ink); background: var(--surface); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+  .seg button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .seg .n { display: inline-block; width: 1.1em; opacity: .8; }
+
+  /* ---- plots ---- */
+  .plot-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: .5rem; margin-bottom: .4rem;
+  }
+  .plot-card canvas { display: block; width: 100%; height: auto; touch-action: pan-y; }
+  .beam-card { margin-bottom: .45rem; }
+
+  .summary {
+    display: flex; flex-wrap: wrap; gap: .25rem 1.1rem;
+    color: var(--muted); font-size: .88rem; margin: 0 0 .3rem; padding: 0 .15rem;
+  }
+  .summary b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .summary.caption { display: block; }
+
+  /* ---- one-screen layout ----
+     Landscape and roomy enough: the controls move into a column beside the plot,
+     which then takes the whole remaining height. Anything smaller — a phone, a
+     sidebar, a short or portrait window — stacks and scrolls instead. */
+  @media (min-width: 64rem) and (min-height: 36rem) and (min-aspect-ratio: 3/2) {
+    :root { --fit: 1; }
+    html, body { height: 100%; }
+    .wrap {
+      max-width: 160rem; height: 100vh; height: 100dvh;
+      display: flex; flex-direction: column;
+      padding: .85rem 1.1rem .9rem;
+    }
+    .widget-header { margin-bottom: .1rem; }
+    .lede { max-width: 64rem; margin-bottom: .7rem; }
+
+    .main { flex: 1 1 auto; min-height: 0; display: flex; gap: 1.3rem; }
+    .side { flex: 0 0 19rem; min-height: 0; overflow-y: auto; }
+    .side .controls { grid-template-columns: 1fr; }
+    .plotcol { flex: 1 1 auto; min-width: 0; min-height: 0;
+      display: flex; flex-direction: column; }
+
+    /* Only the main plot grows; the beam is a fixed strip that happens to share
+       the .plot-card frame. */
+    .plot-card.flex { flex: 1 1 auto; min-height: 0; position: relative; }
+    .beam-card { flex: 0 0 auto; }
+
+    /* Tighter in the column, so every control is reachable without scrolling it
+       even on a 1366x640 laptop, where the column has about 520px to play with. */
+    .side .group { margin-bottom: .5rem; }
+    .side .group-label { margin-bottom: .3rem; padding-bottom: .15rem; }
+    .side .control { margin-bottom: .45rem; }
+    .side .control-label { margin-bottom: .15rem; }
+    .side input[type="range"] { height: 1.4rem; }
+    .side .seg { display: grid; grid-template-columns: 1fr 1fr; }
+    .side .seg button {
+      padding: .3rem .5rem;
+      border-top: 1px solid var(--line); border-left: 1px solid var(--line);
+    }
+    .side .seg button:nth-child(-n+2) { border-top: 0; }
+    .side .seg button:nth-child(odd) { border-left: 0; }
+    /* A canvas is a replaced element, so the four offsets would not stretch it —
+       it is pinned here and given its exact size by the script instead. */
+    .plot-card.flex canvas { position: absolute; top: .5rem; left: .5rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="widget-header">
+    <h1>From prior to posterior &mdash;
+      <span class="formula">prior &times; likelihood</span></h1>
+    <button id="help-btn" class="help-btn" aria-label="Help" title="Help">?</button>
+  </header>
+  <p class="lede">
+    The posterior is the prior reweighted by the likelihood: multiply the two at every value of
+    <i>p</i>, then rescale by a constant. With a Beta prior and a Binomial likelihood the answer
+    is another Beta, exactly.
+  </p>
+
+  <div class="main">
+    <div class="side">
+
+      <p class="group-label">The prior</p>
+      <div class="group">
+        <div class="controls">
+          <div class="control">
+            <div class="control-label">
+              <label class="name" for="a-range">&alpha;</label>
+              <span class="desc">weight toward <i>p</i> = 1</span>
+            </div>
+            <div class="control-row">
+              <input type="range" id="a-range" min="0.1" max="50" step="0.1" value="2"
+                     aria-label="alpha, prior weight toward p equals 1">
+              <input type="text" id="a-num" class="num-input" value="2"
+                     inputmode="decimal" autocomplete="off" spellcheck="false"
+                     aria-label="alpha (exact value)">
+            </div>
+          </div>
+          <div class="control">
+            <div class="control-label">
+              <label class="name" for="b-range">&beta;</label>
+              <span class="desc">weight toward <i>p</i> = 0</span>
+            </div>
+            <div class="control-row">
+              <input type="range" id="b-range" min="0.1" max="50" step="0.1" value="2"
+                     aria-label="beta, prior weight toward p equals 0">
+              <input type="text" id="b-num" class="num-input" value="2"
+                     inputmode="decimal" autocomplete="off" spellcheck="false"
+                     aria-label="beta (exact value)">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="group-label">The data</p>
+      <div class="group">
+        <div class="controls">
+          <div class="control">
+            <div class="control-label">
+              <label class="name" for="n-range"><i>n</i></label>
+              <span class="desc">trials</span>
+            </div>
+            <div class="control-row">
+              <input type="range" id="n-range" min="0" max="200" step="1" value="9"
+                     aria-label="n, number of trials">
+              <input type="text" id="n-num" class="num-input" value="9"
+                     inputmode="numeric" autocomplete="off" spellcheck="false"
+                     aria-label="n, number of trials (exact value)">
+            </div>
+          </div>
+          <div class="control">
+            <div class="control-label">
+              <label class="name" for="x-range"><i>x</i></label>
+              <span class="desc">successes, at most <i>n</i></span>
+            </div>
+            <div class="control-row">
+              <input type="range" id="x-range" min="0" max="9" step="1" value="6"
+                     aria-label="x, number of successes">
+              <input type="text" id="x-num" class="num-input" value="6"
+                     inputmode="numeric" autocomplete="off" spellcheck="false"
+                     aria-label="x, number of successes (exact value)">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="group-label">What to show</p>
+      <div class="group">
+        <div class="seg" id="seg" role="group" aria-label="Which curves to show">
+          <button type="button" data-v="0" aria-pressed="true">all three</button>
+          <button type="button" data-v="1" aria-pressed="false"><span class="n">1</span>prior</button>
+          <button type="button" data-v="2" aria-pressed="false"><span class="n">2</span>&times; likelihood</button>
+          <button type="button" data-v="3" aria-pressed="false"><span class="n">3</span>&divide; a constant</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="controls">
+          <div class="control">
+            <div class="control-label">
+              <label class="name" for="p-range"><i>p</i></label>
+              <span class="desc">where to read the curves</span>
+            </div>
+            <div class="control-row">
+              <input type="range" id="p-range" min="0" max="1" step="0.01" value="0.5"
+                     aria-label="p, the value of p at which to read off the curves">
+              <input type="text" id="p-num" class="num-input" value="0.5"
+                     inputmode="decimal" autocomplete="off" spellcheck="false"
+                     aria-label="p (exact value)">
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="plotcol">
+      <div class="plot-card flex">
+        <canvas id="plot" role="img"
+                aria-label="Prior, Binomial likelihood and posterior plotted against p"></canvas>
+      </div>
+      <p class="summary caption" id="readout"></p>
+      <div class="plot-card beam-card">
+        <canvas id="beam" role="img"
+                aria-label="The posterior mean shown between the prior mean and the observed proportion"></canvas>
+      </div>
+      <p class="summary" id="facts"></p>
+    </div>
+  </div>
+
+</div>
+
+<dialog id="help-dialog" class="help-dialog">
+  <button class="help-close" aria-label="Close help">&times;</button>
+
+  <h2>What this shows</h2>
+  <p>
+    Bayes' rule for the globe-tossing golem of Chapter 2: a Beta prior on <i>p</i>, <i>x</i>
+    successes in <i>n</i> trials, and the posterior that results.
+  </p>
+  <p style="text-align:center">
+    p(<i>p</i> | <i>x</i>) &nbsp;&prop;&nbsp; Binomial(<i>x</i> | <i>n</i>, <i>p</i>)
+    &times; Beta(<i>p</i> | &alpha;, &beta;)
+  </p>
+  <p>
+    Read it pointwise. At each value of <i>p</i>, take how plausible the prior finds that <i>p</i>,
+    multiply by how well that <i>p</i> explains the data, and the result &mdash; once rescaled by a
+    constant &mdash; is the posterior. Multiplication is the whole mechanism: a value of <i>p</i>
+    survives only if <em>both</em> factors are large, so either one can veto it.
+  </p>
+  <p>
+    Because the Beta is conjugate to the Binomial, the answer is another Beta and the update is
+    just bookkeeping: add the successes to &alpha; and the failures to &beta;.
+  </p>
+
+  <h2>How to use it</h2>
+  <ul>
+    <li><b>&alpha;</b> and <b>&beta;</b> &mdash; the prior's shape, 0.1 to 50. Their total is how
+      much the prior is worth in observations, so raising both makes the prior harder to move.</li>
+    <li><b><i>n</i></b> and <b><i>x</i></b> &mdash; the data: <i>x</i> successes in <i>n</i> trials,
+      with <i>x</i> held at or below <i>n</i>. At <i>n</i> = 0 there are no data, the likelihood is
+      flat, and the posterior is exactly the prior.</li>
+    <li><b>What to show</b> &mdash; <b>all three</b> overlays prior, likelihood and posterior on one
+      axis, each scaled so its highest point is 1. Steps <b>1</b>, <b>2</b> and <b>3</b> walk
+      through the calculation instead, one curve at a time, on the true vertical scale.</li>
+    <li><b><i>p</i></b> &mdash; a vertical line marking one value of <i>p</i>. In the overlay it
+      reads off all three curves and does the multiplication for you.</li>
+    <li>Below the plot, the bar shows the posterior mean sitting between the prior mean and the
+      observed proportion <i>x</i>/<i>n</i>, at a position set by their weights.</li>
+  </ul>
+
+  <h2>Things to try</h2>
+  <ul>
+    <li>At the defaults the prior leans to 0.5 and the data say 6/9 = 0.667. The posterior lands
+      between them, at 0.615 &mdash; not at either. Move <b><i>p</i></b> to 0.3: the prior still
+      gives it some support, but the likelihood is nearly zero there, so the product is nearly zero.
+      That veto is what "reweighted by the likelihood" means.</li>
+    <li>Sweep <b><i>p</i></b> across the whole range and watch the last number in the readout, the
+      one the product is divided by. It never changes. Normalising is a single constant, not
+      something that reshapes the curve.</li>
+    <li>Click through steps <b>1</b>, <b>2</b>, <b>3</b>. Between 2 and 3 the curve does not move at
+      all &mdash; only the numbers on the vertical axis do. By step 2 you already have the answer;
+      step 3 only decides what it is called.</li>
+    <li>Hold the data at 6/9 and raise &alpha; and &beta; together: (1,1), (5,5), (30,30). Watch the
+      marker on the bar slide back toward the prior mean as the prior outweighs nine observations.
+      Then hold the prior and raise <i>n</i> instead, keeping <i>x</i>/<i>n</i> near 0.667 &mdash;
+      the data take over.</li>
+    <li>Set &alpha; = 30, &beta; = 3 (a prior sure that <i>p</i> is high) against <i>x</i> = 10,
+      <i>n</i> = 100. Prior and likelihood barely overlap. In the overlay the posterior still sits
+      between them; look at step 2 and see how small the product gets &mdash; its peak is about
+      10<sup>&minus;18</sup>. The shape is still perfectly good; only the scale is tiny.</li>
+  </ul>
+
+  <h2>Notes</h2>
+  <ul>
+    <li>In the overlay, each curve is divided by its own highest value so that three quantities with
+      quite different units share an axis. That is legitimate here because Bayes' rule fixes the
+      posterior only up to a constant anyway. The posterior drawn is exactly the product of the two
+      curves drawn, divided by that product's own peak &mdash; which is why the arithmetic in the
+      readout lands on the curve.</li>
+    <li>The constant that turns the product into a probability density is
+      &int; Binomial(<i>x</i> | <i>n</i>, <i>p</i>) Beta(<i>p</i> | &alpha;, &beta;) d<i>p</i>, the
+      marginal likelihood &mdash; which is exactly the prior predictive probability of the <i>x</i>
+      you observed, the quantity plotted in the prior-predictive widget. It rescales the curve and
+      does nothing else, so nothing here depends on it.</li>
+    <li>The posterior is Beta(&alpha;+<i>x</i>, &beta;+<i>n</i>&minus;<i>x</i>), and its mean is an
+      exact weighted average of the prior mean and <i>x</i>/<i>n</i>, with weights &alpha;+&beta;
+      and <i>n</i>. That is the sense in which a Beta(&alpha;, &beta;) prior "is worth"
+      &alpha;+&beta; observations.</li>
+    <li>Densities are unbounded, and when &alpha; or &beta; is below 1 the prior runs to infinity at
+      an endpoint. Vertical scales are therefore taken from the central 98% of the range
+      (<i>p</i> between 0.01 and 0.99), and anything above the top of the plot is clipped and marked
+      with a caret. Everything is computed in log space with a Lanczos log &Gamma;, so non-integer
+      &alpha; and &beta; are no harder than whole numbers.</li>
+    <li>The URL updates as you change the inputs, so you can copy it from the address bar and share
+      an exact configuration, including which step is showing.</li>
+  </ul>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------------------------------------------ state */
+
+  var DEFAULTS = { a: 2, b: 2, n: 9, x: 6, p: 0.5, v: 0 };
+  var LIMITS   = { abMin: 0.1, abMax: 50, nMin: 0, nMax: 200 };
+  var state    = { a: DEFAULTS.a, b: DEFAULTS.b, n: DEFAULTS.n,
+                   x: DEFAULTS.x, p: DEFAULTS.p, v: DEFAULTS.v };
+
+  // Vertical scales come from this central band, so that a density diverging at
+  // an endpoint cannot flatten the whole plot.
+  var BAND_LO = 0.01, BAND_HI = 0.99, BAND_N = 400;
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function round2(v) { return Math.round(v * 100) / 100; }
+  function round3(v) { return Math.round(v * 1000) / 1000; }
+
+  // Render numbers ourselves rather than letting the browser's locale decide:
+  // always "." for the decimal point and "," between thousands.
+  function fmtNum(v) {
+    var parts = String(v).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  }
+
+  // Accept what a person might reasonably type, including a decimal comma from
+  // a comma-locale keyboard, and reject anything that is not a plain number.
+  function parseNum(raw) {
+    var t = String(raw).trim().replace(/\s/g, "");
+    if (!t) return NaN;
+    if (t.indexOf(",") >= 0) {
+      t = (t.indexOf(".") >= 0) ? t.replace(/,/g, "")     // 1,234.5 -> thousands separators
+                                : t.replace(/,/g, ".");   // 0,5     -> decimal comma
+    }
+    return /^[+-]?(\d+\.?\d*|\.\d+)$/.test(t) ? parseFloat(t) : NaN;
+  }
+
+  /* ----------------------------------------------------------------- maths */
+
+  // Lanczos approximation to log gamma, good to ~15 digits for the range here.
+  var LANCZOS = [
+    676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.13857109526572012,
+    9.9843695780195716e-6, 1.5056327351493116e-7
+  ];
+  function lgamma(z) {
+    if (z < 0.5) {   // reflection: gamma(z) gamma(1-z) = pi / sin(pi z)
+      return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * z))) - lgamma(1 - z);
+    }
+    z -= 1;
+    var x = 0.99999999999980993;
+    for (var i = 0; i < LANCZOS.length; i++) x += LANCZOS[i] / (z + i + 1);
+    var t = z + LANCZOS.length - 0.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+  }
+  function logBeta(a, b) { return lgamma(a) + lgamma(b) - lgamma(a + b); }
+
+  var logFactTable = [0];
+  function logFact(m) {
+    for (var i = logFactTable.length; i <= m; i++) {
+      logFactTable[i] = logFactTable[i - 1] + Math.log(i);
+    }
+    return logFactTable[m];
+  }
+
+  // Beta(p | a, b). Returns Infinity where the density genuinely diverges.
+  function betaPdf(p, a, b) {
+    if (p < 0 || p > 1) return 0;
+    if (p === 0) return a < 1 ? Infinity : (a === 1 ? Math.exp(-logBeta(a, b)) : 0);
+    if (p === 1) return b < 1 ? Infinity : (b === 1 ? Math.exp(-logBeta(a, b)) : 0);
+    return Math.exp((a - 1) * Math.log(p) + (b - 1) * Math.log1p(-p) - logBeta(a, b));
+  }
+
+  // Binomial(x | n, p) read as a function of p. With no data it is flat at 1.
+  function binomLik(p, x, n) {
+    if (n === 0) return 1;
+    if (p <= 0) return x === 0 ? 1 : 0;
+    if (p >= 1) return x === n ? 1 : 0;
+    return Math.exp(logFact(n) - logFact(x) - logFact(n - x)
+                    + x * Math.log(p) + (n - x) * Math.log1p(-p));
+  }
+
+  // The marginal likelihood: the constant that turns prior x likelihood into a
+  // density. It is the Beta-Binomial pmf — the prior predictive probability of x.
+  function marginal(x, n, a, b) {
+    return Math.exp(logFact(n) - logFact(x) - logFact(n - x)
+                    + logBeta(x + a, n - x + b) - logBeta(a, b));
+  }
+
+  // Largest value over the central band, plus whichever endpoints are finite, so
+  // the answer does not depend on how many pixels wide the plot happens to be.
+  function bandMax(f) {
+    var m = 0, i, v;
+    for (i = 0; i <= BAND_N; i++) {
+      v = f(BAND_LO + (BAND_HI - BAND_LO) * i / BAND_N);
+      if (isFinite(v) && v > m) m = v;
+    }
+    v = f(0); if (isFinite(v) && v > m) m = v;
+    v = f(1); if (isFinite(v) && v > m) m = v;
+    return m;
+  }
+
+  /* --------------------------------------------------------- what is plotted */
+
+  var D = null;   // everything the drawing needs, recomputed on a state change
+
+  function compute() {
+    var a = state.a, b = state.b, n = state.n, x = state.x;
+    var A = a + x, B = b + n - x;
+
+    var priorMax = bandMax(function (p) { return betaPdf(p, a, b); });
+    var likMax   = (n === 0) ? 1 : binomLik(x / n, x, n);
+    var postMax  = bandMax(function (p) { return betaPdf(p, A, B); });
+    var rawProdMax = bandMax(function (p) { return betaPdf(p, a, b) * binomLik(p, x, n); });
+
+    // Prior and likelihood are each divided by their own peak; the product of the
+    // two rescaled curves therefore peaks at this, and dividing by it gives a
+    // posterior curve that is exactly the drawn product over the drawn peak.
+    var scaledProdMax = (priorMax > 0 && likMax > 0) ? rawProdMax / (priorMax * likMax) : 1;
+
+    D = {
+      a: a, b: b, n: n, x: x, A: A, B: B,
+      priorMax: priorMax, likMax: likMax, postMax: postMax,
+      rawProdMax: rawProdMax, scaledProdMax: scaledProdMax,
+      Z: marginal(x, n, a, b)
+    };
+  }
+
+  // The three overlay curves, each at peak 1 over the band.
+  function priorHat(p) { return betaPdf(p, D.a, D.b) / D.priorMax; }
+  function likHat(p)   { return binomLik(p, D.x, D.n) / D.likMax; }
+  function postHat(p)  { return priorHat(p) * likHat(p) / D.scaledProdMax; }
+
+  // The stepper curves, on their true vertical scales.
+  function stepFn(v) {
+    if (v === 1) return function (p) { return betaPdf(p, D.a, D.b); };
+    if (v === 2) return function (p) { return betaPdf(p, D.a, D.b) * binomLik(p, D.x, D.n); };
+    return function (p) { return betaPdf(p, D.A, D.B); };
+  }
+  function stepMax(v) { return v === 1 ? D.priorMax : (v === 2 ? D.rawProdMax : D.postMax); }
+
+  /* -------------------------------------------------------- drawing helpers */
+
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  // The breakpoint is defined once, in the stylesheet, and read back here — a
+  // second copy of the query in JS is a copy that will drift out of step.
+  function fitMode() { return cssVar("--fit") === "1"; }
+
+  function palette() {
+    return {
+      ink: cssVar("--ink"), muted: cssVar("--muted"), grid: cssVar("--grid"),
+      line: cssVar("--line"), accent: cssVar("--accent"), hl: cssVar("--highlight"),
+      priorFill: cssVar("--prior-fill"), postFill: cssVar("--post-fill"),
+      inspect: cssVar("--inspect"), bg: cssVar("--bg"), surface: cssVar("--surface")
+    };
+  }
+
+  // The axis maximum is rounded up to one of these, so that dividing it into five
+  // ticks still gives round labels. No gap in the ladder is wider than 1.5x: a
+  // sparser one (1, 2, 5, 10) doubles the axis whenever a peak lands just above a
+  // step, leaving half the plot empty.
+  var NICE_STEPS = [1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10];
+  function niceCeil(v) {
+    if (!(v > 0)) return 1;
+    var e = Math.floor(Math.log10(v));
+    var f = v / Math.pow(10, e);
+    for (var i = 0; i < NICE_STEPS.length; i++) {
+      if (f <= NICE_STEPS[i] + 1e-9) return NICE_STEPS[i] * Math.pow(10, e);
+    }
+    return 10 * Math.pow(10, e);
+  }
+
+  function fmtTick(v) {
+    if (v === 0) return "0";
+    if (v < 0.0001 || v >= 1e6) return v.toExponential(0);
+    var d = v >= 10 ? 1 : v >= 0.1 ? 2 : v >= 0.01 ? 3 : 4;
+    var s = v.toFixed(d);
+    if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, "");
+    return s;
+  }
+
+  // Has to read well from 1e-18 to 1e3.
+  function fmtVal(v) {
+    if (!isFinite(v)) return "∞";
+    if (v === 0) return "0";
+    if (v >= 1000 || v < 0.001) return v.toExponential(2);
+    return v.toFixed(3);
+  }
+
+  var cvPlot = document.getElementById("plot");
+  var cvBeam = document.getElementById("beam");
+  var padLShared = 58;
+
+  function measurePadL(narrow, yMax) {
+    var mctx = cvPlot.getContext("2d");
+    mctx.font = (narrow ? 10 : 11) + "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    var w = 0;
+    for (var j = 0; j <= 5; j++) w = Math.max(w, mctx.measureText(fmtTick(yMax * j / 5)).width);
+    return Math.ceil(w) + 8 + (narrow ? 21 : 25);   // label, gap, rotated title
+  }
+
+  // The plot fills its card when the card has a height of its own; otherwise it
+  // takes a height from its width.
+  function panelBox(cv) {
+    if (!fitMode()) return { w: cv.clientWidth, h: 0 };
+    var card = cv.parentElement, cs = getComputedStyle(card);
+    // Before styles have fully resolved these can come back empty, and an
+    // undefended parseFloat would turn the whole box into NaN.
+    var px = function (v) { return parseFloat(v) || 0; };
+    return {
+      w: card.clientWidth  - px(cs.paddingLeft) - px(cs.paddingRight),
+      h: card.clientHeight - px(cs.paddingTop)  - px(cs.paddingBottom)
+    };
+  }
+
+  function prepFlex(cv) {
+    var cssW, cssH;
+    var box = fitMode() ? panelBox(cv) : null;
+    if (box && box.w > 100 && box.h > 80) {
+      // Fill the card, whose height the flex row has already settled.
+      cssW = box.w; cssH = box.h;
+      cv.style.width = cssW + "px";
+      cv.style.height = cssH + "px";
+    } else {
+      // Either the stacked layout, or the one-screen layout before it has settled.
+      // Size from the width rather than giving up: a plot of the wrong height gets
+      // corrected on the next observation, a blank one is what the user is left with.
+      cv.style.width = "";            // back to the stylesheet's width: 100%
+      cssW = cv.clientWidth || (cv.parentElement ? cv.parentElement.clientWidth : 0);
+      if (!(cssW > 0)) return null;
+      cssH = clamp(Math.round(cssW * 0.62), 220, 420);
+      cv.style.height = cssH + "px";
+    }
+    return setup(cv, cssW, cssH);
+  }
+
+  function prepFixed(cv, cssH) {
+    var cssW = cv.clientWidth;
+    if (!cssW) return null;
+    cv.style.height = cssH + "px";
+    return setup(cv, cssW, cssH);
+  }
+
+  function setup(cv, cssW, cssH) {
+    var dpr = window.devicePixelRatio || 1;
+    cv.width  = Math.round(cssW * dpr);
+    cv.height = Math.round(cssH * dpr);
+    var c = cv.getContext("2d");
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, cssW, cssH);
+    return { ctx: c, w: cssW, h: cssH, narrow: cssW < 420 };
+  }
+
+  // A caret at the top edge, marking something taller than the axis allows.
+  function caret(ctx, g, x, colour) {
+    ctx.fillStyle = colour;
+    var xo = clamp(x, g.padL + 4, g.padL + g.plotW - 4), yo = g.padT + 1;
+    ctx.beginPath();
+    ctx.moveTo(xo, yo); ctx.lineTo(xo - 4, yo + 6); ctx.lineTo(xo + 4, yo + 6);
+    ctx.closePath(); ctx.fill();
+  }
+
+  /* ------------------------------------------------------------- the plot */
+
+  var geom = null;
+
+  function drawPlot() {
+    var s = prepFlex(cvPlot);
+    if (!s || !D) return;
+    var ctx = s.ctx, P = palette(), narrow = s.narrow;
+    var overlay = (state.v === 0);
+    var yMax = overlay ? 1 : niceCeil(stepMax(state.v) * 1.08);
+
+    var padL = padLShared, padR = 14, padT = 14, padB = narrow ? 36 : 42;
+    var plotW = s.w - padL - padR, plotH = s.h - padT - padB;
+    if (plotW <= 10 || plotH <= 10) return;
+    var y0 = padT + plotH;
+    // Every overlay curve peaks at exactly 1, which would put its topmost pixels
+    // on the clip boundary and slice the stroke in half. Rather than move the axis
+    // maximum off a round number, keep 0..1 and leave a few pixels clear above the
+    // top gridline. The stepper does not need it: niceCeil already leaves 8%.
+    var headroom = overlay ? 8 : 0;
+    var xFor = function (p) { return padL + p * plotW; };
+    var yFor = function (v) {
+      return padT + headroom + (plotH - headroom) * (1 - v / yMax);
+    };
+
+    ctx.font = (narrow ? 10 : 11) + "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 1;
+
+    var i, v, y;
+    for (i = 0; i <= 5; i++) {
+      v = yMax * i / 5;
+      y = Math.round(yFor(v)) + 0.5;
+      ctx.strokeStyle = i === 0 ? P.line : P.grid;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+      ctx.fillStyle = P.muted; ctx.textAlign = "right";
+      ctx.fillText(fmtTick(v), padL - 8, yFor(v));
+    }
+    ctx.strokeStyle = P.line;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(padL) + 0.5, padT); ctx.lineTo(Math.round(padL) + 0.5, y0);
+    ctx.stroke();
+
+    var xStep = narrow ? 0.25 : 0.1;
+    ctx.textAlign = "center";
+    for (var t = 0; t <= 1.0000001; t += xStep) {
+      var xt = xFor(t);
+      ctx.strokeStyle = P.line;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(xt) + 0.5, y0); ctx.lineTo(Math.round(xt) + 0.5, y0 + 4);
+      ctx.stroke();
+      ctx.fillStyle = P.muted;
+      ctx.fillText(fmtTick(Math.round(t * 100) / 100), xt, y0 + 13);
+    }
+
+    ctx.fillStyle = P.muted; ctx.textAlign = "center";
+    ctx.fillText("p  (a probability)", padL + plotW / 2, s.h - (narrow ? 7 : 9));
+    ctx.save();
+    ctx.translate(narrow ? 11 : 13, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = "center";
+    ctx.fillText(overlay ? "height, each curve scaled to peak 1"
+                         : (state.v === 2 ? "prior × likelihood" : "density"), 0, 0);
+    ctx.restore();
+
+    geom = { padL: padL, padT: padT, plotW: plotW, plotH: plotH, y0: y0,
+             xFor: xFor, yFor: yFor, yMax: yMax, narrow: narrow };
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(padL, padT, plotW, plotH);
+    ctx.clip();
+
+    var steps = Math.max(2, Math.round(plotW));
+    var overs = [];
+    // Every overlay curve touches 1 by construction, and the per-pixel scan can
+    // land a hair closer to the peak than the coarser band scan that set the
+    // scale did — so allow a little slack before calling it off the top. A real
+    // divergence overshoots by orders of magnitude, not by 2%.
+    var overAt = overlay ? yMax * 1.02 : yMax;
+
+    // One curve: sampled per pixel, optionally washed underneath, and reporting
+    // where it left the top of the plot.
+    function curve(f, colour, width, dash, fill) {
+      var run = null, over = [];
+      ctx.beginPath();
+      for (var k = 0; k <= steps; k++) {
+        var pp = k / steps, d = f(pp);
+        if (!isFinite(d)) d = yMax * 10;      // draw a divergence as running off the top
+        var xv = xFor(pp), yv = yFor(d);
+        if (k === 0) ctx.moveTo(xv, yv); else ctx.lineTo(xv, yv);
+        if (d > overAt) {
+          if (run === null) run = { x: xv, d: d };
+          else if (d > run.d) { run.x = xv; run.d = d; }
+        } else if (run !== null) { over.push(run); run = null; }
+      }
+      if (run !== null) over.push(run);
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = width;
+      ctx.lineJoin = "round";
+      ctx.setLineDash(dash || []);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (fill) {
+        ctx.lineTo(xFor(1), y0); ctx.lineTo(xFor(0), y0); ctx.closePath();
+        ctx.fillStyle = fill; ctx.fill();
+      }
+      for (var j = 0; j < over.length; j++) overs.push(over[j]);
+    }
+
+    if (overlay) {
+      curve(priorHat, P.muted, 1.5, [], P.priorFill);
+      curve(likHat, P.hl, 1.75, [6, 4], null);
+      curve(postHat, P.accent, 2.5, [], null);
+    } else {
+      curve(stepFn(state.v), P.accent, 2.5, [], P.postFill);
+    }
+
+    // the inspected p
+    var pSel = state.p;
+    ctx.strokeStyle = P.inspect;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(xFor(pSel), y0); ctx.lineTo(xFor(pSel), padT);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    function dot(f, colour) {
+      var d = f(pSel);
+      if (!isFinite(d) || d > yMax) return;
+      ctx.fillStyle = P.surface;
+      ctx.beginPath(); ctx.arc(xFor(pSel), yFor(d), 4.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = colour;
+      ctx.beginPath(); ctx.arc(xFor(pSel), yFor(d), 3.2, 0, Math.PI * 2); ctx.fill();
+    }
+    if (overlay) { dot(priorHat, P.muted); dot(likHat, P.hl); dot(postHat, P.accent); }
+    else { dot(stepFn(state.v), P.accent); }
+    ctx.restore();
+
+    ctx.fillStyle = P.inspect;
+    ctx.font = "italic " + (narrow ? 11 : 12) +
+               "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.textAlign = pSel > 0.9 ? "right" : "left";
+    ctx.fillText("p", xFor(pSel) + (pSel > 0.9 ? -5 : 5), padT + 7);
+
+    for (i = 0; i < overs.length; i++) caret(ctx, geom, overs[i].x, P.hl);
+
+    if (overlay) legend(ctx, geom, P);
+  }
+
+  // Named curves, so the three are readable without a colour key elsewhere.
+  function legend(ctx, g, P) {
+    var items = [
+      { t: "prior", c: P.muted, w: 1.5, d: [] },
+      { t: "likelihood", c: P.hl, w: 1.75, d: [6, 4] },
+      { t: "posterior", c: P.accent, w: 2.5, d: [] }
+    ];
+    ctx.font = (g.narrow ? 10 : 11) + "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    var lh = 16, sw = 20, gap = 6, padX = 8, padY = 5;
+    var tw = 0, i;
+    for (i = 0; i < items.length; i++) tw = Math.max(tw, ctx.measureText(items[i].t).width);
+    var bw = sw + gap + tw + padX * 2, bh = items.length * lh + padY * 2;
+    var bx = g.padL + g.plotW - bw - 8, by = g.padT + 8;
+
+    ctx.fillStyle = P.bg;
+    ctx.strokeStyle = P.line;
+    ctx.lineWidth = 1;
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 5); }
+    else { ctx.beginPath(); ctx.rect(bx, by, bw, bh); }
+    ctx.globalAlpha = 0.92; ctx.fill(); ctx.globalAlpha = 1; ctx.stroke();
+
+    for (i = 0; i < items.length; i++) {
+      var yy = by + padY + lh * i + lh / 2;
+      ctx.strokeStyle = items[i].c;
+      ctx.lineWidth = items[i].w;
+      ctx.setLineDash(items[i].d);
+      ctx.beginPath(); ctx.moveTo(bx + padX, yy); ctx.lineTo(bx + padX + sw, yy); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = P.ink;
+      ctx.fillText(items[i].t, bx + padX + sw + gap, yy);
+    }
+  }
+
+  /* ------------------------------------------------------------- the beam */
+
+  function drawBeam() {
+    var s = prepFixed(cvBeam, 54);
+    if (!s || !D) return;
+    var ctx = s.ctx, P = palette(), narrow = s.narrow;
+    var padL = padLShared, padR = 14;
+    var plotW = s.w - padL - padR;
+    if (plotW <= 10) return;
+    var xFor = function (p) { return padL + p * plotW; };
+    var yT = 30;
+
+    ctx.font = (narrow ? 10 : 11) + "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.textBaseline = "middle";
+
+    ctx.strokeStyle = P.line;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padL, yT + 0.5); ctx.lineTo(padL + plotW, yT + 0.5);
+    ctx.stroke();
+
+    var priorMean = D.a / (D.a + D.b);
+    var postMean  = (D.a + D.x) / (D.a + D.b + D.n);
+    var dataProp  = D.n > 0 ? D.x / D.n : null;
+
+    // the span the posterior mean is pulled across
+    if (dataProp !== null) {
+      ctx.strokeStyle = P.accent;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(xFor(Math.min(priorMean, dataProp)), yT + 0.5);
+      ctx.lineTo(xFor(Math.max(priorMean, dataProp)), yT + 0.5);
+      ctx.stroke();
+    }
+
+    function tick(p, colour, label, above) {
+      var xx = xFor(p);
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(xx) + 0.5, yT - 6); ctx.lineTo(Math.round(xx) + 0.5, yT + 6);
+      ctx.stroke();
+      ctx.fillStyle = colour;
+      ctx.textAlign = p > 0.88 ? "right" : (p < 0.12 ? "left" : "center");
+      ctx.fillText(label, clamp(xx, padL, padL + plotW), above ? yT - 15 : yT + 16);
+    }
+
+    tick(priorMean, P.muted, "prior mean", true);
+    if (dataProp !== null) tick(dataProp, P.hl, "x/n", true);
+
+    var xp = xFor(postMean);
+    ctx.fillStyle = P.surface;
+    ctx.beginPath(); ctx.arc(xp, yT, 6.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = P.accent;
+    ctx.beginPath(); ctx.arc(xp, yT, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.textAlign = postMean > 0.88 ? "right" : (postMean < 0.12 ? "left" : "center");
+    ctx.fillText("posterior mean", clamp(xp, padL, padL + plotW), yT + 16);
+
+    ctx.fillStyle = P.muted;
+    ctx.textAlign = "left";
+    ctx.fillText("0", padL, yT + 16);
+    ctx.textAlign = "right";
+    ctx.fillText("1", padL + plotW, yT + 16);
+  }
+
+  /* --------------------------------------------------------------- readout */
+
+  var elReadout = document.getElementById("readout");
+  var elFacts   = document.getElementById("facts");
+
+  function renderText() {
+    var p = state.p;
+    if (state.v === 0) {
+      var pr = priorHat(p), lk = likHat(p), pd = pr * lk;
+      elReadout.innerHTML =
+        "at <i>p</i> = <b>" + fmtNum(p) + "</b> &nbsp; prior <b>" + fmtVal(pr) +
+        "</b> &times; likelihood <b>" + fmtVal(lk) + "</b> = <b>" + fmtVal(pd) +
+        "</b>, &divide; <b>" + fmtVal(D.scaledProdMax) +
+        "</b> (the product's peak, the same at every <i>p</i>) = posterior <b>" +
+        fmtVal(pd / D.scaledProdMax) + "</b>";
+    } else if (state.v === 1) {
+      elReadout.innerHTML =
+        "<b>Step 1.</b> The prior on its own, Beta(<i>p</i> | " + fmtNum(D.a) + ", " +
+        fmtNum(D.b) + "), a density with area 1.";
+    } else if (state.v === 2) {
+      elReadout.innerHTML =
+        "<b>Step 2.</b> Multiplied by the likelihood at every <i>p</i>. This is already the " +
+        "posterior's shape; its peak is just <b>" + fmtVal(D.rawProdMax) +
+        "</b> and the area under it is not 1.";
+    } else {
+      elReadout.innerHTML =
+        "<b>Step 3.</b> Divided by <b>" + fmtVal(D.Z) + "</b> so the area is 1. Compare with " +
+        "step 2: the curve has not moved at all, only the numbers on the vertical axis.";
+    }
+
+    var priorMean = D.a / (D.a + D.b);
+    var postMean = (D.a + D.x) / (D.a + D.b + D.n);
+    var wPrior = D.a + D.b, wData = D.n;
+    elFacts.innerHTML =
+      "<span>Beta(" + fmtNum(D.a) + ", " + fmtNum(D.b) + ") + <b>" + D.x +
+        "</b> successes, <b>" + (D.n - D.x) + "</b> failures &rarr; <b>Beta(" +
+        fmtNum(round3(D.A)) + ", " + fmtNum(round3(D.B)) + ")</b></span>" +
+      "<span>prior mean <b>" + fmtNum(round3(priorMean)) + "</b></span>" +
+      (D.n > 0 ? "<span><i>x</i>/<i>n</i> <b>" + fmtNum(round3(D.x / D.n)) + "</b></span>" : "") +
+      "<span>posterior mean <b>" + fmtNum(round3(postMean)) + "</b></span>" +
+      "<span>weights &mdash; prior <b>" + fmtNum(round2(wPrior)) + "</b>, data <b>" +
+        wData + "</b></span>";
+  }
+
+  /* -------------------------------------------------------------- controls */
+
+  var aRange = document.getElementById("a-range"), aNum = document.getElementById("a-num");
+  var bRange = document.getElementById("b-range"), bNum = document.getElementById("b-num");
+  var nRange = document.getElementById("n-range"), nNum = document.getElementById("n-num");
+  var xRange = document.getElementById("x-range"), xNum = document.getElementById("x-num");
+  var pRange = document.getElementById("p-range"), pNum = document.getElementById("p-num");
+  var seg    = document.getElementById("seg");
+
+  var RANGES = { a: aRange, b: bRange, n: nRange, x: xRange, p: pRange };
+  var NUMS   = { a: aNum,   b: bNum,   n: nNum,   x: xNum,   p: pNum };
+  var STEPS  = { a: 0.1, b: 0.1, n: 1, x: 1, p: 0.01 };
+
+  function bounds(key) {
+    if (key === "a" || key === "b") return [LIMITS.abMin, LIMITS.abMax];
+    if (key === "n") return [LIMITS.nMin, LIMITS.nMax];
+    if (key === "x") return [0, state.n];
+    return [0, 1];
+  }
+
+  function syncControls() {
+    var keys = ["a", "b", "n", "x", "p"], i;
+    xRange.max = String(state.n);
+    xRange.disabled = (state.n === 0);
+    for (i = 0; i < keys.length; i++) {
+      RANGES[keys[i]].value = String(state[keys[i]]);
+      NUMS[keys[i]].value = fmtNum(state[keys[i]]);
+      NUMS[keys[i]].classList.remove("invalid");
+    }
+    var btns = seg.querySelectorAll("button");
+    for (i = 0; i < btns.length; i++) {
+      btns[i].setAttribute("aria-pressed", (+btns[i].dataset.v === state.v) ? "true" : "false");
+    }
+  }
+
+  function setState(partial, opts) {
+    var changed = false, v;
+    if (partial.a !== undefined) {
+      v = round3(clamp(partial.a, LIMITS.abMin, LIMITS.abMax));
+      if (v !== state.a) { state.a = v; changed = true; }
+    }
+    if (partial.b !== undefined) {
+      v = round3(clamp(partial.b, LIMITS.abMin, LIMITS.abMax));
+      if (v !== state.b) { state.b = v; changed = true; }
+    }
+    // n first, then x, so that x can be clamped against the n actually in use
+    if (partial.n !== undefined) {
+      v = clamp(Math.round(partial.n), LIMITS.nMin, LIMITS.nMax);
+      if (v !== state.n) { state.n = v; changed = true; }
+    }
+    if (partial.x !== undefined) {
+      v = clamp(Math.round(partial.x), 0, state.n);
+      if (v !== state.x) { state.x = v; changed = true; }
+    }
+    if (state.x > state.n) { state.x = state.n; changed = true; }
+    if (partial.p !== undefined) {
+      v = Math.round(clamp(partial.p, 0, 1) * 1000) / 1000;
+      if (v !== state.p) { state.p = v; changed = true; }
+    }
+    if (partial.v !== undefined) {
+      v = clamp(Math.round(partial.v), 0, 3);
+      if (v !== state.v) { state.v = v; changed = true; }
+    }
+    if (!(opts && opts.silentControls)) syncControls();
+    if (changed || (opts && opts.force)) {
+      compute();
+      renderText();   // before render, so the plot measures the height left over
+      render();
+      scheduleHashWrite();
+    }
+  }
+
+  function render() {
+    padLShared = measurePadL(panelBox(cvPlot).w < 420,
+      state.v === 0 ? 1 : niceCeil(stepMax(state.v) * 1.08));
+    drawPlot();
+    drawBeam();
+  }
+
+  function wireRange(el, key) {
+    el.addEventListener("input", function () {
+      var partial = {}; partial[key] = +el.value;
+      setState(partial);
+    });
+  }
+  wireRange(aRange, "a"); wireRange(bRange, "b");
+  wireRange(nRange, "n"); wireRange(xRange, "x"); wireRange(pRange, "p");
+
+  function wireNumber(key) {
+    var el = NUMS[key];
+    // While typing, apply valid values but leave the raw text alone, so keystrokes
+    // are never rewritten under the cursor.
+    el.addEventListener("input", function () {
+      var lim = bounds(key), val = parseNum(el.value);
+      if (isNaN(val) || val < lim[0] || val > lim[1]) { el.classList.add("invalid"); return; }
+      el.classList.remove("invalid");
+      var partial = {}; partial[key] = val;
+      setState(partial, { silentControls: true });
+      RANGES[key].value = String(state[key]);
+    });
+    // On commit (Enter or blur), normalise the text to the value actually in use.
+    el.addEventListener("change", function () {
+      var val = parseNum(el.value);
+      if (!isNaN(val)) { var partial = {}; partial[key] = val; setState(partial); }
+      el.value = fmtNum(state[key]);
+      el.classList.remove("invalid");
+    });
+    el.addEventListener("blur", function () {
+      el.value = fmtNum(state[key]);
+      el.classList.remove("invalid");
+    });
+    // Arrow keys nudge by the slider's own step; Shift for a bigger step.
+    el.addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      e.preventDefault();
+      var cur = parseNum(el.value);
+      if (isNaN(cur)) cur = state[key];
+      var step = STEPS[key] * (e.shiftKey ? 10 : 1);
+      var partial = {};
+      partial[key] = round3(cur + (e.key === "ArrowUp" ? step : -step));
+      setState(partial);
+      el.value = fmtNum(state[key]);
+      el.classList.remove("invalid");
+    });
+  }
+  wireNumber("a"); wireNumber("b"); wireNumber("n"); wireNumber("x"); wireNumber("p");
+
+  seg.addEventListener("click", function (e) {
+    var btn = e.target.closest ? e.target.closest("button") : null;
+    if (btn && btn.dataset.v !== undefined) setState({ v: +btn.dataset.v });
+  });
+
+  /* ------------------------------------------------------------- pointer */
+
+  // Clicking or dragging on the plot moves the inspected p, which is quicker
+  // than the slider when you are chasing a particular feature.
+  function pAt(evt) {
+    if (!geom) return null;
+    var rect = cvPlot.getBoundingClientRect();
+    var x = evt.clientX - rect.left, y = evt.clientY - rect.top;
+    if (x < geom.padL - 4 || x > geom.padL + geom.plotW + 4) return null;
+    if (y < geom.padT || y > geom.y0 + 6) return null;
+    return Math.round(clamp((x - geom.padL) / geom.plotW, 0, 1) * 1000) / 1000;
+  }
+  var dragging = false;
+  cvPlot.addEventListener("pointerdown", function (e) {
+    var p = pAt(e);
+    if (p === null) return;
+    dragging = true;
+    cvPlot.setPointerCapture(e.pointerId);
+    setState({ p: p });
+  });
+  cvPlot.addEventListener("pointermove", function (e) {
+    if (!dragging) return;
+    var p = pAt(e);
+    if (p !== null) setState({ p: p });
+  });
+  cvPlot.addEventListener("pointerup", function () { dragging = false; });
+  cvPlot.addEventListener("pointercancel", function () { dragging = false; });
+
+  /* ------------------------------------------------------ URL fragment state */
+
+  function readHash() {
+    var out = { a: DEFAULTS.a, b: DEFAULTS.b, n: DEFAULTS.n,
+                x: DEFAULTS.x, p: DEFAULTS.p, v: DEFAULTS.v };
+    var raw = location.hash.replace(/^#/, "");
+    if (!raw) return out;
+    var q = new URLSearchParams(raw);
+    var a = parseFloat(q.get("a")), b = parseFloat(q.get("b"));
+    var n = parseFloat(q.get("n")), x = parseFloat(q.get("x"));
+    var p = parseFloat(q.get("p")), v = parseFloat(q.get("v"));
+    if (isFinite(a)) out.a = round3(clamp(a, LIMITS.abMin, LIMITS.abMax));
+    if (isFinite(b)) out.b = round3(clamp(b, LIMITS.abMin, LIMITS.abMax));
+    if (isFinite(n)) out.n = clamp(Math.round(n), LIMITS.nMin, LIMITS.nMax);
+    out.x = isFinite(x) ? clamp(Math.round(x), 0, out.n) : Math.min(out.x, out.n);
+    if (isFinite(p)) out.p = Math.round(clamp(p, 0, 1) * 1000) / 1000;
+    if (isFinite(v)) out.v = clamp(Math.round(v), 0, 3);
+    return out;
+  }
+
+  function currentHash() {
+    return "#a=" + state.a + "&b=" + state.b + "&n=" + state.n +
+           "&x=" + state.x + "&p=" + state.p + (state.v ? "&v=" + state.v : "");
+  }
+
+  var hashTimer = null;
+  function scheduleHashWrite() {
+    if (hashTimer) clearTimeout(hashTimer);
+    hashTimer = setTimeout(function () {
+      hashTimer = null;
+      var h = currentHash();
+      if (location.hash !== h) {
+        try { history.replaceState(null, "", h); }
+        catch (err) { location.hash = h; }   // e.g. opened from file:// in some browsers
+      }
+    }, 150);
+  }
+
+  window.addEventListener("hashchange", function () {
+    setState(readHash(), { force: true });
+  });
+
+  /* ------------------------------------------------------------------ help */
+
+  var dlg = document.getElementById("help-dialog");
+  document.getElementById("help-btn").addEventListener("click", function () { dlg.showModal(); });
+  dlg.querySelector(".help-close").addEventListener("click", function () { dlg.close(); });
+  dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
+
+  /* ------------------------------------------------------------------ init */
+
+  var initial = readHash();
+  state.a = initial.a; state.b = initial.b; state.n = initial.n;
+  state.x = initial.x; state.p = initial.p; state.v = initial.v;
+  syncControls();
+  compute();
+  renderText();
+
+  // Installed before the first render, so that a render bailing out can never
+  // leave the widget with nothing watching for its chance to try again.
+  if (window.ResizeObserver) {
+    var card = cvPlot.parentElement;
+    var lastBox = "";   // empty, so the observer's initial callback always draws
+    new ResizeObserver(function () {
+      var box = card.clientWidth + "x" + card.clientHeight;
+      if (box !== lastBox) { lastBox = box; render(); }
+    }).observe(card);
+  }
+  window.addEventListener("resize", render);   // also fires on zoom
+  // A reload can run this script before layout and style have settled, which is
+  // how the plot came up blank on refresh but not on a fresh navigation.
+  window.addEventListener("load", render);
+  if (window.requestAnimationFrame) requestAnimationFrame(render);
+
+  render();
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    if (mq.addEventListener) mq.addEventListener("change", render);
+    else if (mq.addListener) mq.addListener(render);
+  }
+})();
+</script>
+</body>
+</html>

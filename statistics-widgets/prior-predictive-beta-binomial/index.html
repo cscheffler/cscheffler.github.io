@@ -681,26 +681,31 @@
   function panelBox(cv) {
     if (!fitMode()) return { w: cv.clientWidth, h: 0 };
     var card = cv.parentElement, cs = getComputedStyle(card);
+    // Before styles have fully resolved these can come back empty, and an
+    // undefended parseFloat would turn the whole box into NaN.
+    var px = function (v) { return parseFloat(v) || 0; };
     return {
-      w: card.clientWidth  - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
-      h: card.clientHeight - parseFloat(cs.paddingTop)  - parseFloat(cs.paddingBottom)
+      w: card.clientWidth  - px(cs.paddingLeft) - px(cs.paddingRight),
+      h: card.clientHeight - px(cs.paddingTop)  - px(cs.paddingBottom)
     };
   }
 
   // Size the backing store for the device, and hand back a cleared context.
   function prepCanvas(cv) {
     var cssW, cssH;
-    if (fitMode()) {
+    var box = fitMode() ? panelBox(cv) : null;
+    if (box && box.w > 100 && box.h > 80) {
       // Fill the card, whose height the flex row has already settled.
-      var box = panelBox(cv);
       cssW = box.w; cssH = box.h;
-      if (!(cssW > 100) || !(cssH > 80)) return null;
       cv.style.width  = cssW + "px";
       cv.style.height = cssH + "px";
     } else {
+      // Either the stacked layout, or the one-screen layout before it has settled.
+      // Size from the width rather than giving up: a plot of the wrong height gets
+      // corrected on the next observation, a blank one is what the user is left with.
       cv.style.width = "";            // back to the stylesheet's width: 100%
-      cssW = cv.clientWidth;          // read after clearing, not before
-      if (!cssW) return null;
+      cssW = cv.clientWidth || (cv.parentElement ? cv.parentElement.clientWidth : 0);
+      if (!(cssW > 0)) return null;
       cssH = clamp(Math.round(cssW * 0.38), 165, 250);
       cv.style.height = cssH + "px";
     }
@@ -1422,13 +1427,17 @@
   // The card changes height as well as width now, so watch both.
   if (window.ResizeObserver) {
     var card = cvPrior.parentElement;
-    var lastBox = card.clientWidth + "x" + card.clientHeight;
+    var lastBox = "";   // empty, so the observer's initial callback always draws
     new ResizeObserver(function () {
       var box = card.clientWidth + "x" + card.clientHeight;
       if (box !== lastBox) { lastBox = box; render(); }
     }).observe(card);
   }
   window.addEventListener("resize", render);   // also fires on zoom
+  // A reload can run this script before layout and style have settled, which is
+  // how a plot can come up blank on refresh but not on a fresh navigation.
+  window.addEventListener("load", render);
+  if (window.requestAnimationFrame) requestAnimationFrame(render);
   if (window.matchMedia) {
     var mq = window.matchMedia("(prefers-color-scheme: dark)");
     if (mq.addEventListener) mq.addEventListener("change", render);

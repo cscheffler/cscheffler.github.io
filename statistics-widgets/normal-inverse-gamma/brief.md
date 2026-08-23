@@ -65,9 +65,18 @@ flat colour. The equivalent in matplotlib is `norm=PowerNorm(0.5)`; the colour b
 included because the funnel is much easier to read when you can see what each axis looks like on its
 own, and because they make the 2·alpha_0 degrees of freedom concrete.
 
-**Bug worth recording:** the right-hand strip's rotated label was invisible at first. Under a −90°
-rotation the glyphs grow towards screen-right, so `textBaseline = "top"` pushed them straight off
-the edge of the canvas. `"middle"` fixes it.
+**The corner panel** shows what the colours mean in words ("less likely" → "more likely") and what
+the three contour weights stand for. It started life as a colour bar reading "0 … peak" over a
+`density (√ scale)` caption — which told a student nothing they could act on, since a density over
+(m, s²) has no readable units, and at 10px the √ glyph simply looked like a tick.
+
+**Two bugs worth recording.** The right-hand strip's rotated label was invisible at first: under a
+−90° rotation the glyphs grow towards screen-right, so `textBaseline = "top"` pushed them off the
+edge of the canvas. And the heat map did not line up with its own contours on a Retina display —
+`putImageData` ignores the canvas transform and writes raw device pixels, so at dpr 2 it landed at
+half scale in the top-left corner while the contours, drawn normally, filled the plot. It now goes
+through an untransformed offscreen canvas and `drawImage`. Headless Chrome runs at dpr 1 by default,
+which is why the render loop never showed it; `--force-device-scale-factor=2` does.
 
 **Unit placement.** Filed under *Building Statistical Models* rather than *Introduction*: the
 Introduction group is the Binomial/Beta conjugacy thread, and this is a prior for a model rather

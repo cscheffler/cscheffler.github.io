@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W7 — What a matched comparison buys you</title>
+<style>
+  :root{
+    --bg:#fbfaf8; --panel:#ffffff; --ink:#1c1b19; --muted:#6b6862; --line:#e2ded7;
+    --accent:#b45309; --accent-soft:#fdf0dd; --dim:#d8d4cc; --good:#3f6212;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16150f; --panel:#1f1e17; --ink:#f0ede6; --muted:#a09a8e; --line:#33312a;
+      --accent:#f0a03c; --accent-soft:#2e2313; --dim:#3a3831; --good:#a3c063;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .wrap{max-width:920px;margin:0 auto;padding:2.5rem 1.25rem 5rem}
+  a{color:var(--accent)}
+  h1{font-size:1.7rem;line-height:1.25;margin:0 0 1.4rem}
+  h2{font-size:1.15rem;margin:2.5rem 0 .75rem}
+  .back{font-size:.85rem;color:var(--muted);text-decoration:none;display:inline-block;margin-bottom:1.5rem}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.25rem 1.35rem;margin:1rem 0}
+
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1.1rem;margin-bottom:1.4rem}
+  .ctl label{display:block;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:.35rem}
+  .ctl output{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  select{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:.3rem .4rem;font:inherit;font-size:.9rem}
+
+  .groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem}
+  .grp h3{font-size:.95rem;margin:0 0 .15rem}
+  .grp .who{font-size:.82rem;color:var(--muted);margin:0 0 .8rem}
+  .brow{display:grid;grid-template-columns:minmax(96px,1.1fr) 1.6fr 42px;gap:.6rem;align-items:center;margin-bottom:.4rem}
+  .brow .bl{font-size:.85rem}
+  .brow .bn{font-size:.85rem;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+  .bar{display:flex;height:26px;border-radius:6px;overflow:hidden;margin:.8rem 0 .4rem;border:1px solid var(--line)}
+  .bar span{display:block;height:100%}
+  .reach{font-size:.85rem;color:var(--muted)}
+  .reach b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+  .readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-top:1.5rem}
+  .stat{border-left:3px solid var(--line);padding-left:.8rem}
+  .stat.hero{border-left-color:var(--accent)}
+  .stat .num{font-size:1.8rem;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.1}
+  .stat.hero .num{color:var(--accent)}
+  .stat .lbl{font-size:.82rem;color:var(--muted);margin-top:.15rem}
+
+  .kicker{background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;
+    padding:.85rem 1rem;margin-top:1.25rem;font-size:.95rem}
+  ul{padding-left:1.1rem} li{margin:.4rem 0}
+  details{margin-top:1rem;font-size:.9rem}
+  summary{cursor:pointer;color:var(--muted)}
+  details p,details li{color:var(--muted)}
+  .foot{font-size:.85rem;color:var(--muted);margin-top:2.5rem;border-top:1px solid var(--line);padding-top:1rem}
+  code{background:var(--accent-soft);padding:.05rem .3rem;border-radius:3px;font-size:.9em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<a class="back" href="index.html">&larr; All widgets</a>
+
+<h1>What a matched comparison buys you</h1>
+
+<div class="panel">
+  <div class="controls">
+    <div class="ctl">
+      <label for="n">People in each group — <output id="nOut">150</output></label>
+      <input type="range" id="n" min="10" max="400" step="5" value="150">
+    </div>
+    <div class="ctl">
+      <label for="epv">Data needed per question asked</label>
+      <select id="epv">
+        <option value="10" selected>10 per question (the usual rule)</option>
+        <option value="15">15 per question (cautious)</option>
+        <option value="20">20 per question (strict)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="groups">
+    <div class="grp">
+      <h3>Took part</h3>
+      <p class="who">Accepted, and did the programme</p>
+      <div id="rowsP"></div>
+      <div class="bar" id="barP"></div>
+      <p class="reach">Reach an adjacent role or better: <b id="reachP">—</b></p>
+    </div>
+    <div class="grp">
+      <h3>Did not take part</h3>
+      <p class="who">Turned away for lack of places, or offered a place and declined</p>
+      <div id="rowsC"></div>
+      <div class="bar" id="barC"></div>
+      <p class="reach">Reach an adjacent role or better: <b id="reachC">—</b></p>
+    </div>
+  </div>
+
+  <div class="readout">
+    <div class="stat">
+      <div class="num" id="total">—</div>
+      <div class="lbl">people followed up, twice the cohort</div>
+    </div>
+    <div class="stat">
+      <div class="num" id="questions">—</div>
+      <div class="lbl">questions you can ask of it at once</div>
+    </div>
+    <div class="stat hero">
+      <div class="num" id="gap">—</div>
+      <div class="lbl" id="gapLbl">difference the programme makes</div>
+    </div>
+  </div>
+
+  <div class="kicker" id="kick"></div>
+</div>
+
+<h2>Why this is a different kind of number</h2>
+<p>Everywhere else in this project the question is <em>which application signals went with which
+outcomes</em>, asked among people who were all accepted. That can only ever be a pattern: the people
+who did best may simply have been the people who would have done best anyway.</p>
+
+<p>Here the two groups were judged the same at the door. One set got a place because places existed;
+the other did not, or turned one down. Following both and comparing where they end up gives
+something the other comparisons cannot: <strong>a difference you can attribute to the programme
+rather than to who the people already were.</strong></p>
+
+<h2>What follows from this</h2>
+<ul>
+  <li><strong>The second group is worth more than doubling the first.</strong> Without it, a
+  comparison rests on however few participants had a poor outcome — usually a handful. With it, it
+  rests on a whole matched group the same size as the cohort.</li>
+  <li><strong>A single programme may still be too small to see its own effect.</strong> Drag the
+  size down and watch the range widen until it includes zero: at that point the honest answer is
+  "we cannot tell", even when the effect is real and large.</li>
+  <li><strong>Which is the argument for doing it together.</strong> The same reasoning as the
+  cross-programme table: nobody has to share records, only counts.</li>
+  <li><strong>It has to be set up in advance.</strong> Identifying who was near the line, and being
+  allowed to look them up later, are both decided at application time — not when the analysis
+  starts.</li>
+</ul>
+
+<h2>Two things that would undermine it</h2>
+<ul>
+  <li><strong>People who declined are not the same as people turned away.</strong> Someone who
+  turned down a place usually had another option, which often means they were strong. Mixing them
+  in makes the programme look worse than it is. Count the two sources separately and check they
+  agree.</li>
+  <li><strong>Participants are easier to find.</strong> Alumni are listed, announced and searchable;
+  people who did not attend are not. If you locate 90% of one group and 60% of the other, the gap
+  you measure is partly a gap in who you managed to look up.</li>
+</ul>
+
+<details>
+  <summary>The arithmetic, and how much to trust it</summary>
+  <p>The sliders set the shape of each group; the size slider sets how many people are in each. The
+  difference shown is between the shares reaching an adjacent role or better, and the range around
+  it is the ordinary 95% interval for a difference between two proportions.</p>
+  <p>"Questions you can ask at once" follows the same convention as the cross-programme table: about
+  ten people per question, and for a comparison between two groups what limits you is the
+  <em>smaller of the two groups</em>. In a matched design they are the same size, so it is the
+  cohort. Compare that with a study of participants alone, where the limit is however few of them
+  had a poor outcome.</p>
+  <p>The interval assumes the two groups really are comparable and that everyone is found. Neither
+  holds exactly; see the two threats above. Treat the range as the best case, not the answer.</p>
+  <p>The four outcome levels are those in <code>methodology.md</code> §4.1; the design is the
+  accepted-but-declined comparison in §8.1, after
+  <a href="https://www.nber.org/papers/w7322">Dale &amp; Krueger (1999)</a>, with the analysis
+  population set out in §8.2.</p>
+  <p><strong>The percentages are illustrative, not measured.</strong> Set them to whatever you think
+  is realistic and see what follows.</p>
+</details>
+
+<p class="foot">
+Widget <strong>W7</strong> &middot; serves <code>methodology.md</code> §8 Counterfactual arm
+&middot; build list in <code>methodology-widgets.md</code>.
+</p>
+
+</div>
+
+<script>
+const LEVELS = ["AI capabilities role", "No involvement", "Adjacent role", "Core AI safety role"];
+const SHORT  = ["capabilities", "nothing", "adjacent", "core"];
+// Worst to best. Capabilities sits outside the ramp because it is a negative outcome, not a low one.
+const SWATCH = ["#8a4b3f", "#cfc7b8", "#dda45f", "var(--accent)"];
+const ADJ_PLUS = 2;   // index from which an outcome counts as "adjacent or better"
+
+const S = {n:150, epv:10, P:[5,10,40,45], C:[12,28,40,20]};
+const $ = id => document.getElementById(id);
+
+const total = a => a.reduce((x,y) => x+y, 0);
+const shares = a => { const t = total(a) || 1; return a.map(v => v/t); };
+const reach = a => { const s = shares(a); return s.slice(ADJ_PLUS).reduce((x,y) => x+y, 0); };
+
+// Moving one level takes its share from the other three in proportion to how they stand now,
+// so the four always total 100 and every slider reads as the percentage it shows.
+function rebalance(key, i, v){
+  const a = S[key];
+  v = Math.max(0, Math.min(100, v));
+  const rest = 100 - v;
+  const others = [0,1,2,3].filter(j => j !== i);
+  const sum = others.reduce((t, j) => t + a[j], 0);
+  const out = a.slice();
+  out[i] = v;
+
+  // Kept exact. Rounding here instead would quantise the ratios on every move, so dragging a
+  // slider away and back would not return to where it started.
+  others.forEach(j => out[j] = sum > 0 ? a[j] * rest / sum : rest / others.length);
+
+  S[key] = out;
+}
+
+// Whole numbers for display only, largest remainder first so the four still show as 100.
+function display(a){
+  const floors = a.map(Math.floor);
+  const left = Math.round(100 - floors.reduce((x, y) => x + y, 0));
+  const order = a.map((v, i) => ({i, frac: v - Math.floor(v)}))
+                 .sort((p, q) => q.frac - p.frac);
+  const out = floors.slice();
+  for (let m = 0; m < left; m++) out[order[m % a.length].i] += 1;
+  return out;
+}
+
+// Built once. Rebuilding the markup mid-drag would drop the slider being dragged.
+function buildRows(host, key){
+  host.innerHTML = display(S[key]).map((v, i) =>
+    '<div class="brow">'
+    + '<div class="bl">' + LEVELS[i] + '</div>'
+    + '<input type="range" min="0" max="100" step="1" value="' + v + '" data-k="' + key + '" data-i="' + i + '">'
+    + '<div class="bn"></div>'
+    + '</div>').join("");
+  host.querySelectorAll("input").forEach(inp => {
+    inp.oninput = e => {
+      rebalance(e.target.dataset.k, +e.target.dataset.i, +e.target.value);
+      render();
+    };
+  });
+}
+
+function syncRows(host, key){
+  const inputs = host.querySelectorAll("input");
+  const labels = host.querySelectorAll(".bn");
+  display(S[key]).forEach((v, i) => { inputs[i].value = v; labels[i].textContent = v + "%"; });
+}
+
+function bar(host, key){
+  const s = shares(S[key]);
+  host.innerHTML = s.map((v,i) =>
+    '<span style="width:' + (100*v) + '%;background:' + SWATCH[i] + '" title="'
+    + LEVELS[i] + ': ' + Math.round(100*v) + '%"></span>').join("");
+}
+
+function render(){
+  $("nOut").textContent = S.n;
+  syncRows($("rowsP"), "P"); syncRows($("rowsC"), "C");
+  bar($("barP"), "P");   bar($("barC"), "C");
+
+  const pP = reach(S.P), pC = reach(S.C);
+  $("reachP").textContent = Math.round(100*pP) + "%";
+  $("reachC").textContent = Math.round(100*pC) + "%";
+
+  const n = S.n;
+  $("total").textContent = 2*n;
+  $("questions").textContent = Math.max(0, Math.floor(n / S.epv));
+
+  const diff = pP - pC;
+  const se = Math.sqrt(pP*(1-pP)/n + pC*(1-pC)/n);
+  const lo = diff - 1.96*se, hi = diff + 1.96*se;
+  const pp = v => (v >= 0 ? "+" : "−") + Math.abs(Math.round(100*v));
+  $("gap").textContent = pp(diff) + " pts";
+  $("gapLbl").innerHTML = "more reach an adjacent role or better<br>95% range: "
+    + pp(lo) + " to " + pp(hi);
+
+  // What the same cohort would support without a comparison group.
+  const alone = Math.floor(Math.min(n*pP, n*(1-pP)) / S.epv);
+  const here  = Math.floor(n / S.epv);
+
+  if (lo > 0 || hi < 0){
+    $("kick").innerHTML = "<strong>A study this size could see this.</strong> The whole 95% range "
+      + "sits on one side of zero, so a difference of this size would not be mistaken for noise. "
+      + "And the comparison now rests on " + n + " matched people rather than on the "
+      + Math.round(n*Math.min(pP, 1-pP)) + " participants who happened to have the rarer outcome — "
+      + here + " questions instead of " + alone + ".";
+  } else {
+    $("kick").innerHTML = "<strong>A study this size could not tell.</strong> The 95% range still "
+      + "crosses zero, so even this difference would be reported as “no clear effect”. "
+      + "Nothing is wrong with the programme or the design — there are simply too few people. "
+      + "This is what pooling across programmes is for.";
+  }
+  writeHash();
+}
+
+let t = null;
+function writeHash(){
+  clearTimeout(t);
+  t = setTimeout(() => {
+    history.replaceState(null, "", "#n=" + S.n + "&e=" + S.epv
+      + "&p=" + display(S.P).join(".") + "&c=" + display(S.C).join("."));
+  }, 150);
+}
+function readHash(){
+  const q = new URLSearchParams(location.hash.slice(1));
+  const num = (k, lo, hi, dflt) => {
+    const v = parseInt(q.get(k), 10);
+    return Number.isFinite(v) && v >= lo && v <= hi ? v : dflt;
+  };
+  S.n = num("n", 10, 400, 150);
+  S.epv = num("e", 10, 20, 10);
+  const four = (k, dflt) => {
+    const a = (q.get(k) || "").split(".").map(v => parseInt(v, 10));
+    if (!(a.length === 4 && a.every(v => Number.isFinite(v) && v >= 0 && v <= 100) && total(a) > 0))
+      return dflt;
+    const t = total(a);
+    return t === 100 ? a : a.map(v => 100 * v / t);
+  };
+  S.P = four("p", [5,10,40,45]);
+  S.C = four("c", [12,28,40,20]);
+  $("n").value = S.n; $("epv").value = S.epv;
+}
+
+$("n").oninput = e => { S.n = +e.target.value; render(); };
+$("epv").oninput = e => { S.epv = +e.target.value; render(); };
+window.addEventListener("hashchange", () => { readHash(); render(); });
+
+readHash();
+buildRows($("rowsP"), "P");
+buildRows($("rowsC"), "C");
+render();
+</script>
+<script>
+// Presentation runner: forward slide keys to the parent deck. Inert when opened on its own.
+if (window.parent !== window){
+  addEventListener("keydown", e => {
+    if (e.key === "PageDown" || e.key === "PageUp"){
+      e.preventDefault();
+      parent.postMessage({deck: e.key}, "*");
+    }
+  });
+}
+</script>
+</body>
+</html>

@@ -20,7 +20,7 @@
     font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
   .wrap{max-width:920px;margin:0 auto;padding:2.5rem 1.25rem 5rem}
   a{color:var(--accent)}
-  h1{font-size:1.7rem;line-height:1.25;margin:0 0 .4rem}
+  h1{font-size:1.7rem;line-height:1.25;margin:0 0 1.4rem}
   h2{font-size:1.15rem;margin:2.5rem 0 .75rem}
   .claim{font-size:1.05rem;color:var(--muted);margin:0 0 2rem}
   .back{font-size:.85rem;color:var(--muted);text-decoration:none;display:inline-block;margin-bottom:1.5rem}
@@ -69,9 +69,6 @@
 <a class="back" href="index.html">&larr; All widgets</a>
 
 <h1>What a yes/no outcome costs you</h1>
-<p class="claim">Two people who ended up in completely different places get recorded as the same
-thing. Two people who ended up almost identically get recorded as opposites.</p>
-
 <div class="panel">
   <div class="modes">
     <button id="mA" aria-pressed="true"><strong>Time to placement</strong>
@@ -104,8 +101,6 @@ thing. Two people who ended up almost identically get recorded as opposites.</p>
   <div class="striplab">What your yes/no records</div>
   <svg id="s2" viewBox="0 0 800 110" role="img" aria-label="The same alumni collapsed into two groups"></svg>
 
-  <div class="pair" id="pair"></div>
-
   <div class="readout">
     <div class="stat">
       <div class="num" id="nDistinct">—</div>
@@ -120,6 +115,8 @@ thing. Two people who ended up almost identically get recorded as opposites.</p>
       <div class="lbl">alumni's worth of data thrown away by collapsing</div>
     </div>
   </div>
+
+  <div class="pair" id="pair"></div>
 </div>
 
 <h2>Why this happens</h2>

@@ -100,7 +100,7 @@ It is the number in your <strong>smaller</strong> group.</p>
     </div>
     <div class="ctl">
       <label for="rate">Share with a good outcome — <output id="rateOut">80%</output></label>
-      <input type="range" id="rate" min="50" max="97" step="1" value="80">
+      <input type="range" id="rate" min="0" max="100" step="1" value="80">
     </div>
     <div class="ctl">
       <label for="epv">Data needed per question asked</label>
@@ -312,13 +312,30 @@ function renderDots(n, ratePct){
   const MAX = 300;
   const scale = n > MAX ? Math.ceil(n / MAX) : 1;
   const shown = Math.round(n / scale);
-  const events = Math.round(smaller(n, ratePct) / scale);
+  const nGood = Math.round(shown * ratePct / 100);
+  // Below halfway the good outcomes become the rarer group, so the highlight moves to them —
+  // which end of the grid is lit is what shows the swap.
+  const goodIsSmaller = ratePct < 50;
   let html = "";
-  for (let i = 0; i < shown; i++) html += '<span class="dot' + (i < events ? ' event' : '') + '"></span>';
+  for (let i = 0; i < shown; i++){
+    const isGood = i < nGood;
+    const inSmaller = (isGood === goodIsSmaller);
+    html += '<span class="dot' + (inSmaller ? " event" : "") + '"></span>';
+  }
   els.dots.innerHTML = html;
-  els.scalenote.textContent = scale > 1
-    ? "Each dot is about " + scale + " people. Coloured dots are the smaller group."
-    : "Each dot is one person. Coloured dots are the smaller group.";
+
+  const unit = scale > 1 ? "Each dot is about " + scale + " people. " : "Each dot is one person. ";
+  const k = smaller(n, ratePct);
+  let note;
+  if (ratePct === 0 || ratePct === 100){
+    note = "Everyone is in one group. There is no smaller group at all.";
+  } else if (ratePct === 50){
+    note = "The two groups are the same size — the best case, and as good as this ever gets.";
+  } else {
+    note = "Coloured dots are the smaller group: the " + k + " who "
+         + (goodIsSmaller ? "had a good outcome." : "did not have a good outcome.");
+  }
+  els.scalenote.textContent = unit + note;
 }
 
 function render(){
@@ -334,12 +351,21 @@ function render(){
   els.nEvents.textContent = events;
   els.nVars.textContent = vars < 1 ? "under 1" : vars;
 
-  if (rate >= 88){
+  if (rate === 0 || rate === 100){
     els.kicker.className = "kicker show";
-    els.kicker.innerHTML = "<strong>Notice what just happened.</strong> You moved the programme's "
-      + "success rate <em>up</em>, and the amount you can learn went <em>down</em>. Nothing about "
-      + "the programme got worse — there is simply less contrast left to study. This is the case "
-      + "for grading outcomes instead of scoring them pass/fail.";
+    els.kicker.innerHTML = "<strong>Everyone had the same outcome.</strong> There is nothing left "
+      + "to compare, so no amount of data would help — a question needs two groups to have an "
+      + "answer at all.";
+  } else if (rate >= 88 || rate <= 12){
+    els.kicker.className = "kicker show";
+    els.kicker.innerHTML = "<strong>Notice that both ends are the same.</strong> A programme where "
+      + "almost everyone succeeds and one where almost nobody does are equally hard to learn from — "
+      + "what matters is only how lopsided the split is, not which way it leans. You learn most at "
+      + "an even split, and the further you drag this either way, the less there is to work with. "
+      + (rate >= 88
+          ? "Real programmes sit at this end, which is the case for grading outcomes instead of "
+            + "scoring them pass/fail."
+          : "Real programmes sit at the other end, near 80%.");
   } else if (vars < 1){
     els.kicker.className = "kicker show";
     els.kicker.innerHTML = "<strong>Below one question.</strong> At this size the honest output is "
@@ -373,6 +399,12 @@ function renderMeta(evs, epv){
     + '<td class="num">' + r.people + '</td>'
     + '</tr>').join("");
 
+  if (!rows.length){
+    els.metabody.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">'
+      + 'With everyone in one group there is nothing for any programme to contribute.</td></tr>';
+    els.metakick.textContent = "";
+    return;
+  }
   const all = rows.find(r => r.n === evs.length);
   const allK = all ? all.k : 0;
   const totalEv = evs.reduce((a, b) => a + b, 0);
@@ -467,7 +499,7 @@ function readHash(){
     if (Number.isFinite(v) && v >= lo && v <= hi) el.value = v;
   };
   set(els.alumni, "n", 10, 1000);
-  set(els.rate, "p", 50, 97);
+  set(els.rate, "p", 0, 100);
   set(els.epv, "e", 10, 20);
   set(els.cohorts, "k", 1, 20);
   state.anon = q.get("a") === "1";

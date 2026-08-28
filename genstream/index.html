@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Methodology widgets — GenStream</title>
+<style>
+  :root{
+    --bg:#fbfaf8; --panel:#ffffff; --ink:#1c1b19; --muted:#6b6862; --line:#e2ded7;
+    --accent:#b45309; --accent-soft:#fdf0dd; --dim:#d8d4cc;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16150f; --panel:#1f1e17; --ink:#f0ede6; --muted:#a09a8e; --line:#33312a;
+      --accent:#f0a03c; --accent-soft:#2e2313; --dim:#3a3831;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .wrap{max-width:820px;margin:0 auto;padding:3rem 1.25rem 5rem}
+  a{color:var(--accent)}
+  h1{font-size:1.8rem;margin:0 0 .5rem}
+  h2{font-size:1rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+     margin:2.5rem 0 .75rem;font-weight:600}
+  .lede{color:var(--muted);margin:0 0 .5rem}
+  .rule{background:var(--accent-soft);border-left:3px solid var(--accent);padding:.8rem 1rem;
+        margin:1.5rem 0 0;font-size:.92rem}
+  .card{display:block;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+        padding:1.1rem 1.25rem;margin:.75rem 0;text-decoration:none;color:inherit}
+  a.card:hover{border-color:var(--accent)}
+  .card .id{font-size:.75rem;letter-spacing:.06em;color:var(--accent);font-weight:700}
+  .card h3{margin:.2rem 0 .35rem;font-size:1.05rem}
+  .card p{margin:0;color:var(--muted);font-size:.92rem}
+  .card .meta{margin-top:.6rem;font-size:.78rem;color:var(--muted)}
+  .card.planned{opacity:.62;border-style:dashed}
+  .card.planned .id{color:var(--muted)}
+  code{background:var(--accent-soft);padding:.05rem .3rem;border-radius:3px;font-size:.9em}
+  .foot{font-size:.85rem;color:var(--muted);margin-top:3rem;border-top:1px solid var(--line);padding-top:1rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Methodology widgets</h1>
+<p class="lede">Small interactive explainers for the choices made in <code>methodology.md</code>
+(deliverable <strong>D1</strong>). Each one exists to convey <em>why a decision matters</em> and
+what the right intuition is — not to teach statistics.</p>
+
+<div class="rule">
+  Every widget names the section of <code>methodology.md</code> it serves. If it doesn't serve one,
+  it's decoration and doesn't get built. Priorities and rationale live in
+  <code>methodology-widgets.md</code>.
+</div>
+
+<div class="rule" style="border-left-color:var(--muted)">
+  <strong>Presenting?</strong> <a href="present.html">present.html</a> runs a chosen sequence of
+  these as slides &mdash; PageDown and PageUp to move, widgets still fully interactive. Serve the
+  repo over <code>python3 -m http.server</code> and edit the <code>DECK</code> list at the top of
+  that file to re-sequence.
+</div>
+
+<h2>Built</h2>
+
+<a class="card" href="w0-what-we-measure.html">
+  <div class="id">W0</div>
+  <h3>What the methodology measures</h3>
+  <p>One static picture of the whole thing: what gets recorded at application, where the admission
+  line falls, and what gets measured later. Makes no argument — it labels the parts, and the
+  arguments live in the widgets below. Built as a backdrop to talk over.</p>
+  <div class="meta">Orientation &middot; §3 Inputs, §4 Outcomes, §8 Counterfactual arm</div>
+</a>
+
+<a class="card" href="w1-events-capacity.html">
+  <div class="id">W1</div>
+  <h3>How much can your data actually tell you?</h3>
+  <p>Your sample size isn't your headcount — it's your smaller group. Shows why most individual
+  programmes can't study their own selection process alone, why pooling is the method rather than
+  a bonus, and why a very high success rate leaves you with less to learn from, not more.</p>
+  <div class="meta">Serves §1 Scope, §6 Analysis plan &middot; feeds the case for a graded outcome in §4</div>
+</a>
+
+<a class="card" href="w2-disappearing-slope.html">
+  <div class="id">W2</div>
+  <h3>Why your own data shows nothing</h3>
+  <p>Among your own fellows the work-test score barely predicts anything — which is what a
+  selection process <em>working</em> looks like, not evidence the score is useless. Side-by-side
+  scatter of everyone who applied against only those accepted, with the fix: keep the score
+  distribution for the whole applicant pool.</p>
+  <div class="meta">Serves §7 Range restriction, §3.5</div>
+</a>
+
+<a class="card" href="w4-yes-no-cost.html">
+  <div class="id">W4</div>
+  <h3>What a yes/no outcome costs you</h3>
+  <p>Two people who ended up in completely different places get recorded as the same thing.
+  Shows how much of the signal a yes/no throws away, and why the damage is worst exactly where
+  these programmes sit — with a line most alumni are already on the right side of. Works on a
+  continuous outcome (months to placement) or on the ladder.</p>
+  <div class="meta">Serves §4 Outcome variables</div>
+</a>
+
+<a class="card" href="w6-headline-crosswalk.html">
+  <div class="id">W6</div>
+  <h3>Keeping your existing headline number</h3>
+  <p>Adopting a graded outcome doesn't cost you the single figure your board asks for. Crosswalks
+  both a ladder and a continuous time-to-placement back to a yes/no headline — and shows that one
+  cohort can honestly report anything from 26% to 92% depending only on where somebody drew the
+  line.</p>
+  <div class="meta">Serves §4 Outcome variables, §10 Reporting</div>
+</a>
+
+<h2>Planned</h2>
+
+<div class="card planned">
+  <div class="id">W3</div>
+  <h3>The reliability ceiling</h3>
+  <p>If two reviewers don't agree with each other, there's a hard limit on what any signal can be
+  shown to predict — however good the outcome measure is. The most actionable widget in the set.</p>
+  <div class="meta">Serves §5 Measurement quality</div>
+</div>
+
+<div class="card planned">
+  <div class="id">W5</div>
+  <h3>The same data, different answers</h3>
+  <p>With a small sample and many signals, re-running the analysis on a slightly different slice
+  of the same people changes which signals look important. Not a flaw in the analysis — a fact
+  about the sample.</p>
+  <div class="meta">Serves §6 Analysis plan</div>
+</div>
+
+<div class="card planned">
+  <div class="id">W7</div>
+  <h3>Cohorts you haven't waited for yet</h3>
+  <p>A fixed six-month horizon scores your most recent cohorts as failures for not having had time
+  to succeed. What to do instead.</p>
+  <div class="meta">Serves §4.2 Timing and censoring</div>
+</div>
+
+<div class="card planned">
+  <div class="id">W8</div>
+  <h3>Why joining the pool beats going alone</h3>
+  <p>What a programme's own estimate looks like on its own, and what it looks like once it borrows
+  strength from everyone else's. The argument for the consortium.</p>
+  <div class="meta">Serves §6.3 Pooled analysis</div>
+</div>
+
+<div class="card planned">
+  <div class="id">W9</div>
+  <h3>The people you can't find</h3>
+  <p>Accepted fellows are easier to look up than rejected applicants — so a naive comparison
+  flatters the programme. How much, and what honest bounds look like instead.</p>
+  <div class="meta">Serves §8 Counterfactual arm</div>
+</div>
+
+<div class="card planned">
+  <div class="id">W10</div>
+  <h3>Compared to what?</h3>
+  <p>The alternative to your programme isn't nothing — it's usually another programme. What that
+  does to the number everyone wants to quote.</p>
+  <div class="meta">Serves §8.2 Estimand</div>
+</div>
+
+<p class="foot">
+Part of the GenStream cross-programme study of fellowship selection.
+Explanations here are first-pass and will be sharpened as the methodology firms up.
+</p>
+
+</div>
+</body>
+</html>

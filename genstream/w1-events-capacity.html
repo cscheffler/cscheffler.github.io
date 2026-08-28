@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W1 — How much can your data actually tell you?</title>
+<style>
+  :root{
+    --bg:#fbfaf8; --panel:#ffffff; --ink:#1c1b19; --muted:#6b6862; --line:#e2ded7;
+    --accent:#b45309; --accent-soft:#fdf0dd; --dim:#d8d4cc; --good:#3f6212;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16150f; --panel:#1f1e17; --ink:#f0ede6; --muted:#a09a8e; --line:#33312a;
+      --accent:#f0a03c; --accent-soft:#2e2313; --dim:#3a3831; --good:#a3c063;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .wrap{max-width:920px;margin:0 auto;padding:2.5rem 1.25rem 5rem}
+  a{color:var(--accent)}
+  h1{font-size:1.7rem;line-height:1.25;margin:0 0 .4rem}
+  h2{font-size:1.15rem;margin:2.5rem 0 .75rem}
+  .claim{font-size:1.05rem;color:var(--muted);margin:0 0 2rem}
+  .back{font-size:.85rem;color:var(--muted);text-decoration:none;display:inline-block;margin-bottom:1.5rem}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.25rem 1.35rem;margin:1rem 0}
+
+  /* controls */
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1.1rem}
+  .ctl label{display:block;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:.35rem}
+  .ctl output{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  select{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:.3rem .4rem;font:inherit;font-size:.9rem}
+
+  /* dots */
+  .dots{display:flex;flex-wrap:wrap;gap:3px;margin:1.25rem 0 .5rem;min-height:60px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--dim)}
+  .dot.event{background:var(--accent)}
+  .scalenote{font-size:.8rem;color:var(--muted)}
+
+  /* readout */
+  .readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-top:1.25rem}
+  .stat{border-left:3px solid var(--line);padding-left:.8rem}
+  .stat.hero{border-left-color:var(--accent)}
+  .stat .num{font-size:1.9rem;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.1}
+  .stat.hero .num{color:var(--accent)}
+  .stat .lbl{font-size:.82rem;color:var(--muted);margin-top:.15rem}
+
+  .kicker{background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;
+    padding:.85rem 1rem;margin-top:1.25rem;font-size:.95rem;display:none}
+  .kicker.show{display:block}
+
+  /* table */
+  .tablewrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:640px}
+  th,td{text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--line)}
+  th{font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--accent-soft)}
+  tr.pooled{background:var(--accent-soft);font-weight:600}
+  tr.notperm td{color:var(--muted);font-style:italic}
+  tr.notperm:hover{background:transparent}
+  .metawrap{margin-top:1.5rem;border-top:1px solid var(--line);padding-top:1.25rem}
+  .metawrap h3{font-size:1rem;margin:0 0 .5rem}
+  tr.pooled:hover{background:var(--accent-soft)}
+  .badge{font-size:.7rem;padding:.1rem .4rem;border-radius:4px;border:1px solid var(--line);color:var(--muted)}
+  .toggle{background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--muted);
+    font:inherit;font-size:.82rem;padding:.35rem .75rem;cursor:pointer;white-space:nowrap}
+  .toggle:hover{border-color:var(--accent);color:var(--accent)}
+  .toggle[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+  .tablehead{display:flex;gap:1rem;align-items:end;justify-content:space-between;flex-wrap:wrap;margin-bottom:1rem}
+  .tier{font-size:.78rem;color:var(--muted)}
+  .tier.t1{color:var(--accent)}
+
+  ul{padding-left:1.1rem}
+  li{margin:.4rem 0}
+  details{margin-top:1rem;font-size:.9rem}
+  summary{cursor:pointer;color:var(--muted)}
+  details p, details li{color:var(--muted)}
+  .foot{font-size:.85rem;color:var(--muted);margin-top:2.5rem;border-top:1px solid var(--line);padding-top:1rem}
+  code{background:var(--accent-soft);padding:.05rem .3rem;border-radius:3px;font-size:.9em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<a class="back" href="index.html">&larr; All widgets</a>
+
+<h1>How much can your data actually tell you?</h1>
+<p class="claim">Your sample size is not the number of people you have trained.
+It is the number in your <strong>smaller</strong> group.</p>
+
+<div class="panel">
+  <div class="controls">
+    <div class="ctl">
+      <label for="alumni">Alumni so far — <output id="alumniOut">200</output></label>
+      <input type="range" id="alumni" min="10" max="1000" step="10" value="200">
+    </div>
+    <div class="ctl">
+      <label for="rate">Share with a good outcome — <output id="rateOut">80%</output></label>
+      <input type="range" id="rate" min="50" max="97" step="1" value="80">
+    </div>
+    <div class="ctl">
+      <label for="epv">Data needed per question asked</label>
+      <select id="epv">
+        <option value="10" selected>10 per question (the usual rule)</option>
+        <option value="15">15 per question (cautious)</option>
+        <option value="20">20 per question (strict)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="dots" id="dots"></div>
+  <div class="scalenote" id="scalenote"></div>
+
+  <div class="readout">
+    <div class="stat">
+      <div class="num" id="nAlumni">200</div>
+      <div class="lbl">people you trained</div>
+    </div>
+    <div class="stat hero">
+      <div class="num" id="nEvents">40</div>
+      <div class="lbl">in the smaller group — this is what your data is worth</div>
+    </div>
+    <div class="stat">
+      <div class="num" id="nVars">4</div>
+      <div class="lbl">questions you can ask of it at once</div>
+    </div>
+  </div>
+
+  <div class="kicker" id="kicker"></div>
+</div>
+
+<h2>Why the smaller group is the one that counts</h2>
+<p>Suppose 95 of your 100 alumni end up somewhere good. To learn what separates the two groups,
+every comparison you make leans on the five who didn't — they are the only contrast you have.
+A hundred people who all did well tell you almost nothing about <em>why</em> people do well.</p>
+
+<p>So a programme can be genuinely excellent and still be unable to study itself. That is not a
+failure of analysis; it is arithmetic, and no statistical method gets around it. It is also the
+main reason this project recommends recording <strong>how far</strong> someone got rather than a
+yes/no — a graded outcome keeps the contrast that a yes/no throws away.</p>
+
+<h2>What this looks like across the field</h2>
+<p class="claim" style="margin-bottom:1rem;font-size:.95rem">
+Click any row to load it above. Numbers are order-of-magnitude estimates, not measurements —
+see the caveats.</p>
+
+<div class="panel">
+  <div class="tablehead">
+    <div class="ctl" style="flex:1 1 320px;max-width:420px">
+      <label for="cohorts">Cohorts run to date (assumed, applied to all) — <output id="cohortsOut">6</output></label>
+      <input type="range" id="cohorts" min="1" max="20" step="1" value="6">
+    </div>
+    <button class="toggle" id="anon" aria-pressed="false">Anonymise programme names</button>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Programme</th>
+          <th class="num">Per cohort</th>
+          <th class="num">Alumni</th>
+          <th class="num">Smaller group</th>
+          <th class="num">Questions</th>
+          <th>What it can run</th>
+          <th>Source quality</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <p class="scalenote" id="unknowns" style="margin-top:1rem"></p>
+
+  <div class="metawrap">
+    <h3>The last row does not mean anyone hands over their records</h3>
+    <p class="scalenote" style="margin:0 0 .9rem">Nobody sends anyone a list of people. Each
+    programme runs the same short calculation on its own data and shares only the totals that come
+    out of it — sums and counts, no rows, nothing about any individual. Added together, those
+    totals give the same answer as if all the records had been in one place. The bottom row is what
+    that is worth.</p>
+    <p class="scalenote" style="margin:0 0 .9rem">The smaller programmes gain the most and risk the
+    least: a programme with seventy alumni cannot answer any of these questions on its own, but its
+    totals still count towards the answer — and it never publishes a figure of its own for anyone
+    to pick apart.</p>
+    <details>
+      <summary>If programmes can only share finished results instead</summary>
+      <p>A simpler arrangement — everyone answers the questions alone and shares the answers — is
+      easier to set up and gives noticeably less, because a programme can only contribute an answer
+      to a question it was big enough to ask. The group is then limited by its smallest member:</p>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="num">Questions asked</th>
+              <th class="num">Programmes that can answer</th>
+              <th class="num">People behind the combined answer</th>
+            </tr>
+          </thead>
+          <tbody id="metabody"></tbody>
+        </table>
+      </div>
+      <p id="metakick" style="margin-top:.8rem"></p>
+    </details>
+  </div>
+</div>
+
+<h2>What follows from this</h2>
+<ul>
+  <li><strong>Most programmes can ask about a handful of signals, not a selection process.</strong>
+  At realistic numbers the typical row supports two or three questions at once. A real selection
+  process uses ten or twenty signals, so most of it stays untested however carefully you analyse.</li>
+  <li><strong>Working together is the only route to a real answer — and it costs no privacy.</strong>
+  The bottom row needs nothing but totals: no records leave any programme, and no individual appears
+  anywhere. That is the whole argument for a shared set of definitions, because totals can only be
+  added up if everyone counted the same things the same way.</li>
+  <li><strong>Which makes agreeing the columns the important decision.</strong> Not because a small
+  programme cannot contribute — it can — but because a column only one programme collects cannot be
+  added to anything.</li>
+  <li><strong>A high success rate makes your data weaker, not stronger.</strong> Counterintuitive,
+  and worth sitting with — it is the argument for measuring outcomes on a scale rather than as a
+  yes/no.</li>
+  <li><strong>You can find out where you stand today.</strong> Two numbers — how many alumni, and
+  what share had a good outcome — put you on this chart. Neither requires anyone to share
+  anything.</li>
+</ul>
+
+<details>
+  <summary>The arithmetic, and how much to trust it</summary>
+  <p>Smaller group = alumni &times; whichever of (share good) or (1 &minus; share good) is smaller.
+  Questions you can ask &asymp; smaller group &divide; data needed per question.</p>
+  <p>The "10 per question" convention comes from
+  <a href="https://pubmed.ncbi.nlm.nih.gov/8970487/">Peduzzi et al. (1996)</a>. It is a rule of
+  thumb, not a law — it can be too lenient or too strict depending on how strong the signals are.
+  The modern replacement computes a required sample directly:
+  <a href="https://www.bmj.com/content/368/bmj.m441">Riley et al. (2020), BMJ 368:m441</a>. The
+  slider is there so you can see that the conclusion here does not depend on picking 10.</p>
+  <p>The bottom row assumes each programme computes summary quantities on its own data — sums,
+  counts and cross-products — and shares only those, which are added together and fitted centrally.
+  For a linear model that gives an answer algebraically identical to fitting on the combined
+  records; for the models used here it takes several rounds of the same exchange. The simpler
+  alternative, where each programme fits the model alone and shares its conclusions, is what the
+  collapsed table above describes; on the questions everyone can fit, the two agree closely — see
+  <a href="https://doi.org/10.1002/sim.7141">Burke, Ensor &amp; Riley (2017), <em>Meta-analysis
+  using individual participant data</em>, Statistics in Medicine 36(5):855-875</a>. What is lost is
+  not precision but reach: a programme that could not fit the model contributes nothing at all.</p>
+  <p>Two caveats in the other direction. If programmes genuinely differ from one another, adding
+  more of them sharpens the estimate of the <em>average</em> but never drives the uncertainty to
+  zero, because part of it is real variation rather than noise. And more elaborate federated
+  methods, which pass summaries back and forth over several rounds rather than once, can get closer
+  to what combining the records would give — at the cost of shared infrastructure that does not
+  exist yet. See <code>data-protection-notes.md</code> and <code>methodology.md</code> §6.3.</p>
+  <p>Programme figures come from <code>programme-roster.csv</code>. Its cohort-size column is
+  flagged in <code>programme-roster-schema.md</code> as the roster's weakest, and several entries
+  are marked UNVERIFIED. Cohorts-run-to-date is a flat assumption applied to every programme, not
+  a researched figure — which is why it is a slider you can move. The 80% default for good
+  outcomes comes from <a href="https://forum.effectivealtruism.org/posts/SJBBgupFx7SXyBj2B/where-do-ai-safety-fellows-go-analyzing-a-dataset-of-600">Clay's
+  647-alumni dataset</a>, which covers roughly a third to a half of the alumni it looks at.</p>
+  <p><strong>None of these numbers should be quoted as facts about a programme.</strong> They are
+  here to show the size of the problem, and the size of the problem does not change if any single
+  figure is off by half.</p>
+</details>
+
+<p class="foot">
+Widget <strong>W1</strong> &middot; serves <code>methodology.md</code> §1 and §6 &middot;
+build list in <code>methodology-widgets.md</code>.
+</p>
+
+</div>
+
+<script>
+// Programme figures transcribed from programme-roster.csv. `size` is the midpoint of the
+// roster's approx_cohort_size range; `conf` is the roster's own confidence rating for the row.
+const PROGRAMMES = [
+  {name:"SPAR",             size:200, conf:"medium", note:"200+ per round; headcount inferred from project count"},
+  {name:"MATS",             size:75,  conf:"high",   note:"60-90 per cohort; 63 scholars in Winter 2023-24 retro"},
+  {name:"Anthropic Fellows",size:32,  conf:"low",    note:"~32 spots; funnel figures from secondary sources"},
+  {name:"ERA:AI",           size:30,  conf:"low",    note:"cohort size UNVERIFIED"},
+  {name:"ARENA",            size:30,  conf:"medium", note:"cohort size UNVERIFIED; run 8 times to date"},
+  {name:"Algoverse",        size:30,  conf:"medium", note:"selects on observed work, not application materials"},
+  {name:"Pivotal",          size:25,  conf:"medium", note:"20-30 per cohort; UNVERIFIED"},
+  {name:"LASR Labs",        size:17,  conf:"medium", note:"15-20 per cohort"},
+  {name:"PIBBSS",           size:12,  conf:"medium", note:"10-15; inferred from mentor count in 2024 retro"}
+];
+const UNKNOWN = ["Astra Fellowship","MARS","AI Safety Camp","Apart Lab","CHAI Internship","OpenAI Safety Fellowship"];
+
+const $ = id => document.getElementById(id);
+const state = {anon:false};
+const els = {
+  alumni:$("alumni"), rate:$("rate"), epv:$("epv"), cohorts:$("cohorts"),
+  alumniOut:$("alumniOut"), rateOut:$("rateOut"), cohortsOut:$("cohortsOut"),
+  dots:$("dots"), scalenote:$("scalenote"), kicker:$("kicker"),
+  nAlumni:$("nAlumni"), nEvents:$("nEvents"), nVars:$("nVars"),
+  tbody:$("tbody"), unknowns:$("unknowns"), anon:$("anon"),
+  metabody:$("metabody"), metakick:$("metakick")
+};
+
+const smaller = (n, ratePct) => Math.round(n * Math.min(ratePct, 100 - ratePct) / 100);
+
+const LETTERS = "ABCDEFGHIJKLMNOP";
+const nameFor = (p, i) => state.anon ? "Programme " + LETTERS[i] : p.name;
+
+function tierFor(events){
+  if (events < 20) return {label:"one signal at a time, described not modelled", cls:"t1"};
+  if (events <= 60) return {label:"a few signals grouped together", cls:""};
+  return {label:"several signals, separated", cls:""};
+}
+
+function renderDots(n, ratePct){
+  const MAX = 300;
+  const scale = n > MAX ? Math.ceil(n / MAX) : 1;
+  const shown = Math.round(n / scale);
+  const events = Math.round(smaller(n, ratePct) / scale);
+  let html = "";
+  for (let i = 0; i < shown; i++) html += '<span class="dot' + (i < events ? ' event' : '') + '"></span>';
+  els.dots.innerHTML = html;
+  els.scalenote.textContent = scale > 1
+    ? "Each dot is about " + scale + " people. Coloured dots are the smaller group."
+    : "Each dot is one person. Coloured dots are the smaller group.";
+}
+
+function render(){
+  const n = +els.alumni.value, rate = +els.rate.value, epv = +els.epv.value;
+  els.alumniOut.textContent = n;
+  els.rateOut.textContent = rate + "%";
+
+  const events = smaller(n, rate);
+  const vars = Math.floor(events / epv);
+
+  renderDots(n, rate);
+  els.nAlumni.textContent = n;
+  els.nEvents.textContent = events;
+  els.nVars.textContent = vars < 1 ? "under 1" : vars;
+
+  if (rate >= 88){
+    els.kicker.className = "kicker show";
+    els.kicker.innerHTML = "<strong>Notice what just happened.</strong> You moved the programme's "
+      + "success rate <em>up</em>, and the amount you can learn went <em>down</em>. Nothing about "
+      + "the programme got worse — there is simply less contrast left to study. This is the case "
+      + "for grading outcomes instead of scoring them pass/fail.";
+  } else if (vars < 1){
+    els.kicker.className = "kicker show";
+    els.kicker.innerHTML = "<strong>Below one question.</strong> At this size the honest output is "
+      + "a description — counts, proportions, and an interval — not a model that claims to rank "
+      + "which signals matter.";
+  } else {
+    els.kicker.className = "kicker";
+  }
+  renderTable();
+  writeHash();
+}
+
+// A programme can only contribute an answer to a question it could fit on its own data, so a
+// two-stage meta-analysis is governed by the weakest contributor rather than by the total.
+function renderMeta(evs, epv){
+  const maxK = Math.max(1, Math.floor(Math.max(...evs) / epv));
+  const rows = [];
+  let lastCount = null;
+  for (let k = 1; k <= maxK; k++){
+    const contrib = evs.filter(e => e >= k * epv);
+    if (contrib.length === 0) break;
+    if (contrib.length !== lastCount){
+      rows.push({k, n: contrib.length, people: contrib.reduce((a,b) => a+b, 0)});
+      lastCount = contrib.length;
+    }
+  }
+  els.metabody.innerHTML = rows.map(r =>
+    '<tr' + (r.n === evs.length ? ' class="pooled"' : '') + '>'
+    + '<td class="num">' + r.k + '</td>'
+    + '<td class="num">' + r.n + ' of ' + evs.length + '</td>'
+    + '<td class="num">' + r.people + '</td>'
+    + '</tr>').join("");
+
+  const all = rows.find(r => r.n === evs.length);
+  const allK = all ? all.k : 0;
+  const totalEv = evs.reduce((a, b) => a + b, 0);
+  const rawK = Math.floor(totalEv / epv);
+  const q = n => n === 1 ? "one question" : n + " questions";
+  els.metakick.innerHTML =
+    "So under that arrangement all " + evs.length + " programmes together could ask <strong>"
+    + q(allK) + "</strong>, against " + q(rawK) + " when the totals are combined instead. Ask more "
+    + "and the smaller programmes drop out one by one, until it is no longer a cross-programme "
+    + "study at all. That is the cost of sharing conclusions rather than sharing the arithmetic.";
+}
+
+function renderTable(){
+  const rate = +els.rate.value, epv = +els.epv.value, cohorts = +els.cohorts.value;
+  els.cohortsOut.textContent = cohorts;
+
+  let rows = "", totalAlumni = 0;
+  const evs = [];
+  PROGRAMMES.forEach((p, i) => {
+    const alumni = p.size * cohorts;
+    totalAlumni += alumni;
+    const ev = smaller(alumni, rate);
+    evs.push(ev);
+    const v = Math.floor(ev / epv);
+    const t = tierFor(ev);
+    // The per-row note names the programme's specifics, so it is suppressed when anonymised.
+    rows += '<tr data-n="' + alumni + '"' + (state.anon ? '' : ' title="' + p.note + '"') + '>'
+      + '<td>' + nameFor(p, i) + '</td>'
+      + '<td class="num">' + p.size + '</td>'
+      + '<td class="num">' + alumni + '</td>'
+      + '<td class="num">' + ev + '</td>'
+      + '<td class="num">' + (v < 1 ? "&lt;1" : v) + '</td>'
+      + '<td class="tier ' + t.cls + '">' + t.label + '</td>'
+      + '<td><span class="badge">' + p.conf + '</span></td>'
+      + '</tr>';
+  });
+  const poolEv = smaller(totalAlumni, rate);
+  const poolV = Math.floor(poolEv / epv);
+  rows += '<tr class="pooled">'
+    + '<td>All nine, working together</td>'
+    + '<td class="num">&mdash;</td>'
+    + '<td class="num">' + totalAlumni + '</td>'
+    + '<td class="num">' + poolEv + '</td>'
+    + '<td class="num">' + poolV + '</td>'
+    + '<td class="tier">' + tierFor(poolEv).label + '</td>'
+    + '<td><span class="badge">mixed</span></td>'
+    + '</tr>';
+
+  els.tbody.innerHTML = rows;
+  els.tbody.querySelectorAll("tr").forEach(tr => {
+    tr.addEventListener("click", () => {
+      const n = Math.min(+tr.dataset.n, +els.alumni.max);
+      els.alumni.value = Math.round(n / 10) * 10;
+      render();
+      window.scrollTo({top:0, behavior:"smooth"});
+    });
+  });
+
+  renderMeta(evs, epv);
+
+  els.unknowns.textContent = "Not shown, because the roster has no cohort size for them: "
+    + (state.anon ? UNKNOWN.length + " further programmes" : UNKNOWN.join(", "))
+    + ". That gap is itself worth noting — a programme that cannot say how "
+    + "many people it has trained cannot yet measure anything about them.";
+}
+
+["alumni","rate","epv","cohorts"].forEach(id => {
+  els[id].addEventListener("input", render);
+});
+els.anon.addEventListener("click", () => {
+  state.anon = !state.anon;
+  els.anon.setAttribute("aria-pressed", state.anon);
+  els.anon.textContent = state.anon ? "Showing anonymised names" : "Anonymise programme names";
+  render();
+});
+
+let hashTimer = null;
+function writeHash(){
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => {
+    const q = new URLSearchParams({
+      n: els.alumni.value, p: els.rate.value, e: els.epv.value,
+      k: els.cohorts.value, a: state.anon ? 1 : 0
+    });
+    history.replaceState(null, "", "#" + q.toString());
+  }, 150);
+}
+function readHash(){
+  const q = new URLSearchParams(location.hash.slice(1));
+  const set = (el, key, lo, hi) => {
+    const v = parseInt(q.get(key), 10);
+    if (Number.isFinite(v) && v >= lo && v <= hi) el.value = v;
+  };
+  set(els.alumni, "n", 10, 1000);
+  set(els.rate, "p", 50, 97);
+  set(els.epv, "e", 10, 20);
+  set(els.cohorts, "k", 1, 20);
+  state.anon = q.get("a") === "1";
+  els.anon.setAttribute("aria-pressed", state.anon);
+  els.anon.textContent = state.anon ? "Showing anonymised names" : "Anonymise programme names";
+}
+window.addEventListener("hashchange", () => { readHash(); render(); });
+
+readHash();
+render();
+</script>
+<script>
+// Presentation runner: forward slide keys to the parent deck. Inert when opened on its own.
+if (window.parent !== window){
+  addEventListener("keydown", e => {
+    if (e.key === "PageDown" || e.key === "PageUp"){
+      e.preventDefault();
+      parent.postMessage({deck: e.key}, "*");
+    }
+  });
+}
+</script>
+</body>
+</html>

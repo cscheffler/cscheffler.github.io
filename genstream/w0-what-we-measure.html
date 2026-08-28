@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W0 — What the methodology measures</title>
+<style>
+  :root{
+    --bg:#fbfaf8; --panel:#ffffff; --ink:#1c1b19; --muted:#6b6862; --line:#e2ded7;
+    --accent:#b45309; --accent-soft:#fdf0dd; --dim:#d8d4cc; --good:#3f6212;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16150f; --panel:#1f1e17; --ink:#f0ede6; --muted:#a09a8e; --line:#33312a;
+      --accent:#f0a03c; --accent-soft:#2e2313; --dim:#3a3831; --good:#a3c063;
+    }
+  }
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);display:flex;align-items:center;
+    justify-content:center;padding:2vmin;box-sizing:border-box;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  svg{width:100%;height:auto;max-height:96vh}
+  .t   {font-size:31px;font-weight:700;fill:var(--ink)}
+  .sub {font-size:15px;fill:var(--muted)}
+  .hd  {font-size:12px;fill:var(--muted);letter-spacing:.08em}
+  .grp {font-size:13px;fill:var(--ink);font-weight:700;letter-spacing:.06em}
+  .chip{font-size:14px;fill:var(--ink)}
+  .lad {font-size:14px;fill:var(--ink)}
+  .rung{font-size:14px;fill:var(--muted);font-weight:700}
+  .note{font-size:12px;fill:var(--muted)}
+  .lane{font-size:15px;fill:var(--ink);font-weight:600}
+  .leg {font-size:14px;fill:var(--ink)}
+  .legm{font-size:14px;fill:var(--muted)}
+  .box {fill:var(--panel);stroke:var(--line)}
+  .arw {stroke:var(--accent);stroke-width:2.5;fill:none}
+</style>
+</head>
+<body>
+<svg viewBox="0 0 1060 622" role="img"
+     aria-label="Diagram: application signals recorded for all applicants, split by the admission line into accepted and not accepted, followed by outcomes measured later on a five-rung ladder.">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+    </marker>
+    <marker id="ah2" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M10,0 L0,5 L10,10 z" fill="var(--accent)"/>
+    </marker>
+  </defs>
+
+  <text class="t"   x="40" y="46">What the methodology measures</text>
+
+  <!-- ============ intake ============ -->
+  <rect class="box" x="40" y="112" width="250" height="370" rx="12"/>
+  <text class="hd"  x="62" y="140">AT APPLICATION</text>
+  <text class="note" x="62" y="159">recorded for everyone who applies,</text>
+  <text class="note" x="62" y="176">not only those admitted</text>
+
+  <text class="grp" x="62" y="211">FACTS</text>
+  <rect class="box" x="62" y="222" width="206" height="34" rx="6"/>
+  <text class="chip" x="76" y="244">Highest education level</text>
+  <rect class="box" x="62" y="262" width="206" height="34" rx="6"/>
+  <text class="chip" x="76" y="284">Prior AI safety programme</text>
+  <rect class="box" x="62" y="302" width="206" height="34" rx="6"/>
+  <text class="chip" x="76" y="324">Prior research</text>
+
+  <text class="grp" x="62" y="372">JUDGEMENTS</text>
+  <rect class="box" x="62" y="383" width="206" height="34" rx="6"/>
+  <text class="chip" x="76" y="405">Work-test score</text>
+  <rect class="box" x="62" y="423" width="206" height="34" rx="6"/>
+  <text class="chip" x="76" y="445">X-risk motivation</text>
+
+  <!-- ============ split into two lanes ============ -->
+  <path class="arw" d="M290 250 L 368 214" marker-end="url(#ah)"/>
+  <path class="arw" d="M290 366 L 368 424" marker-end="url(#ah)"/>
+
+  <!-- ============ lanes ============ -->
+  <rect class="box" x="372" y="178" width="200" height="72" rx="10"/>
+  <text class="lane" x="392" y="208">Accepted</text>
+  <text class="note" x="392" y="230">they do the programme</text>
+
+  <rect class="box" x="372" y="392" width="200" height="72" rx="10"/>
+  <text class="lane" x="392" y="422">Not accepted</text>
+  <text class="note" x="392" y="444">they do something else</text>
+
+  <path class="arw" d="M582 214 L 688 214" marker-end="url(#ah)"/>
+  <path class="arw" d="M582 428 L 688 428" marker-end="url(#ah)"/>
+
+  <!-- ============ outcomes ============ -->
+  <rect class="box" x="692" y="120" width="328" height="196" rx="12"/>
+  <text class="hd"   x="712" y="148">SIX TO TWELVE MONTHS LATER</text>
+  <text class="rung" x="730" y="180" text-anchor="end">2</text><text class="lad" x="742" y="180">Core AI safety role</text>
+  <text class="rung" x="730" y="208" text-anchor="end">1</text><text class="lad" x="742" y="208">Adjacent role</text>
+  <text class="rung" x="730" y="236" text-anchor="end">0</text><text class="lad" x="742" y="236">No involvement</text>
+  <text class="rung" x="730" y="264" text-anchor="end">&minus;1</text><text class="lad" x="742" y="264">AI capabilities role</text>
+  <text class="note" x="712" y="296">or: months until a full-time role</text>
+
+  <rect class="box" x="692" y="370" width="328" height="112" rx="12"/>
+  <text class="hd"   x="712" y="398">THE SAME LADDER</text>
+  <text class="lad"  x="712" y="425">Everything publicly visible.</text>
+  <text class="note" x="712" y="449">Nothing from inside the programme —</text>
+  <text class="note" x="712" y="467">no papers written, no mentor rating.</text>
+
+  <!-- the two comparisons -->
+  <path class="arw" d="M856 322 L 856 364" marker-end="url(#ah)" marker-start="url(#ah2)"/>
+
+  <!-- ============ legend ============ -->
+  <path class="arw" d="M44 556 L 84 556" marker-end="url(#ah)"/>
+  <text class="leg"  x="98" y="561">Which application signals predicted where people got to?</text>
+  <text class="legm" x="620" y="561">— the study</text>
+
+  <path class="arw" d="M64 580 L 64 614" marker-end="url(#ah)" marker-start="url(#ah2)"/>
+  <text class="leg"  x="98" y="602">How different are the two rows, for people who looked alike?</text>
+  <text class="legm" x="620" y="602">— the counterfactual extension</text>
+
+</svg>
+<script>
+// Presentation runner: forward slide keys to the parent deck. Inert when opened on its own.
+if (window.parent !== window){
+  addEventListener("keydown", e => {
+    if (e.key === "PageDown" || e.key === "PageUp"){
+      e.preventDefault();
+      parent.postMessage({deck: e.key}, "*");
+    }
+  });
+}
+</script>
+</body>
+</html>

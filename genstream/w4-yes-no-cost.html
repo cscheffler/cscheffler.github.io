@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W4 — What a yes/no outcome costs you</title>
+<style>
+  :root{
+    --bg:#fbfaf8; --panel:#ffffff; --ink:#1c1b19; --muted:#6b6862; --line:#e2ded7;
+    --accent:#b45309; --accent-soft:#fdf0dd; --dim:#d8d4cc; --good:#3f6212;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16150f; --panel:#1f1e17; --ink:#f0ede6; --muted:#a09a8e; --line:#33312a;
+      --accent:#f0a03c; --accent-soft:#2e2313; --dim:#3a3831; --good:#a3c063;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .wrap{max-width:920px;margin:0 auto;padding:2.5rem 1.25rem 5rem}
+  a{color:var(--accent)}
+  h1{font-size:1.7rem;line-height:1.25;margin:0 0 .4rem}
+  h2{font-size:1.15rem;margin:2.5rem 0 .75rem}
+  .claim{font-size:1.05rem;color:var(--muted);margin:0 0 2rem}
+  .back{font-size:.85rem;color:var(--muted);text-decoration:none;display:inline-block;margin-bottom:1.5rem}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.25rem 1.35rem;margin:1rem 0}
+
+  .modes{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem}
+  .modes button{flex:1 1 220px;background:var(--panel);color:var(--muted);border:1px solid var(--line);
+    border-radius:8px;padding:.6rem .8rem;font:inherit;font-size:.9rem;cursor:pointer;text-align:left}
+  .modes button strong{display:block;color:var(--ink);font-size:.95rem}
+  .modes button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1.1rem}
+  .ctl label{display:block;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:.35rem}
+  .ctl output{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .reseed{background:none;border:1px solid var(--line);border-radius:6px;color:var(--muted);
+    font:inherit;font-size:.82rem;padding:.3rem .7rem;cursor:pointer}
+  .reseed:hover{border-color:var(--accent);color:var(--accent)}
+
+  .striplab{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:1.25rem 0 .2rem}
+  svg{display:block;width:100%;height:auto;overflow:visible}
+  .axlab{font-size:11px;fill:var(--muted)}
+
+  .pair{background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;
+    padding:.85rem 1rem;margin-top:1.25rem;font-size:.95rem}
+  .pair b{font-variant-numeric:tabular-nums}
+
+  .readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-top:1.25rem}
+  .stat{border-left:3px solid var(--line);padding-left:.8rem}
+  .stat.hero{border-left-color:var(--accent)}
+  .stat .num{font-size:1.9rem;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.1}
+  .stat.hero .num{color:var(--accent)}
+  .stat .lbl{font-size:.82rem;color:var(--muted);margin-top:.15rem}
+
+  ul{padding-left:1.1rem} li{margin:.4rem 0}
+  details{margin-top:1rem;font-size:.9rem}
+  summary{cursor:pointer;color:var(--muted)}
+  details p,details li{color:var(--muted)}
+  .foot{font-size:.85rem;color:var(--muted);margin-top:2.5rem;border-top:1px solid var(--line);padding-top:1rem}
+  code{background:var(--accent-soft);padding:.05rem .3rem;border-radius:3px;font-size:.9em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<a class="back" href="index.html">&larr; All widgets</a>
+
+<h1>What a yes/no outcome costs you</h1>
+<p class="claim">Two people who ended up in completely different places get recorded as the same
+thing. Two people who ended up almost identically get recorded as opposites.</p>
+
+<div class="panel">
+  <div class="modes">
+    <button id="mA" aria-pressed="true"><strong>Time to placement</strong>
+      months until a full-time AI safety role</button>
+    <button id="mB" aria-pressed="false"><strong>Outcome ladder</strong>
+      where someone had got to at six months</button>
+  </div>
+
+  <div class="controls">
+    <div class="ctl">
+      <label for="n">Alumni — <output id="nOut">160</output></label>
+      <input type="range" id="n" min="40" max="400" step="20" value="160">
+    </div>
+    <div class="ctl" id="cutWrapA">
+      <label for="cut">You count it a success if placed within — <output id="cutOut">6 months</output></label>
+      <input type="range" id="cut" min="2" max="30" step="1" value="6">
+    </div>
+    <div class="ctl" id="cutWrapB" style="display:none">
+      <label for="lvl">You count it a success from level — <output id="lvlOut">2</output></label>
+      <input type="range" id="lvl" min="1" max="3" step="1" value="2">
+    </div>
+    <div class="ctl" style="align-self:end">
+      <button class="reseed" id="reseed">Draw a different cohort</button>
+    </div>
+  </div>
+
+  <div class="striplab" id="lab1">What actually happened</div>
+  <svg id="s1" viewBox="0 0 800 130" role="img" aria-label="Alumni spread across the full outcome"></svg>
+
+  <div class="striplab">What your yes/no records</div>
+  <svg id="s2" viewBox="0 0 800 110" role="img" aria-label="The same alumni collapsed into two groups"></svg>
+
+  <div class="pair" id="pair"></div>
+
+  <div class="readout">
+    <div class="stat">
+      <div class="num" id="nDistinct">—</div>
+      <div class="lbl" id="nDistinctLbl">different outcomes your records can tell apart</div>
+    </div>
+    <div class="stat hero">
+      <div class="num" id="retained">—</div>
+      <div class="lbl">of the signal survives the collapse, on average, at this line</div>
+    </div>
+    <div class="stat">
+      <div class="num" id="wasted">—</div>
+      <div class="lbl">alumni's worth of data thrown away by collapsing</div>
+    </div>
+  </div>
+</div>
+
+<h2>Why this happens</h2>
+<p id="explain"></p>
+
+<p>The loss is smallest when the line falls in the middle of the group and grows fast as it moves
+towards either end. That matters here specifically: around 80% of fellowship alumni are already
+working in AI safety, so the usual yes/no line sits a long way off-centre — the worst place for it
+to be. Push the slider towards a rare outcome and watch the last column climb.</p>
+
+<p><strong>You cannot fix this with a better application process.</strong> How much a collapse
+costs barely depends on how well your signals predict anything — it depends on where the line
+sits. A programme with genuinely excellent selection loses about as much by recording the outcome
+as a yes/no as one with no signal at all. There is no escaping it except by not collapsing.</p>
+
+<h2>What follows from this</h2>
+<ul>
+  <li><strong>Record how far someone got, not whether they cleared a line.</strong> You can always
+  compute the yes/no afterwards. You cannot go the other way.</li>
+  <li><strong>The line you happened to pick is doing more work than your analysis is.</strong>
+  Moving it a few months, or one rung, changes the answer more than most of the signals you are
+  trying to test.</li>
+  <li><strong>This is free to fix.</strong> Unlike almost everything else in this project it needs
+  no extra data collection — only that the grade is written down before it is collapsed.</li>
+  <li><strong>Your existing headline number survives.</strong> See
+  <a href="w6-headline-crosswalk.html">W6</a>, which shows how to keep reporting it.</li>
+</ul>
+
+<details>
+  <summary>The arithmetic, and how much to trust it</summary>
+  <p>The dots are a cohort of the size you chose. The two figures on the right are not that
+  cohort's own numbers — a single cohort of a couple of hundred people swings by a wide margin
+  from draw to draw, and quoting one draw would be quoting luck. They are computed on a large
+  reference cohort at the same settings, so they show what collapsing costs on average where you
+  have put the line. Drawing a different cohort changes the picture, not the arithmetic.</p>
+  <p>Each simulated person gets an application signal and an outcome that is partly driven by it
+  and partly by everything else. "Signal that survives" compares how strongly the application
+  signal tracks the full outcome with how strongly it tracks the collapsed yes/no. Both are
+  measured on ranks — on the order people came in rather than the raw numbers — so that the
+  comparison isolates the cost of collapsing and is not distorted by the fact that months to
+  placement is a lopsided scale with a long tail. The thrown-away figure converts that into
+  people: halving the strength of a relationship costs the same as losing three quarters of your
+  sample, because precision scales with the square.</p>
+  <p>For a bell-shaped outcome the loss is exactly known — collapsing at the midpoint retains about
+  80% of the relationship, which is equivalent to discarding roughly a third of the sample, and a
+  90/10 split retains under 60%. See
+  <a href="https://doi.org/10.1037/1082-989X.7.1.19">MacCallum, Zhang, Preacher &amp; Rucker (2002),
+  <em>On the practice of dichotomization of quantitative variables</em>, Psychological Methods
+  7(1):19-40</a>, and Cohen (1983), <em>The cost of dichotomization</em>, Applied Psychological
+  Measurement 7(3):249-253.</p>
+  <p>The ladder levels are those drafted in <code>methodology.md</code> §4.1. The simulation is
+  seeded, so a given link always shows the same cohort; "draw a different cohort" changes the seed
+  and the seed travels in the URL.</p>
+  <p><strong>These are simulated people, not data from any programme.</strong> The widget shows the
+  shape of the problem, not a measurement of anyone.</p>
+</details>
+
+<p class="foot">
+Widget <strong>W4</strong> &middot; serves <code>methodology.md</code> §4 Outcome variables
+&middot; build list in <code>methodology-widgets.md</code>.
+</p>
+
+</div>
+
+<script>
+// Same rungs as W0, worst first. W0 numbers them 2 / 1 / 0 / -1 because a capabilities role is
+// a negative outcome for a safety programme; here they are indexed from zero for the axis.
+const LADDER = [
+  "AI capabilities role",
+  "No involvement",
+  "Adjacent role",
+  "Core AI safety role"
+];
+// Shares chosen so ~78% land at L2 or above, matching the base rate in data-sources.md.
+const LADDER_SHARE = [0.08, 0.14, 0.38, 0.40];
+const TOP = LADDER.length - 1;
+
+const $ = id => document.getElementById(id);
+// How strongly the application signal tracks the outcome. Held fixed: it scales both
+// sides of the retention ratio, so it divides out and moving it changed nothing on screen.
+const SIGNAL = 45;
+const S = {mode:"A", n:160, rho:SIGNAL, cut:6, lvl:2, seed:7};
+
+/* ---------- seeded PRNG ---------- */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function makeNormal(rng){
+  let spare = null;
+  return function(){
+    if (spare !== null){ const v = spare; spare = null; return v; }
+    let u, v, s;
+    do { u = rng()*2-1; v = rng()*2-1; s = u*u + v*v; } while (s === 0 || s >= 1);
+    const f = Math.sqrt(-2*Math.log(s)/s);
+    spare = v*f; return u*f;
+  };
+}
+function ranks(v){
+  const idx = v.map((x,i) => i).sort((i,j) => v[i] - v[j]);
+  const r = new Array(v.length);
+  let i = 0;
+  while (i < idx.length){
+    let j = i;
+    while (j + 1 < idx.length && v[idx[j+1]] === v[idx[i]]) j++;
+    const avg = (i + j) / 2 + 1;           // average rank across the tied block
+    for (let k = i; k <= j; k++) r[idx[k]] = avg;
+    i = j + 1;
+  }
+  return r;
+}
+function corr(a, b){
+  const n = a.length;
+  let ma=0, mb=0;
+  for (let i=0;i<n;i++){ ma+=a[i]; mb+=b[i]; }
+  ma/=n; mb/=n;
+  let sab=0, sa=0, sb=0;
+  for (let i=0;i<n;i++){ const da=a[i]-ma, db=b[i]-mb; sab+=da*db; sa+=da*da; sb+=db*db; }
+  if (sa === 0 || sb === 0) return 0;
+  return sab/Math.sqrt(sa*sb);
+}
+
+/* ---------- the cohort ---------- */
+function build(n, seed){
+  const rng = mulberry32(seed * 2654435761 >>> 0);
+  const norm = makeNormal(rng);
+  const rho = S.rho/100;
+  const people = [];
+  // cumulative ladder thresholds as z-scores
+  const cum = []; let acc = 0;
+  for (const s of LADDER_SHARE){ acc += s; cum.push(acc); }
+  const zAt = p => {  // Acklam-style inverse normal, plenty accurate here
+    if (p <= 0) return -6; if (p >= 1) return 6;
+    const a=[-39.696830,220.946098,-275.928510,138.357751,-30.664798,2.506628];
+    const b=[-54.476098,161.585836,-155.698798,66.801311,-13.280681];
+    const c=[-0.007784894002,-0.32239645,-2.400758,-2.549732,4.374664,2.938163];
+    const d=[0.007784695709,0.32246712,2.445134,3.754408];
+    const pl=0.02425;
+    let q, r;
+    if (p < pl){ q = Math.sqrt(-2*Math.log(p));
+      return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+    if (p > 1-pl){ q = Math.sqrt(-2*Math.log(1-p));
+      return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+    q = p-0.5; r = q*q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q /
+           (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  };
+  const thr = cum.slice(0, TOP).map(zAt);
+
+  for (let i=0;i<n;i++){
+    const x = norm();
+    const latent = rho*x + Math.sqrt(1-rho*rho)*norm();
+    // Months to placement: right-skewed, median ~5, so the default six-month line sits where a
+    // real one does — most people already on the "yes" side. Monotone in latent, so a stronger
+    // application signal always means faster placement.
+    const months = Math.min(36, Math.max(1, Math.round(Math.exp(1.6 - 0.55*latent))));
+    let level = 0; while (level < TOP && latent > thr[level]) level++;
+    people.push({x, latent, months, level});
+  }
+  return people;
+}
+
+/* ---------- rendering ---------- */
+function strip(svg, people, valueOf, min, max, isSuccess, ticks, tickLabel){
+  const W = 800, H = +svg.getAttribute("viewBox").split(" ")[3];
+  const padL = 8, padR = 8, top = 14, bot = 26;
+  const span = W - padL - padR;
+  const xFor = v => padL + span * (v - min) / (max - min || 1);
+  const rng = mulberry32(99);
+  let out = "";
+  // axis
+  out += '<line x1="'+padL+'" y1="'+(H-bot)+'" x2="'+(W-padR)+'" y2="'+(H-bot)+'" stroke="var(--line)"/>';
+  for (const t of ticks){
+    const x = xFor(t);
+    out += '<line x1="'+x+'" y1="'+(H-bot)+'" x2="'+x+'" y2="'+(H-bot+4)+'" stroke="var(--line)"/>';
+    out += '<text class="axlab" x="'+x+'" y="'+(H-bot+16)+'" text-anchor="middle">'+tickLabel(t)+'</text>';
+  }
+  for (const p of people){
+    const v = valueOf(p);
+    const jitter = top + rng() * (H - bot - top - 6);
+    const ok = isSuccess(p);
+    out += '<circle cx="'+xFor(v).toFixed(1)+'" cy="'+jitter.toFixed(1)+'" r="3.1" fill="'
+        + (ok ? "var(--accent)" : "var(--dim)") + '" opacity="0.85"/>';
+  }
+  svg.innerHTML = out;
+  return {xFor, H, padL, padR, top, bot};
+}
+
+const REF_N = 8000, REF_SEED = 424242;
+function expectedRetention(){
+  const ppl = build(REF_N, REF_SEED);
+  const val = S.mode === "A" ? (p => p.months) : (p => p.level);
+  const suc = S.mode === "A" ? (p => p.months <= S.cut) : (p => p.level >= S.lvl);
+  const nOk = ppl.filter(suc).length;
+  if (nOk === 0 || nOk === ppl.length) return 0;
+  const rx = ranks(ppl.map(p => p.x));
+  const full = Math.abs(corr(rx, ranks(ppl.map(val))));
+  const bin  = Math.abs(corr(rx, ppl.map(p => suc(p) ? 1 : 0)));
+  return full > 0 ? Math.min(1, bin/full) : 0;
+}
+
+function render(){
+  const A = S.mode === "A";
+  $("mA").setAttribute("aria-pressed", A);
+  $("mB").setAttribute("aria-pressed", !A);
+  $("cutWrapA").style.display = A ? "" : "none";
+  $("cutWrapB").style.display = A ? "none" : "";
+  $("nOut").textContent = S.n;
+  $("cutOut").textContent = S.cut + (S.cut === 1 ? " month" : " months");
+  $("lvlOut").textContent = S.lvl + " — " + LADDER[S.lvl];
+  $("lab1").textContent = A ? "What actually happened — months until placement"
+                            : "What actually happened — how far each person got by six months";
+
+  const people = build(S.n, S.seed);
+  const success = A ? (p => p.months <= S.cut) : (p => p.level >= S.lvl);
+
+  // full-resolution strip
+  const s1 = $("s1");
+  if (A){
+    strip(s1, people, p => p.months, 1, 36, success, [1,6,12,18,24,30,36], t => t + "m");
+  } else {
+    strip(s1, people, p => p.level, -0.4, TOP + 0.4, success, [0,1,2,3], t => "L" + t);
+  }
+  // cut marker
+  const W = 800, padL = 8, padR = 8, span = W - padL - padR;
+  const cutPos = A ? padL + span * (S.cut + 0.5 - 1) / 35
+                   : padL + span * (S.lvl - 0.5 + 0.4) / (TOP + 0.8);
+  s1.innerHTML += '<line x1="'+cutPos.toFixed(1)+'" y1="6" x2="'+cutPos.toFixed(1)
+    + '" y2="104" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4 3"/>'
+    + '<text class="axlab" x="'+(cutPos+5).toFixed(1)+'" y="14" fill="var(--accent)">your line</text>';
+
+  // collapsed strip: two piles
+  const nOk = people.filter(success).length;
+  const nNo = people.length - nOk;
+  let out = '<line x1="8" y1="84" x2="792" y2="84" stroke="var(--line)"/>';
+  const pile = (cx, count, colour) => {
+    let s = "", perRow = 26, r = 3.1;
+    for (let i=0;i<count;i++){
+      const row = Math.floor(i/perRow), col = i % perRow;
+      s += '<circle cx="'+(cx + (col-perRow/2)*8).toFixed(1)+'" cy="'+(74 - row*7.4).toFixed(1)
+        + '" r="'+r+'" fill="'+colour+'" opacity="0.85"/>';
+    }
+    return s;
+  };
+  out += pile(590, nOk, "var(--accent)") + pile(210, nNo, "var(--dim)");
+  const share = k => people.length ? Math.round(100*k/people.length) + "%" : "—";
+  out += '<text class="axlab" x="210" y="100" text-anchor="middle">recorded as “no” — '
+    + nNo + ' people (' + share(nNo) + ')</text>';
+  out += '<text class="axlab" x="590" y="100" text-anchor="middle">recorded as “yes” — '
+    + nOk + ' people (' + share(nOk) + ')</text>';
+  $("s2").innerHTML = out;
+
+  // the two-people callout
+  const val = A ? (p => p.months) : (p => p.level);
+  const yes = people.filter(success), no = people.filter(p => !success(p));
+  let msg = "";
+  if (yes.length && no.length){
+    const yv = yes.map(val), nv = no.map(val);
+    const nearYes = A ? Math.max(...yv) : Math.min(...yv);
+    const nearNo  = A ? Math.min(...nv) : Math.max(...nv);
+    // Lower-case the leading word for mid-sentence use, but leave acronyms alone ("AI" must
+    // not become "ai").
+    const uncap = t => /^[A-Z]{2}/.test(t) ? t : t.charAt(0).toLowerCase() + t.slice(1);
+    const fmt = v => A ? (v + (v === 1 ? " month" : " months")) : ("level " + v + ", " + uncap(LADDER[v]));
+    // Show the widest same-label pair, whichever side of the line it falls on.
+    const spanY = Math.max(...yv) - Math.min(...yv);
+    const spanN = Math.max(...nv) - Math.min(...nv);
+    const wide = spanN > spanY ? nv : yv;
+    const label = spanN > spanY ? "&ldquo;no&rdquo;" : "&ldquo;yes&rdquo;";
+    msg = "<strong>Look at what the yes/no does.</strong> Someone at <b>" + fmt(nearYes)
+      + "</b> and someone at <b>" + fmt(nearNo) + "</b> are recorded as opposites — they are barely "
+      + "different. Meanwhile someone at <b>" + fmt(Math.min(...wide)) + "</b> and someone at <b>"
+      + fmt(Math.max(...wide)) + "</b> both go down as " + label
+      + ", and they are not remotely the same result.";
+  } else {
+    msg = "<strong>Everyone is on one side of the line.</strong> A yes/no that never says no carries "
+      + "no information at all — every comparison you could make has vanished.";
+  }
+  $("pair").innerHTML = msg;
+
+  // information retained
+  const ratio = expectedRetention();
+  $("nDistinct").textContent = A ? "36 → 2" : (LADDER.length + " → 2");
+  $("retained").textContent = (ratio*100).toFixed(0) + "%";
+  $("wasted").textContent = Math.round(S.n * (1 - ratio*ratio));
+
+  $("explain").innerHTML = A
+    ? "Time to placement is a real number of months, and it carries the whole story: someone placed "
+      + "in two months and someone placed in twenty-six both count as successes under a generous "
+      + "line, and both count as failures under a strict one. The moment you collapse, everything "
+      + "between the extremes stops existing as far as the analysis is concerned."
+    : "The ladder already gives up some detail — it has five rungs, not a continuum — but it keeps "
+      + "the ordering, which is what a comparison needs. Collapsing five rungs to two throws away "
+      + "the ordering as well, and with it most of what distinguished your alumni from each other.";
+
+  writeHash();
+}
+
+/* ---------- URL state ---------- */
+let hashTimer = null;
+function writeHash(){
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => {
+    const q = new URLSearchParams({m:S.mode, n:S.n, c:S.cut, l:S.lvl, s:S.seed});
+    history.replaceState(null, "", "#" + q.toString());
+  }, 150);
+}
+function readHash(){
+  const q = new URLSearchParams(location.hash.slice(1));
+  const num = (k, lo, hi, dflt) => {
+    const v = parseInt(q.get(k), 10);
+    return Number.isFinite(v) && v >= lo && v <= hi ? v : dflt;
+  };
+  S.mode = q.get("m") === "B" ? "B" : "A";
+  S.n    = num("n", 40, 400, 160);
+  S.cut  = num("c", 2, 30, 6);
+  S.lvl  = num("l", 1, 3, 2);
+  S.seed = num("s", 1, 999999, 7);
+  $("n").value = S.n; $("cut").value = S.cut; $("lvl").value = S.lvl;
+}
+
+$("mA").onclick = () => { S.mode = "A"; render(); };
+$("mB").onclick = () => { S.mode = "B"; render(); };
+$("n").oninput   = e => { S.n = +e.target.value; render(); };
+$("cut").oninput = e => { S.cut = +e.target.value; render(); };
+$("lvl").oninput = e => { S.lvl = +e.target.value; render(); };
+$("reseed").onclick = () => { S.seed = (S.seed * 7 + 13) % 999983 || 7; render(); };
+window.addEventListener("hashchange", () => { readHash(); render(); });
+
+readHash();
+render();
+</script>
+<script>
+// Presentation runner: forward slide keys to the parent deck. Inert when opened on its own.
+if (window.parent !== window){
+  addEventListener("keydown", e => {
+    if (e.key === "PageDown" || e.key === "PageUp"){
+      e.preventDefault();
+      parent.postMessage({deck: e.key}, "*");
+    }
+  });
+}
+</script>
+</body>
+</html>

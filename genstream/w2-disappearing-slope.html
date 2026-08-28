@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W2 — Why your own data shows nothing</title>
+<style>
+  :root{
+    --bg:#fbfaf8; --panel:#ffffff; --ink:#1c1b19; --muted:#6b6862; --line:#e2ded7;
+    --accent:#b45309; --accent-soft:#fdf0dd; --dim:#d8d4cc; --good:#3f6212;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16150f; --panel:#1f1e17; --ink:#f0ede6; --muted:#a09a8e; --line:#33312a;
+      --accent:#f0a03c; --accent-soft:#2e2313; --dim:#3a3831; --good:#a3c063;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .wrap{max-width:920px;margin:0 auto;padding:2.5rem 1.25rem 5rem}
+  a{color:var(--accent)}
+  h1{font-size:1.7rem;line-height:1.25;margin:0 0 .4rem}
+  h2{font-size:1.15rem;margin:2.5rem 0 .75rem}
+  .claim{font-size:1.05rem;color:var(--muted);margin:0 0 2rem}
+  .back{font-size:.85rem;color:var(--muted);text-decoration:none;display:inline-block;margin-bottom:1.5rem}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.25rem 1.35rem;margin:1rem 0}
+
+  .controls{display:flex;gap:1.25rem;align-items:end;flex-wrap:wrap;margin-bottom:.5rem}
+  .ctl{flex:1 1 320px;max-width:460px}
+  .ctl label{display:block;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:.35rem}
+  .ctl output{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .reseed{background:none;border:1px solid var(--line);border-radius:6px;color:var(--muted);
+    font:inherit;font-size:.82rem;padding:.35rem .75rem;cursor:pointer;white-space:nowrap}
+  .reseed:hover{border-color:var(--accent);color:var(--accent)}
+
+  .plots{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.25rem;margin-top:1.25rem}
+  .plotwrap h3{font-size:.95rem;margin:0 0 .1rem}
+  .plotwrap p{font-size:.82rem;color:var(--muted);margin:0 0 .4rem}
+  svg{display:block;width:100%;height:auto}
+  .ax{font-size:11px;fill:var(--muted)}
+  .rlab{font-size:15px;font-weight:700;fill:var(--ink)}
+
+  .kicker{background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;
+    padding:.85rem 1rem;margin-top:1.25rem;font-size:.95rem}
+  .readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-top:1.25rem}
+  .stat{border-left:3px solid var(--line);padding-left:.8rem}
+  .stat.hero{border-left-color:var(--accent)}
+  .stat .num{font-size:1.9rem;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.1}
+  .stat.hero .num{color:var(--accent)}
+  .stat .lbl{font-size:.82rem;color:var(--muted);margin-top:.15rem}
+
+  ul{padding-left:1.1rem} li{margin:.4rem 0}
+  details{margin-top:1rem;font-size:.9rem}
+  summary{cursor:pointer;color:var(--muted)}
+  details p,details li{color:var(--muted)}
+  .foot{font-size:.85rem;color:var(--muted);margin-top:2.5rem;border-top:1px solid var(--line);padding-top:1rem}
+  code{background:var(--accent-soft);padding:.05rem .3rem;border-radius:3px;font-size:.9em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<a class="back" href="index.html">&larr; All widgets</a>
+
+<h1>Why your own data shows nothing</h1>
+<p class="claim">Look at your fellows and the work-test score barely predicts anything. That is what
+a selection process <em>working</em> looks like — not evidence that the score is useless.</p>
+
+<div class="panel">
+  <div class="controls">
+    <div class="ctl">
+      <label for="rate">Share of applicants you accept — <output id="rateOut">15%</output></label>
+      <input type="range" id="rate" min="2" max="100" step="1" value="15">
+    </div>
+    <button class="reseed" id="reseed">Draw a different year</button>
+  </div>
+
+  <div class="plots">
+    <div class="plotwrap">
+      <h3>Everyone who applied</h3>
+      <p>What the relationship really is</p>
+      <svg id="p1" viewBox="0 0 400 330" role="img"
+           aria-label="Scatter of work-test score against outcome for all applicants, showing a clear upward slope"></svg>
+    </div>
+    <div class="plotwrap">
+      <h3>Only the people you accepted</h3>
+      <p id="sub2">What you can actually plot</p>
+      <svg id="p2" viewBox="0 0 400 330" role="img"
+           aria-label="The same scatter restricted to accepted applicants, showing a much flatter slope"></svg>
+    </div>
+  </div>
+
+  <div class="readout">
+    <div class="stat">
+      <div class="num" id="rPool">—</div>
+      <div class="lbl">strength of the relationship across everyone who applied</div>
+    </div>
+    <div class="stat hero">
+      <div class="num" id="rAcc">—</div>
+      <div class="lbl">strength you can see among the people you accepted</div>
+    </div>
+    <div class="stat">
+      <div class="num" id="surv">—</div>
+      <div class="lbl">of the real relationship is still visible to you</div>
+    </div>
+  </div>
+
+  <div class="kicker" id="kick"></div>
+</div>
+
+<h2>What is going on</h2>
+<p>The people you accepted all scored well — that is what accepting them meant. So among your
+fellows there is very little difference in score left to compare against anything. A relationship
+needs variation at both ends to be visible, and your selection process removed the variation at one
+end on purpose.</p>
+
+<p>Drag the slider to 100% and the slope comes back, because at that point you are looking at
+everyone. Nothing about the underlying relationship changed as you dragged. Only how much of it
+you were allowed to see.</p>
+
+<h2>What follows from this</h2>
+<ul>
+  <li><strong>A null result from your own alumni is close to uninformative.</strong> The stricter
+  your selection, the more certain you are to find nothing — so "we checked and it didn't predict
+  anything" is the expected outcome whether the signal works or not.</li>
+  <li><strong>The fix costs almost nothing.</strong> Keep the score distribution for
+  <em>everyone who applied</em>, not just those you took — the count, the average and the spread.
+  That is three numbers per signal per year, no personal data, and it is enough to correct for
+  this.</li>
+  <li><strong>Do it now rather than later.</strong> Those distributions are usually deleted with
+  the applications a few months after a round closes. Once gone, this is not recoverable for that
+  cohort.</li>
+  <li><strong>It also explains disagreement between programmes.</strong> A programme accepting 40%
+  will see a stronger relationship than one accepting 5%, on identical underlying data. Comparing
+  raw figures across programmes without correcting for this compares admissions policies, not
+  signals.</li>
+</ul>
+
+<details>
+  <summary>The arithmetic, and how much to trust it</summary>
+  <p>The two big numbers are exact, not read off the pictures. Selecting the top slice of a
+  bell-shaped score shrinks its spread by a known amount, and the visible relationship shrinks with
+  it in a known way — so the widget computes them from the acceptance rate directly. The smaller
+  figures printed on each panel <em>are</em> measured from the dots on screen, which is why they
+  wobble when you draw a different year. That wobble is real and worth noticing: a single cohort is
+  a small sample.</p>
+  <p>This is the textbook case where selection happens on the score itself. Real decisions involve
+  more than one number, which softens the effect somewhat but does not remove it. The correction and
+  its variants are set out in <a href="https://doi.org/10.1037/0021-9010.85.1.112">Sackett &amp; Yang
+  (2000), <em>Correction for range restriction: an expanded typology</em>, Journal of Applied
+  Psychology 85(1):112-118</a>; the requirement it places on you is in <code>methodology.md</code>
+  §3.5 and §7.</p>
+  <p>The vertical axis stands for whatever outcome measure you use — a rung on the ladder, months to
+  placement, a rating. The argument does not depend on which.</p>
+  <p><strong>These are simulated applicants, not data from any programme.</strong></p>
+</details>
+
+<p class="foot">
+Widget <strong>W2</strong> &middot; serves <code>methodology.md</code> §7 Range restriction, §3.5
+&middot; build list in <code>methodology-widgets.md</code>.
+</p>
+
+</div>
+
+<script>
+const RHO = 0.45;   // true relationship between the score and the outcome
+const NPOOL = 700;  // simulated applicants
+const S = {rate:15, seed:11};
+const $ = id => document.getElementById(id);
+
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function makeNormal(rng){
+  let spare = null;
+  return function(){
+    if (spare !== null){ const v = spare; spare = null; return v; }
+    let u, v, s;
+    do { u = rng()*2-1; v = rng()*2-1; s = u*u + v*v; } while (s === 0 || s >= 1);
+    const f = Math.sqrt(-2*Math.log(s)/s);
+    spare = v*f; return u*f;
+  };
+}
+function corr(a, b){
+  const n = a.length;
+  if (n < 3) return null;
+  let ma=0, mb=0;
+  for (let i=0;i<n;i++){ ma+=a[i]; mb+=b[i]; }
+  ma/=n; mb/=n;
+  let sab=0, sa=0, sb=0;
+  for (let i=0;i<n;i++){ const da=a[i]-ma, db=b[i]-mb; sab+=da*db; sa+=da*da; sb+=db*db; }
+  if (sa === 0 || sb === 0) return null;
+  return sab/Math.sqrt(sa*sb);
+}
+const pdf = z => Math.exp(-z*z/2)/Math.sqrt(2*Math.PI);
+function invNorm(p){
+  if (p <= 0) return -6; if (p >= 1) return 6;
+  const a=[-39.696830,220.946098,-275.928510,138.357751,-30.664798,2.506628];
+  const b=[-54.476098,161.585836,-155.698798,66.801311,-13.280681];
+  const c=[-0.007784894002,-0.32239645,-2.400758,-2.549732,4.374664,2.938163];
+  const d=[0.007784695709,0.32246712,2.445134,3.754408];
+  const pl=0.02425;
+  let q, r;
+  if (p < pl){ q = Math.sqrt(-2*Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+  if (p > 1-pl){ q = Math.sqrt(-2*Math.log(1-p));
+    return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+  q = p-0.5; r = q*q;
+  return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q /
+         (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+}
+// Exact attenuation under selection on the score itself (Thorndike Case II), so the headline
+// figures do not depend on which cohort happened to be drawn.
+function expectedR(ratePct){
+  const p = ratePct/100;
+  if (p >= 1) return RHO;
+  const zc = invNorm(1-p), lam = pdf(zc)/p;
+  const sr = Math.sqrt(Math.max(1e-9, 1 + zc*lam - lam*lam));
+  return RHO*sr / Math.sqrt(1 - RHO*RHO + RHO*RHO*sr*sr);
+}
+
+function build(){
+  const rng = mulberry32(S.seed * 2654435761 >>> 0), norm = makeNormal(rng);
+  const out = [];
+  for (let i=0;i<NPOOL;i++){
+    const x = norm();
+    const y = RHO*x + Math.sqrt(1-RHO*RHO)*norm();
+    out.push({score: 50 + 15*x, outcome: 50 + 15*y});
+  }
+  return out;
+}
+
+// Axes, fitted line and correlation are all computed over `pts`. When colourByAcc is set the
+// accepted subset is picked out within that same cloud, rather than replacing it.
+function scatter(svg, pts, colourByAcc){
+  const W=400, H=330, L=48, R=390, T=16, B=282;
+  const xs = pts.map(p => p.score), ys = pts.map(p => p.outcome);
+  const pad = (lo, hi) => { const m = (hi-lo)*0.08 || 1; return [lo-m, hi+m]; };
+  const [x0,x1] = pad(Math.min(...xs), Math.max(...xs));
+  const [y0,y1] = pad(Math.min(...ys), Math.max(...ys));
+  const X = v => L + (R-L)*(v-x0)/(x1-x0);
+  const Y = v => B - (B-T)*(v-y0)/(y1-y0);
+
+  let o = '<line x1="'+L+'" y1="'+B+'" x2="'+R+'" y2="'+B+'" stroke="var(--line)"/>'
+        + '<line x1="'+L+'" y1="'+T+'" x2="'+L+'" y2="'+B+'" stroke="var(--line)"/>';
+
+  for (const p of pts){
+    const on = colourByAcc ? p.acc : true;
+    o += '<circle cx="'+X(p.score).toFixed(1)+'" cy="'+Y(p.outcome).toFixed(1)
+      + '" r="'+(on ? 2.6 : 2.3)+'" fill="' + (on ? "var(--accent)" : "var(--dim)")
+      + '" opacity="'+(on ? 0.8 : 0.55)+'"/>';
+  }
+
+  // least-squares line over the plotted points
+  const n = pts.length;
+  if (n >= 3){
+    let mx=0, my=0;
+    for (const p of pts){ mx+=p.score; my+=p.outcome; }
+    mx/=n; my/=n;
+    let sxy=0, sxx=0;
+    for (const p of pts){ sxy += (p.score-mx)*(p.outcome-my); sxx += (p.score-mx)**2; }
+    if (sxx > 0){
+      const b1 = sxy/sxx, b0 = my - b1*mx;
+      const xa = x0, xb = x1;
+      o += '<line x1="'+X(xa).toFixed(1)+'" y1="'+Y(b0+b1*xa).toFixed(1)
+        + '" x2="'+X(xb).toFixed(1)+'" y2="'+Y(b0+b1*xb).toFixed(1)
+        + '" stroke="var(--ink)" stroke-width="2.5"/>';
+    }
+  }
+
+  o += '<text class="ax" x="'+((L+R)/2)+'" y="'+(B+34)+'" text-anchor="middle">Work-test score &rarr;</text>';
+  o += '<text class="ax" x="'+(L-8)+'" y="'+((T+B)/2)+'" text-anchor="middle" transform="rotate(-90 '+(L-8)+' '+((T+B)/2)+')">How well it went &rarr;</text>';
+  o += '<text class="ax" x="'+L+'" y="'+(B+16)+'">lower</text>';
+  o += '<text class="ax" x="'+R+'" y="'+(B+16)+'" text-anchor="end">higher</text>';
+
+  const r = corr(pts.map(p=>p.score), pts.map(p=>p.outcome));
+  o += '<text class="rlab" x="'+(L+10)+'" y="'+(T+18)+'">'
+    + (r === null ? "too few to plot" : "slope in this sample: " + r.toFixed(2)) + '</text>';
+  svg.innerHTML = o;
+}
+
+function render(){
+  $("rateOut").textContent = S.rate + "%";
+  const pool = build();
+  const cut = invNorm(1 - S.rate/100);
+  const thr = 50 + 15*cut;
+  pool.forEach(p => { p.acc = p.score >= thr; });
+  const acc = pool.filter(p => p.acc);
+
+  scatter($("p1"), pool, true);   // everyone; the accepted are picked out in colour
+  scatter($("p2"), acc, false);   // only the accepted, on their own axes
+
+  const rp = RHO, ra = expectedR(S.rate);
+  $("rPool").textContent = rp.toFixed(2);
+  $("rAcc").textContent  = ra.toFixed(2);
+  $("surv").textContent  = Math.round(100*ra/rp) + "%";
+
+  const sr = S.rate >= 100 ? 1 : (() => {
+    const pr = S.rate/100, zc = invNorm(1-pr), lam = pdf(zc)/pr;
+    return Math.sqrt(Math.max(1e-9, 1 + zc*lam - lam*lam));
+  })();
+  $("sub2").textContent = S.rate >= 99
+    ? "The same picture — you accepted everyone"
+    : "Scores here vary about " + (1/sr).toFixed(1) + "\u00d7 less than across all applicants";
+
+  $("kick").innerHTML = S.rate >= 99
+    ? "<strong>This is the only view nobody ever has.</strong> No programme sees the outcomes of "
+      + "people it turned away, so the left-hand picture is not available to anyone — which is "
+      + "exactly why the summary of the applicant pool is worth keeping."
+    : "<strong>Your data is not telling you the score doesn't work.</strong> It is telling you the "
+      + "score already did its work, at the door. Accepting " + S.rate + "% of applicants leaves "
+      + "you able to see about " + Math.round(100*ra/rp) + "% of a relationship that is fully "
+      + "present in the people who applied.";
+  writeHash();
+}
+
+let t = null;
+function writeHash(){
+  clearTimeout(t);
+  t = setTimeout(() => {
+    history.replaceState(null, "", "#r=" + S.rate + "&s=" + S.seed);
+  }, 150);
+}
+function readHash(){
+  const q = new URLSearchParams(location.hash.slice(1));
+  const r = parseInt(q.get("r"), 10), sd = parseInt(q.get("s"), 10);
+  if (Number.isFinite(r) && r >= 2 && r <= 100) S.rate = r;
+  if (Number.isFinite(sd) && sd >= 1 && sd <= 999999) S.seed = sd;
+  $("rate").value = S.rate;
+}
+
+$("rate").oninput = e => { S.rate = +e.target.value; render(); };
+$("reseed").onclick = () => { S.seed = (S.seed*7 + 13) % 999983 || 11; render(); };
+window.addEventListener("hashchange", () => { readHash(); render(); });
+
+readHash();
+render();
+</script>
+<script>
+// Presentation runner: forward slide keys to the parent deck. Inert when opened on its own.
+if (window.parent !== window){
+  addEventListener("keydown", e => {
+    if (e.key === "PageDown" || e.key === "PageUp"){
+      e.preventDefault();
+      parent.postMessage({deck: e.key}, "*");
+    }
+  });
+}
+</script>
+</body>
+</html>

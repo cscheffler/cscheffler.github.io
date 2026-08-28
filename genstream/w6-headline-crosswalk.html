@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W6 — Keeping your existing headline number</title>
+<style>
+  :root{
+    --bg:#fbfaf8; --panel:#ffffff; --ink:#1c1b19; --muted:#6b6862; --line:#e2ded7;
+    --accent:#b45309; --accent-soft:#fdf0dd; --dim:#d8d4cc; --good:#3f6212;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16150f; --panel:#1f1e17; --ink:#f0ede6; --muted:#a09a8e; --line:#33312a;
+      --accent:#f0a03c; --accent-soft:#2e2313; --dim:#3a3831; --good:#a3c063;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .wrap{max-width:920px;margin:0 auto;padding:2.5rem 1.25rem 5rem}
+  a{color:var(--accent)}
+  h1{font-size:1.7rem;line-height:1.25;margin:0 0 .4rem}
+  h2{font-size:1.15rem;margin:2.5rem 0 .75rem}
+  .claim{font-size:1.05rem;color:var(--muted);margin:0 0 2rem}
+  .back{font-size:.85rem;color:var(--muted);text-decoration:none;display:inline-block;margin-bottom:1.5rem}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.25rem 1.35rem;margin:1rem 0}
+
+  .modes{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem}
+  .modes button{flex:1 1 220px;background:var(--panel);color:var(--muted);border:1px solid var(--line);
+    border-radius:8px;padding:.6rem .8rem;font:inherit;font-size:.9rem;cursor:pointer;text-align:left}
+  .modes button strong{display:block;color:var(--ink);font-size:.95rem}
+  .modes button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+
+  .buckets{display:grid;gap:.55rem}
+  .brow{display:grid;grid-template-columns:minmax(120px,1.4fr) 2fr 46px;gap:.7rem;align-items:center}
+  .brow .bl{font-size:.87rem}
+  .brow .bn{font-size:.87rem;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+
+  .bar{display:flex;height:30px;border-radius:6px;overflow:hidden;margin:1rem 0 .35rem;border:1px solid var(--line)}
+  .bar span{display:block;height:100%}
+  .barkey{font-size:.78rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:.9rem}
+  .barkey i{font-style:normal;display:inline-flex;align-items:center;gap:.3rem}
+  .swatch{width:10px;height:10px;border-radius:2px;display:inline-block}
+
+  .tablewrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:560px}
+  th,td{text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr.sel{background:var(--accent-soft)}
+  tr.sel td{font-weight:600}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--accent-soft)}
+
+  .spread{background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;
+    padding:.85rem 1rem;margin-top:1.25rem;font-size:.95rem}
+  .readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-top:1.25rem}
+  .stat{border-left:3px solid var(--line);padding-left:.8rem}
+  .stat.hero{border-left-color:var(--accent)}
+  .stat .num{font-size:1.75rem;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.1}
+  .stat.hero .num{color:var(--accent)}
+  .stat .lbl{font-size:.82rem;color:var(--muted);margin-top:.15rem}
+
+  .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}
+  ul{padding-left:1.1rem} li{margin:.4rem 0}
+  details{margin-top:1rem;font-size:.9rem}
+  summary{cursor:pointer;color:var(--muted)}
+  details p,details li{color:var(--muted)}
+  .foot{font-size:.85rem;color:var(--muted);margin-top:2.5rem;border-top:1px solid var(--line);padding-top:1rem}
+  code{background:var(--accent-soft);padding:.05rem .3rem;border-radius:3px;font-size:.9em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<a class="back" href="index.html">&larr; All widgets</a>
+
+<h1>Keeping your existing headline number</h1>
+<p class="claim">Recording a graded outcome doesn't cost you the single figure your board asks for.
+It does show you that the figure was never comparable to anyone else's.</p>
+
+<div class="panel">
+  <div class="modes">
+    <button id="mA" aria-pressed="true"><strong>Outcome ladder</strong>
+      where people had got to at six months</button>
+    <button id="mB" aria-pressed="false"><strong>Time to placement</strong>
+      months until a full-time AI safety role</button>
+  </div>
+
+  <p class="claim" style="font-size:.9rem;margin:0 0 .9rem">Set your cohort, then pick a line in the
+  table below. Every row is a legitimate way to report a single headline percentage.</p>
+
+  <div class="buckets" id="buckets"></div>
+
+  <div class="bar" id="bar"></div>
+  <div class="barkey" id="barkey"></div>
+
+  <h2 style="font-size:1rem;margin:1.75rem 0 .5rem">Every headline this one cohort can produce</h2>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>If you report…</th><th class="num">Headline</th><th>What it cannot distinguish</th></tr>
+      </thead>
+      <tbody id="rules"></tbody>
+    </table>
+  </div>
+
+  <div class="spread" id="spread"></div>
+
+  <div class="readout">
+    <div class="stat hero">
+      <div class="num" id="headline">—</div>
+      <div class="lbl" id="headlineLbl">your headline, under the selected line</div>
+    </div>
+    <div class="stat">
+      <div class="num" id="richer">—</div>
+      <div class="lbl" id="richerLbl">the single number you could report instead</div>
+    </div>
+    <div class="stat">
+      <div class="num" id="ncohort">—</div>
+      <div class="lbl">people in the cohort</div>
+    </div>
+  </div>
+</div>
+
+<h2>Two programmes, one number</h2>
+<p>These two cohorts report <strong>exactly the same headline</strong> under the usual line, and are
+not the same at all. This is what a shared definition is for: not to stop you reporting a headline,
+but to make two programmes' headlines mean the same thing.</p>
+
+<div class="two" id="compare"></div>
+
+<h2>What follows from this</h2>
+<ul>
+  <li><strong>You keep your number.</strong> Record the grade, collapse it at the end. Every row in
+  that table is one line of arithmetic away, including the one you already publish.</li>
+  <li><strong>You gain a better one.</strong> A median time-to-placement, or a mean rung, is still a
+  single figure a board can read — and it doesn't move when someone changes the cut-off.</li>
+  <li><strong>Your history survives.</strong> Past cohorts can be re-scored onto the ladder from
+  records you already hold, so the new series joins the old one instead of replacing it.</li>
+  <li><strong>Cross-programme comparison needs this.</strong> Two programmes quoting different
+  numbers may be doing equally well; two quoting the same number may not be. Without an agreed
+  collapse rule, neither comparison can be made — see <code>methodology.md</code> §10.</li>
+</ul>
+
+<details>
+  <summary>The arithmetic, and how much to trust it</summary>
+  <p>Headlines are cumulative counts over the buckets you set, divided by the cohort size. The
+  "instead" figure is the mean rung for the ladder, and the median months-to-placement for the time
+  version — read off the bucket in which the halfway person falls.</p>
+  <p>Ladder levels are those drafted in <code>methodology.md</code> §4.1 and are still open for
+  revision; the argument here does not depend on where the rungs sit, only on there being more than
+  two of them. For why the collapse loses information in the first place, see
+  <a href="w4-yes-no-cost.html">W4</a>.</p>
+  <p>The time version's last bucket — not placed within two years — is <em>censored</em> rather than
+  a failure: those people may still be placed later, and cohorts observed for different lengths of
+  time are not directly comparable. That is a separate problem, handled in <code>methodology.md</code>
+  §4.2.</p>
+  <p><strong>The cohorts here are illustrative, not data from any programme.</strong></p>
+</details>
+
+<p class="foot">
+Widget <strong>W6</strong> &middot; serves <code>methodology.md</code> §4 Outcome variables and
+§10 Reporting &middot; build list in <code>methodology-widgets.md</code>.
+</p>
+
+</div>
+
+<script>
+const MODES = {
+  A: {
+    label: "ladder",
+    buckets: ["No identifiable involvement","Adjacent or voluntary","Funded independent work",
+              "Adjacent organisation","Core AI safety role"],
+    short:  ["L0","L1","L2","L3","L4"],
+    rules: [
+      {i:1, name:"Any involvement at all (level 1 or above)"},
+      {i:2, name:"Funded work or better (level 2 or above)"},
+      {i:3, name:"Working at an organisation (level 3 or above)"},
+      {i:4, name:"A core safety role only (level 4)"}
+    ],
+    hides: [
+      "someone volunteering at weekends from someone running a safety team",
+      "a self-funded independent researcher from a salaried core hire",
+      "an adjacent role from a core one — the distinction most people mean by success",
+      "everyone below the top rung from everyone else, including funded researchers"
+    ],
+    defaults: [8, 14, 20, 32, 26],
+    richerLbl: "average rung reached",
+    richer: c => {
+      const n = c.reduce((a,b)=>a+b,0) || 1;
+      return (c.reduce((a,v,i)=>a+v*i,0)/n).toFixed(2);
+    }
+  },
+  B: {
+    label: "time",
+    buckets: ["Placed within 3 months","3 to 6 months","6 to 12 months","12 to 24 months",
+              "Not placed within 24 months"],
+    short:  ["<3m","3-6m","6-12m","12-24m","24m+"],
+    rules: [
+      {i:1, name:"Placed within 3 months"},
+      {i:2, name:"Placed within 6 months"},
+      {i:3, name:"Placed within 12 months"},
+      {i:4, name:"Placed within 24 months"}
+    ],
+    hides: [
+      "a fast placement from one that took five months — and calls the second a failure",
+      "someone placed in week two from someone placed in month five",
+      "a rapid placement from a slow one, which is most of what a programme affects",
+      "almost nobody — but it also tells you almost nothing, since nearly everyone qualifies"
+    ],
+    defaults: [25, 30, 5, 20, 20],
+    richerLbl: "median months to placement",
+    richer: c => {
+      const n = c.reduce((a,b)=>a+b,0);
+      if (!n) return "—";
+      const edges = [0, 3, 6, 12, 24];
+      let cum = 0;
+      for (let i=0;i<5;i++){
+        cum += c[i];
+        if (cum >= n/2){
+          if (i === 4) return "not reached";
+          return edges[i] + "–" + edges[i+1];
+        }
+      }
+      return "—";
+    }
+  }
+};
+
+// Two illustrative cohorts that agree on the usual line and disagree elsewhere.
+const PAIR = {
+  A: [[8,14,20,32,26],[10,12,48,22,8]],
+  B: [[25,30,5,20,20],[20,35,35,8,2]]
+};
+
+const $ = id => document.getElementById(id);
+const S = {mode:"A", counts:MODES.A.defaults.slice(), rule:2};
+
+const cum = (c, i) => c.slice(i).reduce((a,b)=>a+b,0);            // ladder: level >= i
+const cumUpTo = (c, i) => c.slice(0, i).reduce((a,b)=>a+b,0);      // time: within bucket i
+const total = c => c.reduce((a,b)=>a+b,0);
+const pct = (num, den) => den ? (100*num/den) : 0;
+const headlineFor = (mode, c, i) => mode === "A" ? pct(cum(c,i), total(c)) : pct(cumUpTo(c,i), total(c));
+
+const SWATCH = ["var(--dim)","#c9c2b4","#d9a15c","#c07a24","var(--accent)"];
+
+function renderBuckets(){
+  const M = MODES[S.mode];
+  let h = "";
+  for (let i=0;i<5;i++){
+    h += '<div class="brow">'
+      + '<div class="bl">' + M.buckets[i] + '</div>'
+      + '<input type="range" min="0" max="80" step="1" value="' + S.counts[i] + '" data-i="' + i + '">'
+      + '<div class="bn">' + S.counts[i] + '</div>'
+      + '</div>';
+  }
+  $("buckets").innerHTML = h;
+  $("buckets").querySelectorAll("input").forEach(inp => {
+    inp.oninput = e => { S.counts[+e.target.dataset.i] = +e.target.value; render(); };
+  });
+}
+
+function renderBar(el, keyEl, counts){
+  const n = total(counts) || 1;
+  const M = MODES[S.mode];
+  el.innerHTML = counts.map((v,i) =>
+    '<span style="width:' + (100*v/n) + '%;background:' + SWATCH[i] + '" title="' + M.buckets[i] + ': ' + v + '"></span>'
+  ).join("");
+  if (keyEl){
+    keyEl.innerHTML = M.short.map((s,i) =>
+      '<i><span class="swatch" style="background:' + SWATCH[i] + '"></span>' + s + ' — ' + counts[i] + '</i>'
+    ).join("");
+  }
+}
+
+function render(){
+  const M = MODES[S.mode];
+  $("mA").setAttribute("aria-pressed", S.mode === "A");
+  $("mB").setAttribute("aria-pressed", S.mode === "B");
+
+  renderBuckets();
+  renderBar($("bar"), $("barkey"), S.counts);
+
+  const n = total(S.counts);
+  let rows = "", vals = [];
+  M.rules.forEach((r, k) => {
+    const v = headlineFor(S.mode, S.counts, r.i);
+    vals.push(v);
+    rows += '<tr class="' + (S.rule === r.i ? "sel" : "") + '" data-i="' + r.i + '">'
+      + '<td>' + r.name + '</td>'
+      + '<td class="num">' + v.toFixed(0) + '%</td>'
+      + '<td style="color:var(--muted)">' + M.hides[k] + '</td>'
+      + '</tr>';
+  });
+  $("rules").innerHTML = rows;
+  $("rules").querySelectorAll("tr").forEach(tr => {
+    tr.onclick = () => { S.rule = +tr.dataset.i; render(); };
+  });
+
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  $("spread").innerHTML = "<strong>One cohort, " + lo.toFixed(0) + "% to " + hi.toFixed(0)
+    + "%.</strong> Every one of those figures is true, and each is what some programme means when "
+    + "it says how many alumni succeeded. Nothing about the cohort changed between them — only "
+    + "where somebody drew a line. This is why two programmes' headline numbers cannot be compared "
+    + "unless they agreed the line in advance.";
+
+  $("headline").textContent = headlineFor(S.mode, S.counts, S.rule).toFixed(0) + "%";
+  $("headlineLbl").textContent = S.mode === "A"
+    ? "reached the selected rung or higher" : "placed within the selected window";
+  $("richer").textContent = M.richer(S.counts);
+  $("richerLbl").textContent = M.richerLbl + " — unaffected by where the line goes";
+  $("ncohort").textContent = n;
+
+  // the paired comparison
+  const pair = PAIR[S.mode];
+  let cmp = "";
+  ["Programme A","Programme B"].forEach((name, idx) => {
+    const c = pair[idx];
+    cmp += '<div class="panel" style="margin:0">'
+      + '<div style="font-weight:600;margin-bottom:.5rem">' + name + '</div>'
+      + '<div class="bar" id="cbar' + idx + '" style="margin-top:0"></div>'
+      + '<table style="min-width:0;margin-top:.75rem"><tbody>';
+    M.rules.forEach(r => {
+      const v = headlineFor(S.mode, c, r.i);
+      cmp += '<tr><td style="border:none;padding:.2rem 0;color:var(--muted);font-size:.85rem">'
+        + r.name + '</td><td class="num" style="border:none;padding:.2rem 0">' + v.toFixed(0) + '%</td></tr>';
+    });
+    cmp += '<tr><td style="border:none;padding:.35rem 0 0;font-size:.85rem">' + M.richerLbl
+      + '</td><td class="num" style="border:none;padding:.35rem 0 0">' + M.richer(c) + '</td></tr>';
+    cmp += '</tbody></table></div>';
+  });
+  $("compare").innerHTML = cmp;
+  renderBar($("cbar0"), null, pair[0]);
+  renderBar($("cbar1"), null, pair[1]);
+
+  writeHash();
+}
+
+let t = null;
+function writeHash(){
+  clearTimeout(t);
+  t = setTimeout(() => {
+    const q = new URLSearchParams({m:S.mode, c:S.counts.join("."), r:S.rule});
+    history.replaceState(null, "", "#" + q.toString());
+  }, 150);
+}
+function readHash(){
+  const q = new URLSearchParams(location.hash.slice(1));
+  S.mode = q.get("m") === "B" ? "B" : "A";
+  const raw = (q.get("c") || "").split(".").map(v => parseInt(v, 10));
+  S.counts = (raw.length === 5 && raw.every(v => Number.isFinite(v) && v >= 0 && v <= 80))
+    ? raw : MODES[S.mode].defaults.slice();
+  const r = parseInt(q.get("r"), 10);
+  S.rule = (r >= 1 && r <= 4) ? r : 2;
+}
+
+$("mA").onclick = () => { if (S.mode !== "A"){ S.mode = "A"; S.counts = MODES.A.defaults.slice(); render(); } };
+$("mB").onclick = () => { if (S.mode !== "B"){ S.mode = "B"; S.counts = MODES.B.defaults.slice(); render(); } };
+window.addEventListener("hashchange", () => { readHash(); render(); });
+
+readHash();
+render();
+</script>
+<script>
+// Presentation runner: forward slide keys to the parent deck. Inert when opened on its own.
+if (window.parent !== window){
+  addEventListener("keydown", e => {
+    if (e.key === "PageDown" || e.key === "PageUp"){
+      e.preventDefault();
+      parent.postMessage({deck: e.key}, "*");
+    }
+  });
+}
+</script>
+</body>
+</html>

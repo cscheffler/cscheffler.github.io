@@ -145,8 +145,7 @@ yes/no — a graded outcome keeps the contrast that a yes/no throws away.</p>
 
 <h2>What this looks like across the field</h2>
 <p class="claim" style="margin-bottom:1rem;font-size:.95rem">
-Click any row to load it above. Numbers are order-of-magnitude estimates, not measurements —
-see the caveats.</p>
+Click any row to load it above. Numbers are order-of-magnitude estimates, not measurements.</p>
 
 <div class="panel">
   <div class="tablehead">
@@ -172,8 +171,6 @@ see the caveats.</p>
       <tbody id="tbody"></tbody>
     </table>
   </div>
-  <p class="scalenote" id="unknowns" style="margin-top:1rem"></p>
-
   <div class="metawrap">
     <h3>The last row does not mean anyone hands over their records</h3>
     <p class="scalenote" style="margin:0 0 .9rem">Nobody sends anyone a list of people. Each
@@ -284,7 +281,6 @@ const PROGRAMMES = [
   {name:"LASR Labs",        size:17,  conf:"medium", note:"15-20 per cohort"},
   {name:"PIBBSS",           size:12,  conf:"medium", note:"10-15; inferred from mentor count in 2024 retro"}
 ];
-const UNKNOWN = ["Astra Fellowship","MARS","AI Safety Camp","Apart Lab","CHAI Internship","OpenAI Safety Fellowship"];
 
 const $ = id => document.getElementById(id);
 const state = {anon:false};
@@ -293,7 +289,7 @@ const els = {
   alumniOut:$("alumniOut"), rateOut:$("rateOut"), cohortsOut:$("cohortsOut"),
   dots:$("dots"), scalenote:$("scalenote"), kicker:$("kicker"),
   nAlumni:$("nAlumni"), nEvents:$("nEvents"), nVars:$("nVars"),
-  tbody:$("tbody"), unknowns:$("unknowns"), anon:$("anon"),
+  tbody:$("tbody"), anon:$("anon"),
   metabody:$("metabody"), metakick:$("metakick")
 };
 
@@ -465,10 +461,6 @@ function renderTable(){
 
   renderMeta(evs, epv);
 
-  els.unknowns.textContent = "Not shown, because the roster has no cohort size for them: "
-    + (state.anon ? UNKNOWN.length + " further programmes" : UNKNOWN.join(", "))
-    + ". That gap is itself worth noting — a programme that cannot say how "
-    + "many people it has trained cannot yet measure anything about them.";
 }
 
 ["alumni","rate","epv","cohorts"].forEach(id => {

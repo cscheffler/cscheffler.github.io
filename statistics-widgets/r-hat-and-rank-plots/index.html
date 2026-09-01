@@ -303,11 +303,11 @@
 <div class="wrap">
 
   <header class="widget-header">
-    <h1><math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> &mdash; <span class="formula">when do four chains agree?</span></h1>
+    <h1><math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> &mdash; <span class="formula">when do four chains agree?</span></h1>
     <button id="help-btn" class="help-btn" aria-label="Help" title="Help">?</button>
   </header>
   <p class="lede">
-    Four chains that <i>look</i> alike are not enough &mdash; <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> asks <i>how</i> alike. It
+    Four chains that <i>look</i> alike are not enough &mdash; <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> asks <i>how</i> alike. It
     compares the spread of the four chains' centres against the width of a single chain, and the
     rank plot in the middle is that same comparison as a picture.
   </p>
@@ -359,7 +359,7 @@
   <section class="step">
     <div class="step-head">
       <span class="step-num" aria-hidden="true">3</span>
-      <h2><math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math></h2>
+      <h2><math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math></h2>
       <span class="formula">&radic;(1 &minus; 1/<i>N</i> + <i>b</i>/<i>W</i>)</span>
     </div>
     <p class="step-note">
@@ -367,7 +367,7 @@
       chain, &radic;<i>W</i>. That ratio is the whole statistic.
     </p>
     <div class="plot-card rhat-card">
-      <div class="rhat-big"><span class="sym"><math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> =</span><span id="rhat-val">1.000</span></div>
+      <div class="rhat-big"><span class="sym"><math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> =</span><span id="rhat-val">1.000</span></div>
       <div class="rhat-verdict" id="rhat-verdict"></div>
 
       <div class="gauge" id="gauge" role="img" aria-hidden="true">
@@ -408,7 +408,7 @@
           <div class="ruler-thresh" id="bar-thresh" title="R-hat = 1.01"></div>
         </div>
         <p class="ruler-note">
-          the mark is where &radic;<i>b</i> would put <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> at exactly 1.01
+          the mark is where &radic;<i>b</i> would put <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> at exactly 1.01
         </p>
       </div>
 
@@ -426,19 +426,19 @@
   <h2>What this shows</h2>
   <p>
     When a sampler has converged, every chain is drawing from the same posterior, so the chains
-    should be interchangeable. <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> turns that into a number. It compares <b>W</b>, the average
+    should be interchangeable. <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> turns that into a number. It compares <b>W</b>, the average
     variance <i>within</i> a chain, with <b>b</b>, the variance <i>between</i> the four chain means:
   </p>
   <p>
-    <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> = &radic;(1 &minus; 1/<i>N</i> + <i>b</i>/<i>W</i>)
+    <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> = &radic;(1 &minus; 1/<i>N</i> + <i>b</i>/<i>W</i>)
   </p>
   <p>
     If the chains all sit on top of each other, <i>b</i> is nothing but sampling noise and
-    <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> &asymp; 1. If they have drifted apart, <i>b</i> grows while <i>W</i> does not, and
-    <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> rises. The usual rule of thumb is to distrust anything above 1.01.
+    <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> &asymp; 1. If they have drifted apart, <i>b</i> grows while <i>W</i> does not, and
+    <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> rises. The usual rule of thumb is to distrust anything above 1.01.
   </p>
   <p>
-    <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> only ever looks at chain <i>means</i>, so on its own it is blind to four chains that
+    <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> only ever looks at chain <i>means</i>, so on its own it is blind to four chains that
     share a centre and differ in width. The fix is to look twice. Fold the draws &mdash; replace
     each one by |&theta; &minus; median| &mdash; and a wide chain acquires a large mean while a
     narrow one acquires a small one: a difference in spread has become a difference in location,
@@ -448,22 +448,22 @@
   <p>
     Here the four chains are stand-ins: instead of running a sampler, each chain is <i>N</i>
     independent draws from a Normal whose centre and width you set. That is not what a real chain
-    looks like, but it isolates exactly what <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> can see.
+    looks like, but it isolates exactly what <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> can see.
   </p>
 
   <h2>How to use it</h2>
   <ul>
     <li><b>&mu;<sub>1</sub>&ndash;&mu;<sub>4</sub></b> move the chains' centres apart. This is the
-      only thing <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> reacts to, so watch the &radic;<i>b</i> ruler in step 3 grow.</li>
+      only thing <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> reacts to, so watch the &radic;<i>b</i> ruler in step 3 grow.</li>
     <li><b>&sigma;<sub>1</sub>&ndash;&sigma;<sub>4</sub></b> set how wide each chain is. Widening
       every chain raises &radic;<i>W</i>, which makes the same disagreement look
-      <i>smaller</i> &mdash; <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> is a ratio, not a distance.</li>
+      <i>smaller</i> &mdash; <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> is a ratio, not a distance.</li>
     <li><b><i>N</i></b> is the number of draws per chain. Raising it extends the same chains rather
       than redrawing them.</li>
     <li><b>seed</b> and <b>new sample</b> redraw everything. Same seed, same picture, for everyone
       who opens the link.</li>
     <li><b>view</b> switches all three panels between the draws and their folded version. The big
-      number stays the reported <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> &mdash; the larger of the two &mdash; while the rulers and
+      number stays the reported <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> &mdash; the larger of the two &mdash; while the rulers and
       the formula below it belong to whichever view you are looking at.</li>
     <li>In step 2 each chain gets its own histogram of where its draws sit in the pooled ordering.
       The dashed line is what a flat histogram would be; the triangle on the baseline is that
@@ -473,31 +473,31 @@
 
   <h2>Things to try</h2>
   <ul>
-    <li>Start from <b>converged</b> and nudge &mu;<sub>4</sub> up in steps of 0.05. <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> passes
+    <li>Start from <b>converged</b> and nudge &mu;<sub>4</sub> up in steps of 0.05. <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> passes
       1.01 while the traces still look thoroughly mixed &mdash; the four centres only have to
       disagree by about a seventh of one chain's width to fail the test.</li>
     <li>Now set every &sigma; to 3 and repeat. The same offset in &mu; is forgiven, because
-      &radic;<i>W</i> is three times bigger. <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> measures disagreement in units of the
+      &radic;<i>W</i> is three times bigger. <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> measures disagreement in units of the
       posterior's own width.</li>
     <li>Load <b>different scales</b> and stay on the <b>&theta;</b> view. The rank plot is
       obviously wrong &mdash; the narrow chain bulges in the middle, the wide one piles up at both
-      ends &mdash; and yet <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math>(&theta;) reads 1.00, because the four means agree. Now press
+      ends &mdash; and yet <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math>(&theta;) reads 1.00, because the four means agree. Now press
       <b>|&theta; &minus; median|</b>. The four chains separate, the rank histograms tilt, and the
       statistic climbs to about 1.28. Nothing about the formula changed; only what it was shown.</li>
     <li>Go back to <b>two modes</b> and switch to the folded view. Now it is the folded number that
       reads 1.00, because folding throws away exactly the information that case depends on. Neither
       view is sufficient alone, which is why the reported value is the larger of the two.</li>
     <li>Pull <i>N</i> down to 50 with all four chains identical and press <b>new sample</b> a
-      dozen times. <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> crosses 1.01 on roughly one draw in eight, from four chains that are
+      dozen times. <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> crosses 1.01 on roughly one draw in eight, from four chains that are
       genuinely the same. Short chains cannot be diagnosed.</li>
   </ul>
 
   <h2>Notes</h2>
   <ul>
-    <li>The statistic here is the textbook Gelman&ndash;Rubin <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math>, computed on the raw draws.
+    <li>The statistic here is the textbook Gelman&ndash;Rubin <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math>, computed on the raw draws.
       The form shown is algebraically identical to the usual
-      <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> = &radic;(<math><mover accent="true"><mi>V</mi><mo>&#x0302;</mo></mover></math>/W) with <math><mover accent="true"><mi>V</mi><mo>&#x0302;</mo></mover></math> = ((N&minus;1)/N)W + B/N and
-      B = N/(M&minus;1)&nbsp;&Sigma;(<math><mover accent="true"><mi>&theta;</mi><mo>&#x203E;</mo></mover></math><sub>m</sub> &minus; <math><mover accent="true"><mi>&theta;</mi><mo>&#x203E;</mo></mover></math>)&sup2;; it is
+      <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> = &radic;(<math><mover><mi>V</mi><mo>&#x0302;</mo></mover></math>/W) with <math><mover><mi>V</mi><mo>&#x0302;</mo></mover></math> = ((N&minus;1)/N)W + B/N and
+      B = N/(M&minus;1)&nbsp;&Sigma;(<math><mover><mi>&theta;</mi><mo>&#x203E;</mo></mover></math><sub>m</sub> &minus; <math><mover><mi>&theta;</mi><mo>&#x203E;</mo></mover></math>)&sup2;; it is
       written with <i>b</i> = B/N so that every symbol is something on the screen.</li>
     <li>The fold is taken about the median of all 4<i>N</i> pooled draws, and the folded view's
       densities are the corresponding folded Normals. Reporting the maximum over the two views
@@ -507,10 +507,10 @@
       fine, and it replaces each draw by the normal score of its pooled rank first, which makes the
       statistic robust to heavy tails. Those two layers are deliberately left out here; what remains
       is the mechanism they are built on. They are why the number in <code>az.summary</code> will
-      not match this one exactly. Note in particular that plain <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> is not merely blind to
+      not match this one exactly. Note in particular that plain <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> is not merely blind to
       drift but actively fooled by it: a drifting chain has an inflated within-chain variance, which
-      pushes <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> <i>down</i>.</li>
-    <li><math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> is a random quantity, and with four identical chains it lands slightly below 1 about
+      pushes <math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> <i>down</i>.</li>
+    <li><math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math> is a random quantity, and with four identical chains it lands slightly below 1 about
       as often as slightly above. The widget reports what it computed rather than clipping at 1.</li>
     <li>The rank plot is <code>az.plot_rank</code> in miniature: 20 bins over the ranks
       1&hellip;4<i>N</i>, one histogram per chain, on a shared vertical scale.</li>
@@ -529,7 +529,7 @@
   var M = 4, BINS = 20, NMAX = 2000;
 
   // R-hat as MathML, for the strings this script writes into the page.
-  var RH = '<math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math>';
+  var RH = '<math><mover><mi>R</mi><mo>&#x0302;</mo></mover></math>';
 
   // v is the lens: "t" for the draws themselves, "f" for |theta - median|.
   var DEFAULTS = { m1: 0, m2: 0, m3: 0, m4: 0,

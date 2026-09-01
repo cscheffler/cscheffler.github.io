@@ -1,0 +1,1477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R-hat — when do four chains agree?</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg:        #ffffff;
+    --surface:   #f7f7f5;
+    --ink:       #1b1b1a;
+    --muted:     #6b6b66;
+    --line:      #d9d9d4;
+    --grid:      #ececE7;
+    --accent:    #2f6f8f;
+    --highlight: #b4542a;
+    --focus:     #2f6f8f;
+    --good:      #2e7d32;
+    --good-soft: rgba(46,125,50,0.14);
+    /* Four chains need four colours, so this is the Okabe-Ito colourblind-safe
+       set rather than the two-colour house scheme. Hue is never the only cue:
+       the density curves are dashed differently and every rank histogram is
+       labelled with its chain number. */
+    --c1: #0b62a4;
+    --c2: #c25200;
+    --c3: #0e8a63;
+    --c4: #b0479b;
+    --fit:       0;      /* 1 when the one-screen layout below is in force */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg:        #16171a;
+      --surface:   #1e2024;
+      --ink:       #e8e8e4;
+      --muted:     #9b9b95;
+      --line:      #34363b;
+      --grid:      #26282d;
+      --accent:    #6fb3d2;
+      --highlight: #e08a5c;
+      --focus:     #6fb3d2;
+      --good:      #7fc784;
+      --good-soft: rgba(127,199,132,0.16);
+      --c1: #6fb3d2;
+      --c2: #e8905a;
+      --c3: #5cc4a0;
+      --c4: #d99ad0;
+    }
+  }
+
+  /* R-hat is built from MathML rather than a combining circumflex: many system
+     fonts place U+0302 badly over a capital R, or drop it altogether. <mover>
+     positions the accent geometrically instead. */
+  math { font-size: inherit; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1.25rem 1rem 2.5rem; }
+
+  .widget-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 0.75rem; margin-bottom: 0.25rem;
+  }
+  .widget-header h1 { font-size: 1.25rem; font-weight: 600; margin: 0; line-height: 1.3; }
+  .widget-header h1 .formula { white-space: nowrap; font-weight: 400; color: var(--muted);
+    font-size: 0.95rem; }
+  .lede { color: var(--muted); margin: 0 0 1.25rem; font-size: 0.95rem; }
+
+  /* ---- help button (canonical) ---- */
+  .help-btn {
+    flex: 0 0 auto;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--muted); background: transparent; color: var(--muted);
+    font: inherit; font-size: 16px; line-height: 1;
+    display: grid; place-items: center; cursor: pointer;
+    padding: 0; transition: color .12s, border-color .12s, background-color .12s;
+  }
+  .help-btn:hover, .help-btn:focus-visible {
+    color: var(--ink); border-color: var(--ink); background: var(--surface);
+  }
+  .help-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .help-dialog {
+    max-width: 34rem; max-height: 80vh; width: calc(100% - 2rem);
+    padding: 1.5rem; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); color: var(--ink);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+    overflow: auto; position: relative;
+  }
+  .help-dialog::backdrop { background: rgba(0,0,0,0.45); }
+  .help-dialog h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin: 1.4rem 0 .35rem; }
+  .help-dialog h2:first-of-type { margin-top: 0; }
+  .help-dialog p, .help-dialog li { font-size: 0.94rem; }
+  .help-dialog p { margin: .35rem 0; }
+  .help-dialog ul { margin: .35rem 0; padding-left: 1.15rem; }
+  .help-dialog li { margin: .2rem 0; }
+  .help-dialog code { background: var(--surface); padding: 0.05em 0.3em; border-radius: 3px;
+    font-size: 0.88em; }
+  .help-close {
+    position: absolute; top: .6rem; right: .6rem;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid transparent; background: transparent; color: var(--muted);
+    font-size: 20px; line-height: 1; cursor: pointer; display: grid; place-items: center;
+  }
+  .help-close:hover, .help-close:focus-visible { color: var(--ink); background: var(--surface); }
+  .help-close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- controls ---- */
+  .controls {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0 1.4rem; margin-bottom: .35rem;
+  }
+  .chain-block { margin-bottom: .7rem; }
+  .block-title {
+    display: flex; align-items: center; gap: .4rem;
+    font-weight: 600; font-size: .9rem; margin-bottom: .2rem;
+  }
+  .swatch { width: 20px; height: 3px; border-radius: 2px; flex: 0 0 auto; }
+  .swatch.k1 { background: var(--c1); }
+  .swatch.k2 { background: var(--c2); }
+  .swatch.k3 { background: var(--c3); }
+  .swatch.k4 { background: var(--c4); }
+  .crow { display: flex; align-items: center; gap: .45rem; margin-bottom: .25rem; }
+  .crow .mini {
+    flex: 0 0 auto; width: 1.5rem; text-align: right;
+    color: var(--muted); font-size: .88rem;
+  }
+  input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); height: 1.5rem; }
+  input[type="range"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  .num-input {
+    flex: 0 0 auto; width: 3.9rem; padding: .28rem .4rem;
+    font: inherit; font-size: .9rem; font-variant-numeric: tabular-nums;
+    color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 5px;
+  }
+  .num-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px;
+    border-color: var(--focus); }
+  .num-input.invalid { border-color: var(--highlight); }
+
+  .btn {
+    font: inherit; font-size: .85rem; padding: .28rem .6rem;
+    color: var(--muted); background: transparent;
+    border: 1px solid var(--line); border-radius: 5px; cursor: pointer;
+    transition: color .12s, border-color .12s, background-color .12s;
+  }
+  .btn:hover, .btn:focus-visible { color: var(--ink); border-color: var(--muted);
+    background: var(--surface); }
+  .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .preset-row {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem;
+    margin: .1rem 0 1.5rem;
+  }
+  .preset-row .lbl { color: var(--muted); font-size: .85rem; margin-right: .15rem; }
+
+  /* ---- one-screen layout ----
+     Same breakpoint as the other widgets in the collection: wide, tall and
+     actually landscape. Controls across the top, the three steps left to right,
+     and the plots flexing into whatever height is left, so the pipeline
+     chains -> ranks -> R-hat is readable without scrolling. Anything smaller
+     keeps the stacked layout above. */
+  @media (min-width: 64rem) and (min-height: 36rem) and (min-aspect-ratio: 3/2) {
+    :root { --fit: 1; }
+    html, body { height: 100%; }
+    .wrap {
+      max-width: 160rem; height: 100vh; height: 100dvh;
+      display: flex; flex-direction: column;
+      padding: .85rem 1.1rem .9rem;
+    }
+    .widget-header { margin-bottom: .1rem; }
+    .lede { max-width: 64rem; margin-bottom: .6rem; }
+    .controls { grid-template-columns: repeat(5, 1fr); margin-bottom: 0; gap: 0 1.2rem; }
+    .chain-block { margin-bottom: .35rem; }
+    .preset-row { margin: 0 0 .5rem; }
+
+    /* Four explicit rows, so heads, notes, plots and summaries line up across
+       the three steps however long their text runs. The first column is wider:
+       a trace plot needs horizontal room in a way a rank plot does not. */
+    .steps {
+      flex: 1 1 auto; min-height: 0;
+      display: grid;
+      grid-template-columns: 1.25fr 1fr 0.85fr;
+      grid-template-rows: auto auto minmax(8rem, 1fr) auto;
+      column-gap: 1.1rem;
+    }
+    .step { display: contents; }
+    .step > .step-head { grid-row: 1; }
+    .step > .step-note { grid-row: 2; }
+    .step > .plot-card { grid-row: 3; }
+    .step > .summary   { grid-row: 4; }
+    .step:nth-child(1) > * { grid-column: 1; }
+    .step:nth-child(2) > * { grid-column: 2; }
+    .step:nth-child(3) > * { grid-column: 3; }
+
+    .step-head .formula { flex: 1 0 100%; }
+    .plot-card { position: relative; min-height: 0; margin-bottom: .3rem; }
+    /* A canvas is a replaced element, so the four offsets would not stretch it —
+       it is pinned here and given its exact size by the script instead. */
+    .plot-card canvas { position: absolute; top: .5rem; left: .5rem; }
+    .rhat-card { overflow: auto; display: flex; flex-direction: column;
+      justify-content: center; }
+  }
+
+  /* ---- the three steps ---- */
+  .step { margin: 0 0 1.5rem; }
+  .step-head {
+    display: flex; align-items: baseline; flex-wrap: wrap; gap: .1rem .55rem;
+    margin-bottom: .15rem;
+  }
+  .step-num {
+    flex: 0 0 auto; align-self: center;
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 1px solid var(--muted); color: var(--muted);
+    font-size: 11px; line-height: 1; font-variant-numeric: tabular-nums;
+    display: grid; place-items: center;
+  }
+  .step-head h2 { font-size: .98rem; font-weight: 600; margin: 0; }
+  .step-head .formula { color: var(--muted); font-size: .9rem; white-space: nowrap; }
+  .step-note { color: var(--muted); font-size: .87rem; margin: 0 0 .45rem; }
+
+  .plot-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: .5rem; margin-bottom: .4rem;
+  }
+  .plot-card canvas { display: block; width: 100%; height: auto; touch-action: pan-y; }
+
+  .summary {
+    display: flex; flex-wrap: wrap; gap: .3rem 1.25rem;
+    color: var(--muted); font-size: .88rem; margin: 0; padding: 0 .15rem;
+  }
+  .summary b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---- step 3: the statistic itself ---- */
+  .rhat-card { padding: .8rem .9rem; }
+  .rhat-big {
+    font-size: 2.6rem; font-weight: 600; line-height: 1.05;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  }
+  .rhat-big .sym { font-size: 1.1rem; font-weight: 400; color: var(--muted);
+    margin-right: .35rem; letter-spacing: 0; }
+  .rhat-verdict { font-size: .88rem; margin: .1rem 0 .7rem; }
+  .rhat-verdict.ok   { color: var(--good); }
+  .rhat-verdict.warn { color: var(--highlight); }
+
+  .lens-rows { margin: 0 0 .8rem; border-top: 1px solid var(--line); }
+  .lens-row {
+    display: flex; align-items: baseline; gap: .5rem;
+    padding: .3rem .15rem .3rem .5rem;
+    border-bottom: 1px solid var(--line); border-left: 3px solid transparent;
+    font-size: .85rem; color: var(--muted);
+  }
+  .lens-row.on { border-left-color: var(--accent); color: var(--ink); }
+  .lens-row .nm { flex: 1 1 auto; }
+  .lens-row .tag { font-size: .72rem; }
+  .lens-row .vl { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .lens-row.rep .vl { color: var(--ink); }
+
+  .btn.on {
+    color: var(--ink); border-color: var(--accent); background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .preset-row .sep { margin-left: .9rem; }
+
+  .gauge { position: relative; height: 10px; margin: 0 0 1.35rem;
+    background: var(--grid); border: 1px solid var(--line); border-radius: 5px; }
+  .gauge .zone { position: absolute; left: 0; top: 0; bottom: 0;
+    background: var(--good-soft); border-radius: 4px 0 0 4px; }
+  .gauge .tick { position: absolute; top: -2px; bottom: -2px; width: 1px;
+    background: var(--muted); }
+  .gauge .mark { position: absolute; top: -5px; width: 3px; height: 20px;
+    background: var(--ink); border-radius: 2px; transform: translateX(-1px); }
+  .gauge .cap { position: absolute; top: 13px; font-size: .7rem; color: var(--muted);
+    transform: translateX(-50%); white-space: nowrap; }
+
+  .ruler { margin-bottom: .6rem; }
+  .ruler-head { display: flex; justify-content: space-between; align-items: baseline;
+    gap: .5rem; font-size: .82rem; color: var(--muted); }
+  .ruler-head b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ruler-track { position: relative; height: 12px; margin-top: 3px;
+    background: var(--grid); border-radius: 3px; }
+  .ruler-bar { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+  .ruler-bar.w { background: var(--muted); opacity: .55; }
+  .ruler-bar.b { background: var(--accent); }
+  .ruler-thresh { position: absolute; top: -3px; bottom: -3px; width: 2px;
+    background: var(--highlight); }
+  .ruler-note { font-size: .75rem; color: var(--muted); margin: .15rem 0 0; }
+
+  .rhat-formula {
+    font-size: .8rem; color: var(--muted); margin: .5rem 0 0;
+    font-variant-numeric: tabular-nums; line-height: 1.45;
+  }
+  .rhat-formula b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="widget-header">
+    <h1><math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> &mdash; <span class="formula">when do four chains agree?</span></h1>
+    <button id="help-btn" class="help-btn" aria-label="Help" title="Help">?</button>
+  </header>
+  <p class="lede">
+    Four chains that <i>look</i> alike are not enough &mdash; <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> asks <i>how</i> alike. It
+    compares the spread of the four chains' centres against the width of a single chain, and the
+    rank plot in the middle is that same comparison as a picture.
+  </p>
+
+  <div class="controls" id="controls"></div>
+
+  <div class="preset-row">
+    <span class="lbl">try:</span>
+    <button class="btn" data-preset="0">converged</button>
+    <button class="btn" data-preset="1">just over the line</button>
+    <button class="btn" data-preset="2">one chain stuck</button>
+    <button class="btn" data-preset="3">different scales</button>
+    <button class="btn" data-preset="4">two modes</button>
+    <span class="lbl sep">view:</span>
+    <button class="btn seg" data-view="t">&theta;</button>
+    <button class="btn seg" data-view="f">|&theta; &minus; median|</button>
+  </div>
+
+  <div class="steps">
+
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num" aria-hidden="true">1</span>
+      <h2 id="head-chains">The four chains</h2>
+      <span class="formula" id="form-chains">&theta; ~ Normal(&mu;<sub>m</sub>, &sigma;<sub>m</sub>)</span>
+    </div>
+    <p class="step-note" id="note-chains"></p>
+    <div class="plot-card">
+      <canvas id="plot-chains" role="img"
+              aria-label="Trace plot of four chains against iteration, with the four Normal densities beside it"></canvas>
+    </div>
+    <p class="summary" id="sum-chains"></p>
+  </section>
+
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num" aria-hidden="true">2</span>
+      <h2>Their rank plot</h2>
+      <span class="formula">ranks among all 4<i>N</i> draws</span>
+    </div>
+    <p class="step-note" id="note-rank"></p>
+    <div class="plot-card">
+      <canvas id="plot-rank" role="img"
+              aria-label="Four histograms, one per chain, of the ranks of that chain's draws among all pooled draws"></canvas>
+    </div>
+    <p class="summary" id="sum-rank"></p>
+  </section>
+
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num" aria-hidden="true">3</span>
+      <h2><math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math></h2>
+      <span class="formula">&radic;(1 &minus; 1/<i>N</i> + <i>b</i>/<i>W</i>)</span>
+    </div>
+    <p class="step-note">
+      The spread of the four centres, &radic;<i>b</i>, measured in units of the width of one
+      chain, &radic;<i>W</i>. That ratio is the whole statistic.
+    </p>
+    <div class="plot-card rhat-card">
+      <div class="rhat-big"><span class="sym"><math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> =</span><span id="rhat-val">1.000</span></div>
+      <div class="rhat-verdict" id="rhat-verdict"></div>
+
+      <div class="gauge" id="gauge" role="img" aria-hidden="true">
+        <div class="zone" id="gauge-zone"></div>
+        <div class="tick" id="gauge-t1"></div>
+        <div class="tick" id="gauge-t2"></div>
+        <div class="mark" id="gauge-mark"></div>
+        <div class="cap" id="gauge-c1">1.01</div>
+        <div class="cap" id="gauge-c2">1.05</div>
+      </div>
+
+      <div class="lens-rows">
+        <div class="lens-row" id="lens-t">
+          <span class="nm">&theta;</span>
+          <span class="tag" id="tag-t"></span>
+          <span class="vl" id="lens-t-val">1.000</span>
+        </div>
+        <div class="lens-row" id="lens-f">
+          <span class="nm">|&theta; &minus; median|</span>
+          <span class="tag" id="tag-f"></span>
+          <span class="vl" id="lens-f-val">1.000</span>
+        </div>
+      </div>
+
+      <div class="ruler">
+        <div class="ruler-head">
+          <span>width of one chain &nbsp;&radic;<i>W</i></span><b id="sqw">1.00</b>
+        </div>
+        <div class="ruler-track"><div class="ruler-bar w" id="bar-w"></div></div>
+      </div>
+
+      <div class="ruler">
+        <div class="ruler-head">
+          <span>spread of the centres &nbsp;&radic;<i>b</i></span><b id="sqb">0.00</b>
+        </div>
+        <div class="ruler-track">
+          <div class="ruler-bar b" id="bar-b"></div>
+          <div class="ruler-thresh" id="bar-thresh" title="R-hat = 1.01"></div>
+        </div>
+        <p class="ruler-note">
+          the mark is where &radic;<i>b</i> would put <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> at exactly 1.01
+        </p>
+      </div>
+
+      <p class="rhat-formula" id="rhat-formula"></p>
+    </div>
+    <p class="summary" id="sum-rhat"></p>
+  </section>
+
+  </div>
+</div>
+
+<dialog id="help-dialog" class="help-dialog">
+  <button class="help-close" aria-label="Close help">&times;</button>
+
+  <h2>What this shows</h2>
+  <p>
+    When a sampler has converged, every chain is drawing from the same posterior, so the chains
+    should be interchangeable. <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> turns that into a number. It compares <b>W</b>, the average
+    variance <i>within</i> a chain, with <b>b</b>, the variance <i>between</i> the four chain means:
+  </p>
+  <p>
+    <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> = &radic;(1 &minus; 1/<i>N</i> + <i>b</i>/<i>W</i>)
+  </p>
+  <p>
+    If the chains all sit on top of each other, <i>b</i> is nothing but sampling noise and
+    <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> &asymp; 1. If they have drifted apart, <i>b</i> grows while <i>W</i> does not, and
+    <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> rises. The usual rule of thumb is to distrust anything above 1.01.
+  </p>
+  <p>
+    <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> only ever looks at chain <i>means</i>, so on its own it is blind to four chains that
+    share a centre and differ in width. The fix is to look twice. Fold the draws &mdash; replace
+    each one by |&theta; &minus; median| &mdash; and a wide chain acquires a large mean while a
+    narrow one acquires a small one: a difference in spread has become a difference in location,
+    which the same formula can then see. What gets reported is the larger of the two views. The
+    <b>view</b> buttons switch between them, and all three panels follow.
+  </p>
+  <p>
+    Here the four chains are stand-ins: instead of running a sampler, each chain is <i>N</i>
+    independent draws from a Normal whose centre and width you set. That is not what a real chain
+    looks like, but it isolates exactly what <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> can see.
+  </p>
+
+  <h2>How to use it</h2>
+  <ul>
+    <li><b>&mu;<sub>1</sub>&ndash;&mu;<sub>4</sub></b> move the chains' centres apart. This is the
+      only thing <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> reacts to, so watch the &radic;<i>b</i> ruler in step 3 grow.</li>
+    <li><b>&sigma;<sub>1</sub>&ndash;&sigma;<sub>4</sub></b> set how wide each chain is. Widening
+      every chain raises &radic;<i>W</i>, which makes the same disagreement look
+      <i>smaller</i> &mdash; <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> is a ratio, not a distance.</li>
+    <li><b><i>N</i></b> is the number of draws per chain. Raising it extends the same chains rather
+      than redrawing them.</li>
+    <li><b>seed</b> and <b>new sample</b> redraw everything. Same seed, same picture, for everyone
+      who opens the link.</li>
+    <li><b>view</b> switches all three panels between the draws and their folded version. The big
+      number stays the reported <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> &mdash; the larger of the two &mdash; while the rulers and
+      the formula below it belong to whichever view you are looking at.</li>
+    <li>In step 2 each chain gets its own histogram of where its draws sit in the pooled ordering.
+      The dashed line is what a flat histogram would be; the triangle on the baseline is that
+      chain's mean rank, and the dotted line is where that mean rank would sit if the chain were a
+      fair slice of the pool. The gap between triangle and dotted line is what feeds <i>b</i>.</li>
+  </ul>
+
+  <h2>Things to try</h2>
+  <ul>
+    <li>Start from <b>converged</b> and nudge &mu;<sub>4</sub> up in steps of 0.05. <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> passes
+      1.01 while the traces still look thoroughly mixed &mdash; the four centres only have to
+      disagree by about a seventh of one chain's width to fail the test.</li>
+    <li>Now set every &sigma; to 3 and repeat. The same offset in &mu; is forgiven, because
+      &radic;<i>W</i> is three times bigger. <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> measures disagreement in units of the
+      posterior's own width.</li>
+    <li>Load <b>different scales</b> and stay on the <b>&theta;</b> view. The rank plot is
+      obviously wrong &mdash; the narrow chain bulges in the middle, the wide one piles up at both
+      ends &mdash; and yet <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math>(&theta;) reads 1.00, because the four means agree. Now press
+      <b>|&theta; &minus; median|</b>. The four chains separate, the rank histograms tilt, and the
+      statistic climbs to about 1.28. Nothing about the formula changed; only what it was shown.</li>
+    <li>Go back to <b>two modes</b> and switch to the folded view. Now it is the folded number that
+      reads 1.00, because folding throws away exactly the information that case depends on. Neither
+      view is sufficient alone, which is why the reported value is the larger of the two.</li>
+    <li>Pull <i>N</i> down to 50 with all four chains identical and press <b>new sample</b> a
+      dozen times. <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> crosses 1.01 on roughly one draw in eight, from four chains that are
+      genuinely the same. Short chains cannot be diagnosed.</li>
+  </ul>
+
+  <h2>Notes</h2>
+  <ul>
+    <li>The statistic here is the textbook Gelman&ndash;Rubin <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math>, computed on the raw draws.
+      The form shown is algebraically identical to the usual
+      <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> = &radic;(<math><mover accent="true"><mi>V</mi><mo>&#x0302;</mo></mover></math>/W) with <math><mover accent="true"><mi>V</mi><mo>&#x0302;</mo></mover></math> = ((N&minus;1)/N)W + B/N and
+      B = N/(M&minus;1)&nbsp;&Sigma;(<math><mover accent="true"><mi>&theta;</mi><mo>&#x203E;</mo></mover></math><sub>m</sub> &minus; <math><mover accent="true"><mi>&theta;</mi><mo>&#x203E;</mo></mover></math>)&sup2;; it is
+      written with <i>b</i> = B/N so that every symbol is something on the screen.</li>
+    <li>The fold is taken about the median of all 4<i>N</i> pooled draws, and the folded view's
+      densities are the corresponding folded Normals. Reporting the maximum over the two views
+      follows Vehtari et al. (2021), where they are called the bulk and tail versions.</li>
+    <li><b>What PyMC reports is still a little more than this.</b> ArviZ also splits each chain in
+      half before doing any of it, so a chain that drifts is caught even when its overall mean is
+      fine, and it replaces each draw by the normal score of its pooled rank first, which makes the
+      statistic robust to heavy tails. Those two layers are deliberately left out here; what remains
+      is the mechanism they are built on. They are why the number in <code>az.summary</code> will
+      not match this one exactly. Note in particular that plain <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> is not merely blind to
+      drift but actively fooled by it: a drifting chain has an inflated within-chain variance, which
+      pushes <math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> <i>down</i>.</li>
+    <li><math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math> is a random quantity, and with four identical chains it lands slightly below 1 about
+      as often as slightly above. The widget reports what it computed rather than clipping at 1.</li>
+    <li>The rank plot is <code>az.plot_rank</code> in miniature: 20 bins over the ranks
+      1&hellip;4<i>N</i>, one histogram per chain, on a shared vertical scale.</li>
+    <li>Draws come from a seeded generator in the page, so a link reproduces the picture exactly,
+      down to the individual draws. Everything is in the URL &mdash; copy it and everyone sees the
+      same thing.</li>
+  </ul>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------------------------------------------ state */
+
+  var M = 4, BINS = 20, NMAX = 2000;
+
+  // R-hat as MathML, for the strings this script writes into the page.
+  var RH = '<math><mover accent="true"><mi>R</mi><mo>&#x0302;</mo></mover></math>';
+
+  // v is the lens: "t" for the draws themselves, "f" for |theta - median|.
+  var DEFAULTS = { m1: 0, m2: 0, m3: 0, m4: 0,
+                   s1: 1, s2: 1, s3: 1, s4: 1, n: 500, seed: 1, v: "t" };
+  var LIM = { muMin: -4, muMax: 4, sgMin: 0.1, sgMax: 4,
+              nMin: 20, nMax: NMAX, seedMin: 1, seedMax: 9999 };
+  var MU_KEYS = ["m1", "m2", "m3", "m4"], SG_KEYS = ["s1", "s2", "s3", "s4"];
+
+  var state = {};
+  for (var dk in DEFAULTS) if (DEFAULTS.hasOwnProperty(dk)) state[dk] = DEFAULTS[dk];
+
+  var PRESETS = [
+    { mu: [0, 0, 0, 0],               sg: [1, 1, 1, 1] },
+    { mu: [-0.15, -0.05, 0.05, 0.15], sg: [1, 1, 1, 1] },
+    { mu: [0, 0, 0, 2.5],             sg: [1, 1, 1, 0.4] },
+    { mu: [0, 0, 0, 0],               sg: [0.5, 1, 1.5, 3] },
+    { mu: [-1.5, -1.5, 1.5, 1.5],     sg: [0.6, 0.6, 0.6, 0.6] }
+  ];
+
+  // sqrt(1.01^2 - 1): how big sqrt(b) may be, in units of sqrt(W), at R-hat = 1.01.
+  var THRESH_RATIO = Math.sqrt(1.01 * 1.01 - 1);
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function round2(v) { return Math.round(v * 100) / 100; }
+
+  // Render numbers ourselves rather than letting the browser's locale decide:
+  // always "." for the decimal point and "," between thousands.
+  function fmtNum(v) {
+    var parts = String(v).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  }
+
+  // Accept what a person might reasonably type, including a decimal comma from
+  // a comma-locale keyboard, and reject anything that is not a plain number.
+  function parseNum(raw) {
+    var t = String(raw).trim().replace(/\s/g, "");
+    if (!t) return NaN;
+    if (t.indexOf(",") >= 0) {
+      t = (t.indexOf(".") >= 0) ? t.replace(/,/g, "")     // 1,234.5 -> thousands separators
+                                : t.replace(/,/g, ".");   // 0,5     -> decimal comma
+    }
+    return /^[+-]?(\d+\.?\d*|\.\d+)$/.test(t) ? parseFloat(t) : NaN;
+  }
+
+  /* --------------------------------------------------------- draws and R-hat */
+
+  // Seeded so a link reproduces the draws exactly. mulberry32 is short, has a
+  // long enough period for 8,000 draws, and needs no state beyond one integer.
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  // One block of NMAX standardised draws per chain, generated once per seed.
+  // Chain m always reads from the same block and N always takes a prefix of it,
+  // so raising N extends the chains rather than resampling them, and moving a
+  // mu or sigma slider rescales draws already in hand — which is what keeps the
+  // sliders smooth and the picture stable.
+  var zSeed = null, zData = null;
+  function standardDraws(seed) {
+    if (zSeed === seed && zData) return zData;
+    var rnd = mulberry32(seed * 2654435761 % 4294967296 || 1);
+    var out = new Float64Array(M * NMAX);
+    for (var i = 0; i < out.length; i += 2) {
+      var u1 = Math.max(rnd(), 1e-12), u2 = rnd();
+      var r = Math.sqrt(-2 * Math.log(u1)), a = 2 * Math.PI * u2;
+      out[i] = r * Math.cos(a);
+      if (i + 1 < out.length) out[i + 1] = r * Math.sin(a);
+    }
+    zSeed = seed; zData = out;
+    return out;
+  }
+
+  function normalPdf(x, mu, sg) {
+    var z = (x - mu) / sg;
+    return Math.exp(-0.5 * z * z) / (sg * Math.sqrt(2 * Math.PI));
+  }
+
+  // Density of |X| for X ~ Normal(shift, sg): the two halves fold onto each other.
+  function foldedPdf(x, shift, sg) {
+    if (x < 0) return 0;
+    return normalPdf(x, shift, sg) + normalPdf(x, -shift, sg);
+  }
+
+  // Everything one lens needs: the between/within decomposition and the pooled
+  // ranks. It is written against a bare array of chains so that the identical
+  // machinery can be run on the draws and on their folded version — which is the
+  // whole point of the fold. R-hat only ever looks at chain *means*, so it is
+  // blind to four chains that share a centre and differ in width; replacing each
+  // draw by its distance from the pooled median turns that difference in spread
+  // into a difference in location, which this function can then see.
+  function statsFor(ch, n) {
+    var means = [], vars = [], m, i;
+    var lo = Infinity, hi = -Infinity;
+    for (m = 0; m < M; m++) {
+      var c = ch[m], sum = 0;
+      for (i = 0; i < n; i++) {
+        var v = c[i]; sum += v;
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      var mn = sum / n, ss = 0;
+      for (i = 0; i < n; i++) { var d = c[i] - mn; ss += d * d; }
+      means.push(mn); vars.push(n > 1 ? ss / (n - 1) : 0);
+    }
+
+    // W is the average within-chain variance; b the variance among the four
+    // chain means. R-hat = sqrt(V-hat/W) rearranges to exactly this.
+    var W = 0, grand = 0;
+    for (m = 0; m < M; m++) { W += vars[m]; grand += means[m]; }
+    W /= M; grand /= M;
+    var bs = 0;
+    for (m = 0; m < M; m++) bs += (means[m] - grand) * (means[m] - grand);
+    var b = bs / (M - 1);
+    var rhat = Math.sqrt(Math.max(0, 1 - 1 / n + (W > 0 ? b / W : 0)));
+
+    // Ranks of every draw among all M*N pooled draws, then binned per chain.
+    var total = M * n;
+    var flat = new Float64Array(total), idx = new Int32Array(total);
+    for (m = 0; m < M; m++) for (i = 0; i < n; i++) flat[m * n + i] = ch[m][i];
+    for (i = 0; i < total; i++) idx[i] = i;
+    idx.sort(function (p2, q) { return flat[p2] - flat[q]; });
+
+    var counts = [], meanRank = [];
+    for (m = 0; m < M; m++) { counts.push(new Int32Array(BINS)); meanRank.push(0); }
+    for (var r = 0; r < total; r++) {
+      var k = idx[r], cm = (k / n) | 0;
+      var bin = (r * BINS / total) | 0;
+      if (bin >= BINS) bin = BINS - 1;
+      counts[cm][bin]++;
+      meanRank[cm] += r;
+    }
+    var maxCount = 0;
+    for (m = 0; m < M; m++) {
+      meanRank[m] /= n;
+      for (i = 0; i < BINS; i++) if (counts[m][i] > maxCount) maxCount = counts[m][i];
+    }
+
+    var pooledVar = 0;
+    for (m = 0; m < M; m++) {
+      for (i = 0; i < n; i++) { var e = ch[m][i] - grand; pooledVar += e * e; }
+    }
+    pooledVar /= (total - 1);
+
+    return { chains: ch, means: means, W: W, b: b, rhat: rhat, grand: grand,
+             pooledSd: Math.sqrt(pooledVar), counts: counts, meanRank: meanRank,
+             maxCount: maxCount, expect: n / BINS, ax: niceAxis(lo, hi) };
+  }
+
+  var data = null;
+  function compute() {
+    var n = state.n, i, m, z = standardDraws(state.seed);
+    var mu = [], sg = [], raw = [];
+    for (m = 0; m < M; m++) { mu.push(state[MU_KEYS[m]]); sg.push(state[SG_KEYS[m]]); }
+    for (m = 0; m < M; m++) {
+      var arr = new Float64Array(n), base = m * NMAX;
+      for (i = 0; i < n; i++) arr[i] = mu[m] + sg[m] * z[base + i];
+      raw.push(arr);
+    }
+
+    // The fold is about the median of everything pooled, as in Vehtari et al.
+    var all = new Float64Array(M * n);
+    for (m = 0; m < M; m++) all.set(raw[m], m * n);
+    var sorted = Float64Array.from(all);
+    sorted.sort();
+    var half = sorted.length >> 1;
+    var med = (sorted.length % 2) ? sorted[half] : (sorted[half - 1] + sorted[half]) / 2;
+
+    var fold = [];
+    for (m = 0; m < M; m++) {
+      var f = new Float64Array(n);
+      for (i = 0; i < n; i++) f[i] = Math.abs(raw[m][i] - med);
+      fold.push(f);
+    }
+
+    var A = statsFor(raw, n), B = statsFor(fold, n);
+    // What gets reported is the larger of the two: each lens is blind to what
+    // the other one catches.
+    data = { n: n, total: M * n, mu: mu, sg: sg, med: med,
+             raw: A, fold: B, reported: Math.max(A.rhat, B.rhat) };
+  }
+
+  function folded() { return state.v === "f"; }
+  function view() { return folded() ? data.fold : data.raw; }
+
+  /* --------------------------------------------------------------- plumbing */
+
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  function palette() {
+    return {
+      ink: cssVar("--ink"), muted: cssVar("--muted"), grid: cssVar("--grid"),
+      line: cssVar("--line"), accent: cssVar("--accent"), surface: cssVar("--surface"),
+      hl: cssVar("--highlight"), bg: cssVar("--bg"),
+      chain: [cssVar("--c1"), cssVar("--c2"), cssVar("--c3"), cssVar("--c4")]
+    };
+  }
+
+  // Round tick steps that also work for a negative axis, so theta can run either
+  // side of zero without the labels turning into fractions of a fraction.
+  function niceAxis(lo, hi) {
+    if (!isFinite(lo) || !isFinite(hi) || hi <= lo) { lo = lo - 1; hi = lo + 2; }
+    // |theta - median| cannot be negative, so padding must not invent an axis
+    // below zero and waste a quarter of the panel on it.
+    var nonneg = lo >= 0;
+    var pad = (hi - lo) * 0.04;
+    lo -= pad; hi += pad;
+    if (nonneg && lo < 0) lo = 0;
+    var raw = (hi - lo) / 5;
+    var e = Math.pow(10, Math.floor(Math.log10(raw)));
+    var f = raw / e;
+    var step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e;
+    return { lo: Math.floor(lo / step) * step, hi: Math.ceil(hi / step) * step, step: step };
+  }
+
+  function fmtAxis(v, step) {
+    var d = step >= 1 ? 0 : step >= 0.1 ? 1 : step >= 0.01 ? 2 : 3;
+    var s = v.toFixed(d);
+    if (/^-0(\.0*)?$/.test(s)) s = s.slice(1);
+    return fmtNum(s);
+  }
+
+  function fmtSig(v) {
+    if (!isFinite(v)) return "–";
+    if (v === 0) return "0";
+    if (Math.abs(v) >= 100) return fmtNum(v.toFixed(0));
+    if (Math.abs(v) >= 10) return v.toFixed(1);
+    if (Math.abs(v) >= 1) return v.toFixed(2);
+    if (Math.abs(v) >= 0.001) return v.toFixed(3);
+    return v.toExponential(1);
+  }
+
+  // A tick label at either end would otherwise hang off the canvas and be cut.
+  function tickLabel(ctx, text, x, y, lo, hi) {
+    var half = ctx.measureText(text).width / 2;
+    if (x - half < lo)      { ctx.textAlign = "left";  x = lo; }
+    else if (x + half > hi) { ctx.textAlign = "right"; x = hi; }
+    else                    { ctx.textAlign = "center"; }
+    ctx.fillText(text, x, y);
+    ctx.textAlign = "center";
+  }
+
+  function xTickStep(n, maxTicks) {
+    var raw = n / maxTicks;
+    var cands = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
+    for (var i = 0; i < cands.length; i++) if (cands[i] >= raw) return cands[i];
+    return cands[cands.length - 1];
+  }
+
+  // In the one-screen layout the plots are absolutely positioned inside cards
+  // that the grid has already given a height to; in the stacked layout they take
+  // a height from their own width. The breakpoint is defined once, in the
+  // stylesheet, and read back here — a second copy of the query in JS is a copy
+  // that will drift out of step.
+  function fitMode() { return cssVar("--fit") === "1"; }
+
+  function panelBox(cv) {
+    if (!fitMode()) return { w: cv.clientWidth, h: 0 };
+    var card = cv.parentElement, cs = getComputedStyle(card);
+    // Before styles have fully resolved these can come back empty, and an
+    // undefended parseFloat would turn the whole box into NaN.
+    var px = function (v) { return parseFloat(v) || 0; };
+    return {
+      w: card.clientWidth  - px(cs.paddingLeft) - px(cs.paddingRight),
+      h: card.clientHeight - px(cs.paddingTop)  - px(cs.paddingBottom)
+    };
+  }
+
+  function prepCanvas(cv, aspect) {
+    var cssW, cssH;
+    var box = fitMode() ? panelBox(cv) : null;
+    if (box && box.w > 100 && box.h > 80) {
+      cssW = box.w; cssH = box.h;
+      cv.style.width  = cssW + "px";
+      cv.style.height = cssH + "px";
+    } else {
+      // Either the stacked layout, or the one-screen layout before it has
+      // settled. Size from the width rather than giving up: a plot of the wrong
+      // height is corrected on the next observation, a blank one is not.
+      cv.style.width = "";
+      cssW = cv.clientWidth || (cv.parentElement ? cv.parentElement.clientWidth : 0);
+      if (!(cssW > 0)) return null;
+      cssH = clamp(Math.round(cssW * aspect), 180, 320);
+      cv.style.height = cssH + "px";
+    }
+    var dpr = window.devicePixelRatio || 1;
+    cv.width  = Math.round(cssW * dpr);
+    cv.height = Math.round(cssH * dpr);
+    var c = cv.getContext("2d");
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, cssW, cssH);
+    return { ctx: c, w: cssW, h: cssH, narrow: cssW < 420 };
+  }
+
+  function font(narrow) {
+    return (narrow ? 10 : 11) + "px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  }
+
+  /* ------------------------------------------------------- step 1: the chains */
+
+  var cvChains = document.getElementById("plot-chains");
+  var cvRank   = document.getElementById("plot-rank");
+
+  var DASHES = [[], [6, 3], [2, 2.5], [8, 2.5, 2, 2.5]];
+
+  function drawChains() {
+    var s = prepCanvas(cvChains, 0.62);
+    if (!s || !data) return;
+    var ctx = s.ctx, P = palette(), narrow = s.narrow, V = view(), ax = V.ax, i, m, v;
+
+    ctx.font = font(narrow);
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 1;
+
+    var labW = 0;
+    for (v = ax.lo; v <= ax.hi + ax.step * 1e-6; v += ax.step) {
+      labW = Math.max(labW, ctx.measureText(fmtAxis(v, ax.step)).width);
+    }
+    var padL = Math.ceil(labW) + 8 + (narrow ? 20 : 24);
+    var padR = 10, padT = 10, padB = narrow ? 30 : 36;
+    var plotW = s.w - padL - padR, plotH = s.h - padT - padB;
+    if (plotW <= 40 || plotH <= 40) return;
+
+    var densW = clamp(Math.round(plotW * 0.26), 40, 130);
+    var gap = 9;
+    var traceW = plotW - densW - gap;
+    var densX = padL + traceW + gap;
+    var y0 = padT + plotH;
+    var yFor = function (t) { return padT + plotH * (ax.hi - t) / (ax.hi - ax.lo); };
+    var xFor = function (k) { return padL + (data.n <= 1 ? 0 : traceW * k / (data.n - 1)); };
+
+    // grid and y ticks
+    for (v = ax.lo; v <= ax.hi + ax.step * 1e-6; v += ax.step) {
+      var y = Math.round(yFor(v)) + 0.5;
+      ctx.strokeStyle = P.grid;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+      ctx.fillStyle = P.muted; ctx.textAlign = "right";
+      ctx.fillText(fmtAxis(v, ax.step), padL - 7, yFor(v));
+    }
+
+    // the grand mean: the point b measures the spread around
+    ctx.strokeStyle = P.muted;
+    ctx.setLineDash([2, 3]);
+    ctx.beginPath();
+    ctx.moveTo(padL, Math.round(yFor(V.grand)) + 0.5);
+    ctx.lineTo(padL + plotW, Math.round(yFor(V.grand)) + 0.5);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // traces
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 0.8;
+    for (m = 0; m < M; m++) {
+      ctx.strokeStyle = P.chain[m];
+      ctx.beginPath();
+      for (i = 0; i < data.n; i++) {
+        var xp = xFor(i), yp = yFor(V.chains[m][i]);
+        if (i === 0) ctx.moveTo(xp, yp); else ctx.lineTo(xp, yp);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // Each chain's own mean, drawn on a halo so it reads through the trace.
+    // Four lines close together is what b being small looks like; they fan out
+    // as the chains disagree, which is the whole of step 3 seen here.
+    for (m = 0; m < M; m++) {
+      var ymn = Math.round(yFor(V.means[m])) + 0.5;
+      ctx.strokeStyle = P.surface; ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.moveTo(padL, ymn); ctx.lineTo(padL + traceW, ymn); ctx.stroke();
+      ctx.strokeStyle = P.chain[m]; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(padL, ymn); ctx.lineTo(padL + traceW, ymn); ctx.stroke();
+    }
+    ctx.lineWidth = 1;
+
+    // the density strip: the four Normals the chains were drawn from
+    ctx.strokeStyle = P.line;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(densX) + 0.5, padT);
+    ctx.lineTo(Math.round(densX) + 0.5, y0);
+    ctx.stroke();
+
+    // In the folded lens the strip shows the folded-Normal densities, so the
+    // curves move apart exactly as the draws do.
+    var fold = folded();
+    var pdfAt = function (t, k) {
+      return fold ? foldedPdf(t, data.mu[k] - data.med, data.sg[k])
+                  : normalPdf(t, data.mu[k], data.sg[k]);
+    };
+    var STEPS_D = 140;
+    var maxPdf = 0;
+    for (m = 0; m < M; m++) {
+      for (i = 0; i <= STEPS_D; i++) {
+        maxPdf = Math.max(maxPdf, pdfAt(ax.lo + (ax.hi - ax.lo) * i / STEPS_D, m));
+      }
+    }
+    if (!(maxPdf > 0)) maxPdf = 1;
+    ctx.lineWidth = 1.4;
+    for (m = 0; m < M; m++) {
+      ctx.strokeStyle = P.chain[m];
+      ctx.setLineDash(DASHES[m]);
+      ctx.beginPath();
+      for (i = 0; i <= STEPS_D; i++) {
+        var t = ax.lo + (ax.hi - ax.lo) * i / STEPS_D;
+        var d = pdfAt(t, m) / maxPdf;
+        var xd = densX + densW * d, yd = yFor(t);
+        if (i === 0) ctx.moveTo(xd, yd); else ctx.lineTo(xd, yd);
+      }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1;
+
+    // a triangle at each chain's sample mean — the four numbers b is built from
+    for (m = 0; m < M; m++) {
+      var ym = yFor(V.means[m]);
+      ctx.fillStyle = P.chain[m];
+      ctx.beginPath();
+      ctx.moveTo(densX + 1, ym);
+      ctx.lineTo(densX + 8, ym - 4.5);
+      ctx.lineTo(densX + 8, ym + 4.5);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // x axis
+    ctx.strokeStyle = P.line;
+    ctx.beginPath();
+    ctx.moveTo(padL, Math.round(y0) + 0.5); ctx.lineTo(padL + traceW, Math.round(y0) + 0.5);
+    ctx.stroke();
+    var step = xTickStep(data.n, narrow ? 4 : 7);
+    ctx.textAlign = "center"; ctx.fillStyle = P.muted;
+    for (var t2 = 0; t2 <= data.n; t2 += step) {
+      var xt = xFor(Math.min(t2, data.n - 1));
+      ctx.strokeStyle = P.line;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(xt) + 0.5, y0); ctx.lineTo(Math.round(xt) + 0.5, y0 + 4);
+      ctx.stroke();
+      ctx.fillStyle = P.muted;
+      tickLabel(ctx, fmtNum(t2), xt, y0 + 13, padL, padL + traceW);
+    }
+    ctx.fillText("iteration", padL + traceW / 2, s.h - (narrow ? 5 : 7));
+    ctx.textAlign = "center";
+    ctx.fillText("density", densX + densW / 2, s.h - (narrow ? 5 : 7));
+
+    ctx.save();
+    ctx.translate(narrow ? 10 : 12, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = "center";
+    ctx.fillStyle = P.muted;
+    ctx.fillText(fold ? "|θ − median|" : "θ", 0, 0);
+    ctx.restore();
+
+    // legend, so the panel reads on its own
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    var lx = padL + 6, ly = padT + 7;
+    for (m = 0; m < M; m++) {
+      ctx.strokeStyle = P.chain[m];
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash(DASHES[m]);
+      ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + 13, ly); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = P.muted;
+      ctx.fillText(String(m + 1), lx + 16, ly);
+      lx += 13 + 16;
+    }
+    ctx.lineWidth = 1;
+  }
+
+  /* --------------------------------------------------- step 2: the rank plot */
+
+  function drawRank() {
+    var s = prepCanvas(cvRank, 0.95);
+    if (!s || !data) return;
+    var ctx = s.ctx, P = palette(), narrow = s.narrow, V = view(), m, i;
+
+    ctx.font = font(narrow);
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 1;
+
+    var padL = 8, padR = 8, padT = 6, padB = narrow ? 30 : 36;
+    var plotW = s.w - padL - padR, plotH = s.h - padT - padB;
+    if (plotW <= 40 || plotH <= 40) return;
+
+    var gapY = 6;
+    var subH = (plotH - (M - 1) * gapY) / M;
+    var maxC = Math.max(V.maxCount, 1);
+    var barW = plotW / BINS;
+
+    for (m = 0; m < M; m++) {
+      var top = padT + m * (subH + gapY), base = top + subH;
+
+      // where a chain's mean rank would sit if it were a fair slice of the pool
+      ctx.strokeStyle = P.line;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(Math.round(padL + plotW / 2) + 0.5, top);
+      ctx.lineTo(Math.round(padL + plotW / 2) + 0.5, base);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // bars
+      ctx.fillStyle = P.chain[m];
+      ctx.globalAlpha = 0.75;
+      for (i = 0; i < BINS; i++) {
+        var h = subH * V.counts[m][i] / maxC;
+        if (h < 0.5) continue;
+        ctx.fillRect(padL + i * barW + 0.5, base - h, Math.max(barW - 1, 1), h);
+      }
+      ctx.globalAlpha = 1;
+
+      // what a flat histogram would be
+      var ye = Math.round(base - subH * V.expect / maxC) + 0.5;
+      ctx.strokeStyle = P.muted;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(padL, ye); ctx.lineTo(padL + plotW, ye); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // baseline
+      ctx.strokeStyle = P.line;
+      ctx.beginPath();
+      ctx.moveTo(padL, Math.round(base) + 0.5);
+      ctx.lineTo(padL + plotW, Math.round(base) + 0.5);
+      ctx.stroke();
+
+      // this chain's mean rank — the marker that becomes b in step 3
+      var xm = padL + plotW * V.meanRank[m] / (data.total - 1);
+      ctx.fillStyle = P.chain[m];
+      ctx.beginPath();
+      ctx.moveTo(xm, base - 6);
+      ctx.lineTo(xm - 4.5, base + 1);
+      ctx.lineTo(xm + 4.5, base + 1);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.textAlign = "left";
+      var lab = "chain " + (m + 1);
+      ctx.fillStyle = P.surface;
+      ctx.globalAlpha = 0.88;
+      ctx.fillRect(padL + 2, top + 1, ctx.measureText(lab).width + 5, 14);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = P.muted;
+      ctx.fillText(lab, padL + 4, top + 8);
+    }
+
+    // x axis: the pooled ranks
+    var y0 = padT + plotH;
+    var stepR = xTickStep(data.total, narrow ? 3 : 5);
+    ctx.textAlign = "center";
+    for (var r = 0; r <= data.total; r += stepR) {
+      var xr = padL + plotW * r / data.total;
+      ctx.strokeStyle = P.line;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(xr) + 0.5, y0); ctx.lineTo(Math.round(xr) + 0.5, y0 + 4);
+      ctx.stroke();
+      ctx.fillStyle = P.muted;
+      tickLabel(ctx, fmtNum(r), xr, y0 + 13, padL, padL + plotW);
+    }
+    ctx.fillStyle = P.muted;
+    ctx.fillText("rank among all " + fmtNum(data.total) + " pooled draws",
+                 padL + plotW / 2, s.h - (narrow ? 5 : 7));
+  }
+
+  /* ------------------------------------------------------- step 3: R-hat */
+
+  var elVal = document.getElementById("rhat-val");
+  var elVerdict = document.getElementById("rhat-verdict");
+  var elZone = document.getElementById("gauge-zone");
+  var elT1 = document.getElementById("gauge-t1"), elT2 = document.getElementById("gauge-t2");
+  var elC1 = document.getElementById("gauge-c1"), elC2 = document.getElementById("gauge-c2");
+  var elMark = document.getElementById("gauge-mark");
+  var elSqW = document.getElementById("sqw"), elSqB = document.getElementById("sqb");
+  var elBarW = document.getElementById("bar-w"), elBarB = document.getElementById("bar-b");
+  var elThresh = document.getElementById("bar-thresh");
+  var elFormula = document.getElementById("rhat-formula");
+  var rowT = document.getElementById("lens-t"), rowF = document.getElementById("lens-f");
+  var valT = document.getElementById("lens-t-val"), valF = document.getElementById("lens-f-val");
+  var tagT = document.getElementById("tag-t"), tagF = document.getElementById("tag-f");
+
+  var G_LO = 0.99, G_HI = 1.10;
+  function gaugePct(v) { return clamp((v - G_LO) / (G_HI - G_LO), 0, 1) * 100; }
+
+  function renderRhat() {
+    if (!data) return;
+    var V = view(), fold = folded();
+    var R = data.reported, sqW = Math.sqrt(V.W), sqB = Math.sqrt(V.b);
+
+    // The headline is what would be reported: the larger of the two lenses.
+    elVal.textContent = R.toFixed(3);
+    if (R < 1.01) {
+      elVerdict.className = "rhat-verdict ok";
+      elVerdict.textContent = "below 1.01 — the four chains agree";
+    } else if (R < 1.05) {
+      elVerdict.className = "rhat-verdict warn";
+      elVerdict.textContent = "above 1.01 — not there yet";
+    } else {
+      elVerdict.className = "rhat-verdict warn";
+      elVerdict.textContent = "above 1.05 — the chains disagree";
+    }
+
+    elZone.style.width = gaugePct(1.01) + "%";
+    elT1.style.left = gaugePct(1.01) + "%";
+    elT2.style.left = gaugePct(1.05) + "%";
+    elC1.style.left = gaugePct(1.01) + "%";
+    elC2.style.left = gaugePct(1.05) + "%";
+    elMark.style.left = gaugePct(R) + "%";
+
+    valT.textContent = data.raw.rhat.toFixed(3);
+    valF.textContent = data.fold.rhat.toFixed(3);
+    var fWins = data.fold.rhat > data.raw.rhat;
+    rowT.className = "lens-row" + (fold ? "" : " on") + (fWins ? "" : " rep");
+    rowF.className = "lens-row" + (fold ? " on" : "") + (fWins ? " rep" : "");
+    tagT.textContent = fWins ? "" : "reported";
+    tagF.textContent = fWins ? "reported" : "";
+
+    // Both rulers share a scale, so their lengths can be compared directly.
+    var scale = Math.max(sqW, sqB, 1e-12);
+    elSqW.textContent = fmtSig(sqW);
+    elSqB.textContent = fmtSig(sqB);
+    elBarW.style.width = (100 * sqW / scale) + "%";
+    elBarB.style.width = (100 * sqB / scale) + "%";
+    var tPct = 100 * THRESH_RATIO * sqW / scale;
+    elThresh.style.left = clamp(tPct, 0, 100) + "%";
+    elThresh.style.display = tPct <= 100.5 ? "" : "none";
+
+    elFormula.innerHTML =
+      RH + "(" + (fold ? "|&theta; &minus; median|" : "&theta;") + ") = &radic;(1 &minus; 1/" +
+      fmtNum(data.n) + " + " + fmtSig(V.b) + "/" + fmtSig(V.W) + ") = <b>" +
+      V.rhat.toFixed(3) + "</b>";
+  }
+
+  /* --------------------------------------------------------------- summaries */
+
+  var sumChains = document.getElementById("sum-chains");
+  var sumRank   = document.getElementById("sum-rank");
+  var sumRhat   = document.getElementById("sum-rhat");
+  var headChains = document.getElementById("head-chains");
+  var formChains = document.getElementById("form-chains");
+  var noteChains = document.getElementById("note-chains");
+  var noteRank   = document.getElementById("note-rank");
+
+  var NOTES = {
+    t: {
+      head: "The four chains",
+      form: "&theta; ~ Normal(&mu;<sub>m</sub>, &sigma;<sub>m</sub>)",
+      note: "Each chain is <i>N</i> draws from its own Normal. The strip on the right is the " +
+            "four densities, with a triangle at each chain's sample mean.",
+      rank: "Pool every draw, sort them, and ask where each chain's draws landed. Chains " +
+            "exploring the same distribution give four flat histograms."
+    },
+    f: {
+      head: "The four chains, folded",
+      form: "|&theta; &minus; median|",
+      note: "The same draws, each replaced by its distance from the pooled median. A chain " +
+            "that was merely wider than the others now sits <i>higher</i> &mdash; spread has " +
+            "become location, which is the one thing " + RH + " can see.",
+      rank: "Ranks of the folded draws. A chain whose only fault was its width tilts this " +
+            "histogram, where it left the unfolded one flat."
+    }
+  };
+
+  function renderSummary() {
+    if (!data) return;
+    var V = view(), t = NOTES[folded() ? "f" : "t"];
+    headChains.textContent = t.head;
+    formChains.innerHTML = t.form;
+    noteChains.innerHTML = t.note;
+    noteRank.innerHTML = t.rank;
+    sumChains.innerHTML =
+      "<span>grand mean <b>" + fmtSig(V.grand) + "</b></span>" +
+      "<span>pooled sd <b>" + fmtSig(V.pooledSd) + "</b></span>";
+    sumRank.innerHTML =
+      "<span>dashed line = <b>" + fmtSig(V.expect) + "</b> draws per bin if flat</span>" +
+      "<span>tallest bin <b>" + fmtNum(V.maxCount) + "</b></span>";
+    sumRhat.innerHTML =
+      "<span>" + RH + " &lt; 1.01 needs &radic;<i>b</i> &lt; <b>" +
+      THRESH_RATIO.toFixed(3) + "</b> &times; &radic;<i>W</i></span>";
+  }
+
+  /* ---------------------------------------------------------------- controls */
+
+  var RANGES = {}, NUMS = {};
+  var STEPS  = { n: 10, seed: 1 };
+  var BOUNDS = { n: [LIM.nMin, LIM.nMax], seed: [LIM.seedMin, LIM.seedMax] };
+  for (var ci = 0; ci < M; ci++) {
+    STEPS[MU_KEYS[ci]] = 0.05; BOUNDS[MU_KEYS[ci]] = [LIM.muMin, LIM.muMax];
+    STEPS[SG_KEYS[ci]] = 0.05; BOUNDS[SG_KEYS[ci]] = [LIM.sgMin, LIM.sgMax];
+  }
+
+  function buildControls() {
+    var host = document.getElementById("controls"), html = "", m;
+    for (m = 0; m < M; m++) {
+      var mk = MU_KEYS[m], sk = SG_KEYS[m], num = m + 1;
+      html +=
+        '<div class="chain-block">' +
+          '<div class="block-title"><span class="swatch k' + num + '"></span>Chain ' + num + '</div>' +
+          '<div class="crow">' +
+            '<label class="mini" for="' + mk + '-range">&mu;<sub>' + num + '</sub></label>' +
+            '<input type="range" id="' + mk + '-range" min="' + LIM.muMin + '" max="' + LIM.muMax +
+              '" step="0.01" aria-label="mean of chain ' + num + '">' +
+            '<input type="text" id="' + mk + '-num" class="num-input" inputmode="decimal" ' +
+              'autocomplete="off" spellcheck="false" aria-label="mean of chain ' + num +
+              ' (exact value)">' +
+          '</div>' +
+          '<div class="crow">' +
+            '<label class="mini" for="' + sk + '-range">&sigma;<sub>' + num + '</sub></label>' +
+            '<input type="range" id="' + sk + '-range" min="' + LIM.sgMin + '" max="' + LIM.sgMax +
+              '" step="0.01" aria-label="standard deviation of chain ' + num + '">' +
+            '<input type="text" id="' + sk + '-num" class="num-input" inputmode="decimal" ' +
+              'autocomplete="off" spellcheck="false" aria-label="standard deviation of chain ' +
+              num + ' (exact value)">' +
+          '</div>' +
+        '</div>';
+    }
+    html +=
+      '<div class="chain-block">' +
+        '<div class="block-title">Sampling</div>' +
+        '<div class="crow">' +
+          '<label class="mini" for="n-range"><i>N</i></label>' +
+          '<input type="range" id="n-range" min="' + LIM.nMin + '" max="' + LIM.nMax +
+            '" step="1" aria-label="draws per chain">' +
+          '<input type="text" id="n-num" class="num-input" inputmode="numeric" ' +
+            'autocomplete="off" spellcheck="false" aria-label="draws per chain (exact value)">' +
+        '</div>' +
+        '<div class="crow">' +
+          '<label class="mini" for="seed-num">seed</label>' +
+          '<input type="text" id="seed-num" class="num-input" inputmode="numeric" ' +
+            'autocomplete="off" spellcheck="false" aria-label="random seed">' +
+          '<button class="btn" id="reseed" type="button">new sample</button>' +
+        '</div>' +
+      '</div>';
+    host.innerHTML = html;
+  }
+  buildControls();
+
+  var ALL_KEYS = MU_KEYS.concat(SG_KEYS).concat(["n"]);
+  for (var ri = 0; ri < ALL_KEYS.length; ri++) {
+    RANGES[ALL_KEYS[ri]] = document.getElementById(ALL_KEYS[ri] + "-range");
+    NUMS[ALL_KEYS[ri]]   = document.getElementById(ALL_KEYS[ri] + "-num");
+  }
+  NUMS.seed = document.getElementById("seed-num");
+
+  function syncControls() {
+    for (var i = 0; i < ALL_KEYS.length; i++) {
+      var k = ALL_KEYS[i];
+      RANGES[k].value = String(state[k]);
+      if (document.activeElement !== NUMS[k]) NUMS[k].value = fmtNum(state[k]);
+      NUMS[k].classList.remove("invalid");
+    }
+    if (document.activeElement !== NUMS.seed) NUMS.seed.value = fmtNum(state.seed);
+    for (var j = 0; j < viewBtns.length; j++) {
+      var on = viewBtns[j].getAttribute("data-view") === state.v;
+      viewBtns[j].className = "btn seg" + (on ? " on" : "");
+      viewBtns[j].setAttribute("aria-pressed", on ? "true" : "false");
+    }
+  }
+
+  function normalise(key, v) {
+    if (key === "v")    return v === "f" ? "f" : "t";
+    if (key === "n")    return clamp(Math.round(v), LIM.nMin, LIM.nMax);
+    if (key === "seed") return clamp(Math.round(v), LIM.seedMin, LIM.seedMax);
+    if (SG_KEYS.indexOf(key) >= 0) return round2(clamp(v, LIM.sgMin, LIM.sgMax));
+    return round2(clamp(v, LIM.muMin, LIM.muMax));
+  }
+
+  function setState(partial, opts) {
+    var changed = false;
+    for (var k in partial) {
+      if (!partial.hasOwnProperty(k) || !DEFAULTS.hasOwnProperty(k)) continue;
+      var v = normalise(k, partial[k]);
+      if (v !== state[k]) { state[k] = v; changed = true; }
+    }
+    if (!(opts && opts.silentControls)) syncControls();
+    if (changed || (opts && opts.force)) drawAll();
+  }
+
+  function drawAll() {
+    compute();
+    render();
+    renderRhat();
+    renderSummary();
+    scheduleHashWrite();
+  }
+  // A resize or a theme change only needs the pixels redrawn.
+  function render() { drawChains(); drawRank(); }
+
+  function wireRange(key) {
+    RANGES[key].addEventListener("input", function () {
+      var partial = {}; partial[key] = +RANGES[key].value;
+      setState(partial);
+    });
+  }
+  for (var wi = 0; wi < ALL_KEYS.length; wi++) wireRange(ALL_KEYS[wi]);
+
+  function wireNumber(key) {
+    var el = NUMS[key], lo = BOUNDS[key][0], hi = BOUNDS[key][1];
+    // While typing, apply valid values but leave the raw text alone, so
+    // keystrokes are never rewritten under the cursor.
+    el.addEventListener("input", function () {
+      var v = parseNum(el.value);
+      if (isNaN(v) || v < lo || v > hi) { el.classList.add("invalid"); return; }
+      el.classList.remove("invalid");
+      var partial = {}; partial[key] = v;
+      setState(partial, { silentControls: true });
+      if (RANGES[key]) RANGES[key].value = String(state[key]);
+    });
+    el.addEventListener("change", function () {
+      var v = parseNum(el.value);
+      if (!isNaN(v)) { var partial = {}; partial[key] = v; setState(partial); }
+      el.value = fmtNum(state[key]);
+      el.classList.remove("invalid");
+    });
+    el.addEventListener("blur", function () {
+      el.value = fmtNum(state[key]);
+      el.classList.remove("invalid");
+    });
+    // Arrow keys nudge by the slider's own step; Shift for a bigger one.
+    el.addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      e.preventDefault();
+      var cur = parseNum(el.value);
+      if (isNaN(cur)) cur = state[key];
+      var st = STEPS[key] * (e.shiftKey ? 10 : 1);
+      var partial = {};
+      partial[key] = cur + (e.key === "ArrowUp" ? st : -st);
+      setState(partial);
+      el.value = fmtNum(state[key]);
+      el.classList.remove("invalid");
+    });
+  }
+  for (var ni = 0; ni < ALL_KEYS.length; ni++) wireNumber(ALL_KEYS[ni]);
+  wireNumber("seed");
+
+  document.getElementById("reseed").addEventListener("click", function () {
+    setState({ seed: state.seed >= LIM.seedMax ? LIM.seedMin : state.seed + 1 });
+  });
+
+  var viewBtns = document.querySelectorAll("[data-view]");
+  for (var vi = 0; vi < viewBtns.length; vi++) {
+    viewBtns[vi].addEventListener("click", function (e) {
+      setState({ v: e.currentTarget.getAttribute("data-view") });
+    });
+  }
+
+  var presetBtns = document.querySelectorAll("[data-preset]");
+  for (var pi = 0; pi < presetBtns.length; pi++) {
+    presetBtns[pi].addEventListener("click", function (e) {
+      var p = PRESETS[+e.currentTarget.getAttribute("data-preset")];
+      if (!p) return;
+      var partial = {};
+      for (var m = 0; m < M; m++) { partial[MU_KEYS[m]] = p.mu[m]; partial[SG_KEYS[m]] = p.sg[m]; }
+      setState(partial);
+    });
+  }
+
+  /* ------------------------------------------------------ URL fragment state */
+
+  var HASH_KEYS = MU_KEYS.concat(SG_KEYS).concat(["n", "seed", "v"]);
+
+  function readHash() {
+    var out = {}, i, k;
+    for (i = 0; i < HASH_KEYS.length; i++) out[HASH_KEYS[i]] = DEFAULTS[HASH_KEYS[i]];
+    var raw = location.hash.replace(/^#/, "");
+    if (!raw) return out;
+    var q = new URLSearchParams(raw);
+    for (i = 0; i < HASH_KEYS.length; i++) {
+      k = HASH_KEYS[i];
+      var raw2 = q.get(k);
+      if (raw2 === null) continue;
+      if (k === "v") { out[k] = normalise(k, raw2); continue; }
+      var v = parseFloat(raw2);
+      if (isFinite(v)) out[k] = normalise(k, v);
+    }
+    return out;
+  }
+
+  function currentHash() {
+    var parts = [];
+    for (var i = 0; i < HASH_KEYS.length; i++) {
+      parts.push(HASH_KEYS[i] + "=" + state[HASH_KEYS[i]]);
+    }
+    return "#" + parts.join("&");
+  }
+
+  var hashTimer = null;
+  function scheduleHashWrite() {
+    if (hashTimer) clearTimeout(hashTimer);
+    hashTimer = setTimeout(function () {
+      hashTimer = null;
+      var h = currentHash();
+      if (location.hash !== h) {
+        try { history.replaceState(null, "", h); }
+        catch (err) { location.hash = h; }   // e.g. file:// in some browsers
+      }
+    }, 150);
+  }
+
+  window.addEventListener("hashchange", function () {
+    setState(readHash(), { force: true });
+  });
+
+  /* ------------------------------------------------------------------ help */
+
+  var dlg = document.getElementById("help-dialog");
+  document.getElementById("help-btn").addEventListener("click", function () { dlg.showModal(); });
+  dlg.querySelector(".help-close").addEventListener("click", function () { dlg.close(); });
+  dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
+
+  /* ------------------------------------------------------------------ init */
+
+  var initial = readHash();
+  for (var ik = 0; ik < HASH_KEYS.length; ik++) state[HASH_KEYS[ik]] = initial[HASH_KEYS[ik]];
+  syncControls();
+  drawAll();
+
+  // The cards change height as well as width in the one-screen layout, so watch
+  // both. lastBox starts empty so the observer's first callback always draws.
+  if (window.ResizeObserver) {
+    var card = cvChains.parentElement;
+    var lastBox = "";
+    new ResizeObserver(function () {
+      var box = card.clientWidth + "x" + card.clientHeight;
+      if (box !== lastBox) { lastBox = box; render(); }
+    }).observe(card);
+  }
+  window.addEventListener("resize", render);   // also fires on zoom
+  // A reload can run this script before layout and style have settled, which is
+  // how a plot can come up blank on refresh but not on a fresh navigation.
+  window.addEventListener("load", render);
+  if (window.requestAnimationFrame) requestAnimationFrame(render);
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    if (mq.addEventListener) mq.addEventListener("change", render);
+    else if (mq.addListener) mq.addListener(render);
+  }
+})();
+</script>
+</body>
+</html>

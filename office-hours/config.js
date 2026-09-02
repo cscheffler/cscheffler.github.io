@@ -9,9 +9,9 @@ export const firebaseConfig = {
   projectId: "office-plant-1",
   storageBucket: "office-plant-1.firebasestorage.app",
   messagingSenderId: "19642607697",
-  appId: "1:19642607697:web:8d38baa667818ad0a53070"
+  appId: "1:19642607697:web:8d38baa667818ad0a53070",
+  databaseURL: "https://office-plant-1-default-rtdb.europe-west1.firebasedatabase.app"
 };
-
 
 // 2. Where the office is. The time zone drives the wall clock and the day/night cycle,
 //    the coordinates drive sunrise and sunset, so every student sees the same sky

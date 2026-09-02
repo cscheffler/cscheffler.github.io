@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Office chilli plant</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #e8dfcf; overflow: hidden; }
+  svg { display: block; width: 100%; height: 100%; }
+  #plant { transform-box: view-box; transform-origin: 560px 257px; animation: sway 7s ease-in-out infinite; }
+  @keyframes sway { 0%, 100% { transform: rotate(-1.1deg); } 50% { transform: rotate(1.1deg); } }
+  @media (prefers-reduced-motion: reduce) { #plant { animation: none; } }
+</style>
+</head>
+<body>
+<svg id="scene" viewBox="0 0 1200 560" preserveAspectRatio="xMidYMid meet" role="img"
+     aria-label="A professor's office with a chilli plant on the windowsill"></svg>
+<script type="module">
+import { createScene } from './scene.js';
+import { normaliseLog, plantState, demoLog, fmtAgo } from './plant-model.js';
+import { fetchWeather } from './weather.js';
+import { firebaseConfig, OFFICE_TIMEZONE, OFFICE_LOCATION, LIVE_WEATHER, WEATHER_SEED } from './config.js';
+
+// Preview knobs (all optional):
+//   ?demo                 synthetic plant instead of the shared one
+//   &days=16 &dry=0.3 &picked=2 &seed=7   shape the demo plant
+//   &pickago=0.2 &pickgap=0.2             when the picks happened, in days
+//   &empty                                no plant at all (pot with bare soil)
+//   &hour=21 &cloud=0.9 &rain=0.8         force time of day and weather
+//   &snow=1 &fog=1                        force snow instead of rain, or fog
+//   &weather=noise                        synthetic weather instead of the live Open-Meteo data
+//   &month=1 or &doy=60                   force the season (1 = January; doy = day of year)
+const params = new URLSearchParams(location.search);
+const num = (k, d) => params.has(k) ? Number(params.get(k)) : d;
+
+const scene = createScene(document.getElementById('scene'), { weatherSeed: WEATHER_SEED, timeZone: OFFICE_TIMEZONE, location: OFFICE_LOCATION });
+scene.setOverrides({
+  hour: params.has('hour') ? num('hour') : null,
+  cloud: params.has('cloud') ? num('cloud') : null,
+  rain: params.has('rain') ? num('rain') : null,
+  snow: params.has('snow') ? num('snow') : null,
+  fog: params.has('fog') ? num('fog') : null,
+  doy: params.has('doy') ? num('doy') : params.has('month') ? Math.round((num('month') - 1) * 30.4 + 15) : null
+});
+
+// Live weather, unless the weather is being forced or the synthetic one is asked for.
+function startLiveWeather() {
+  const weatherForced = ['cloud', 'rain', 'snow', 'fog'].some(k => params.has(k));
+  if (!LIVE_WEATHER || weatherForced || params.get('weather') === 'noise') return;
+  const poll = async () => {
+    try {
+      scene.setWeather(await fetchWeather(OFFICE_LOCATION.latitude, OFFICE_LOCATION.longitude));
+      lastView = 0; // show the new conditions on the next tick, not up to five seconds later
+      tick();
+    } catch (e) { /* keep whatever we had, or the synthetic weather */ }
+  };
+  poll();
+  setInterval(poll, 10 * 60 * 1000);
+}
+
+const configured = !!(firebaseConfig && firebaseConfig.apiKey && !/^YOUR_/.test(firebaseConfig.apiKey));
+let offset = 0;                       // server clock minus local clock
+const now = () => Date.now() + offset;
+let log = null, mode = 'loading', problem = '';
+let dirty = true, lastPlant = 0, lastView = 0;
+
+async function connect() {
+  if (params.has('demo') || !configured) {
+    log = params.has('empty') ? null : normaliseLog(demoLog({
+      days: num('days', 16), dry: num('dry', 0.3), picked: num('picked', 2), seed: num('seed', 7),
+      pickago: num('pickago', 1 / 6), pickgap: num('pickgap', 1 / 6)
+    }, now()));
+    mode = configured ? 'demo' : 'unconfigured';
+    dirty = true;
+    return;
+  }
+  try {
+    const [{ initializeApp }, { getDatabase, ref, onValue }] = await Promise.all([
+      import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js')
+    ]);
+    const db = getDatabase(initializeApp(firebaseConfig));
+    onValue(ref(db, '.info/serverTimeOffset'), s => { offset = s.val() || 0; });
+    onValue(ref(db, 'plant'),
+      snap => { log = normaliseLog(snap.val()); mode = 'live'; problem = ''; dirty = true; tick(); },
+      err => { mode = 'error'; problem = err.message; dirty = true; tick(); });
+  } catch (e) {
+    mode = 'error'; problem = e.message; dirty = true;
+  }
+}
+
+function noteLines(state) {
+  const lines = ['Chilli log'];
+  if (mode === 'loading') lines.push('loading…');
+  else if (mode === 'error') lines.push('offline');
+  else if (!state) lines.push('no seed yet');
+  else {
+    lines.push('day ' + Math.floor(state.daysSincePlanted + 1));
+    lines.push('watered', fmtAgo(state.hoursSinceWater));
+    if (state.wilt > 0.3) lines.push('wilting!');
+    else if (state.needsWater) lines.push('thirsty');
+    else lines.push(state.totalPicked + ' picked');
+  }
+  if (mode === 'demo' || mode === 'unconfigured') lines.push('(demo)');
+  return lines;
+}
+
+function tick() {
+  const t = now();
+  scene.renderClock(t);
+  if (t - lastView > 5000) {
+    lastView = t;
+    document.body.style.background = scene.renderView(t).background;
+  }
+  if (dirty || t - lastPlant > 30000) {
+    dirty = false; lastPlant = t;
+    const state = log ? plantState(log, t) : null;
+    scene.renderPlant(state);
+    scene.renderNote(noteLines(state));
+  }
+}
+
+connect();
+tick();
+setInterval(tick, 1000);
+startLiveWeather();
+</script>
+</body>
+</html>

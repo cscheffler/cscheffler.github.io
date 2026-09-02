@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chilli plant controls</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f4f5f7; color: #1d2129; line-height: 1.45; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.4rem; margin: 0 0 12px; }
+  .card { background: #fff; border: 1px solid #e3e6ea; border-radius: 12px; padding: 14px 18px; margin-bottom: 14px; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button { font: inherit; font-size: 1.05rem; padding: 14px; border-radius: 10px; border: 1px solid #c7ccd2; background: #fff; cursor: pointer; }
+  button.primary { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+  button.small { font-size: 0.95rem; padding: 8px 14px; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.danger { grid-column: 1 / -1; color: #991b1b; }
+  .muted { color: #6b7280; font-size: 0.9rem; }
+  .bar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+  .bar > div { height: 100%; background: #3b82f6; transition: width 0.4s; }
+  ul.slots { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  ul.slots li { padding: 4px 9px; border-radius: 999px; font-size: 0.85rem; background: #f3f4f6; }
+  iframe { width: 100%; aspect-ratio: 1200 / 560; border: 1px solid #d5d9de; border-radius: 8px; background: #e8dfcf; display: block; }
+  code { background: #f0f2f4; padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  #msg { min-height: 1.3em; margin: 10px 0 0; }
+  .ok { color: #166534; } .err { color: #991b1b; }
+  #events li { font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Chilli plant controls</h1>
+
+  <div class="card">
+    <div id="auth-status" class="muted">Checking sign-in…</div>
+    <div style="margin-top:10px">
+      <button id="signin" type="button" class="primary small">Sign in with Google</button>
+      <button id="signout" type="button" class="small" hidden>Sign out</button>
+    </div>
+    <p class="muted" style="margin:10px 0 0">Your user id: <code id="uid">–</code></p>
+  </div>
+
+  <div class="card">
+    <div id="summary">Loading…</div>
+    <div class="bar"><div id="moisture" style="width:0"></div></div>
+    <ul class="slots" id="slots"></ul>
+  </div>
+
+  <div class="card">
+    <div class="actions">
+      <button id="water" type="button" class="primary" disabled>💧 Water</button>
+      <button id="pick" type="button" disabled>🌶️ Pick a chilli</button>
+      <button id="seed" type="button" class="danger" disabled>🌱 Plant a new seed</button>
+    </div>
+    <p id="msg" class="muted"></p>
+  </div>
+
+  <div class="card">
+    <iframe id="preview" src="index.html" title="What the students see"></iframe>
+  </div>
+
+  <div class="card">
+    <details><summary>Recent events</summary><ul id="events" class="muted"></ul></details>
+  </div>
+</main>
+
+<script type="module">
+import { normaliseLog, plantState, fmtAgo } from './plant-model.js';
+import { firebaseConfig } from './config.js';
+
+const $ = id => document.getElementById(id);
+const configured = !!(firebaseConfig && firebaseConfig.apiKey && !/^YOUR_/.test(firebaseConfig.apiKey));
+let log = null, state = null, user = null, db = null, fb = null;
+
+function say(text, cls) { $('msg').textContent = text; $('msg').className = 'muted ' + (cls || ''); }
+
+function fruitLabel(x) {
+  if (x.kind === 'flower') return '🌼 flower ' + Math.round(x.progress * 100) + '%';
+  if (x.ripeness < 0.5) return '🌶️ growing ' + Math.round(x.ripeness * 200) + '%';
+  if (x.ripeness < 0.75) return '🌶️ green, can pick';
+  if (x.ripeness < 1) return '🌶️ turning red';
+  return '🌶️ ripe';
+}
+
+function render() {
+  const now = Date.now();
+  state = log ? plantState(log, now) : null;
+  if (!log) {
+    $('summary').innerHTML = configured
+      ? 'No seed planted yet. Sign in and press <b>Plant a new seed</b> to begin.'
+      : 'Firebase is not configured yet, so there is nothing to control. The preview below runs in demo mode.';
+    $('moisture').style.width = '0';
+    $('slots').innerHTML = '';
+    $('events').innerHTML = '';
+  } else {
+    const s = state;
+    const water = s.wilt > 0.3 ? ', <b class="err">wilting</b>' : s.needsWater ? ', <b>thirsty</b>' : '';
+    $('summary').innerHTML =
+      `Day <b>${Math.floor(s.daysSincePlanted + 1)}</b>, ${s.stageLabel}. ` +
+      `Watered <b>${fmtAgo(s.hoursSinceWater)}</b>, moisture ${Math.round(s.moisture * 100)}%${water}. ` +
+      `${s.fruitOnPlant} fruit on the plant (${s.pickable} ready to pick), ${s.flowers} flowers, ${s.totalPicked} picked so far.`;
+    $('moisture').style.width = (s.moisture * 100) + '%';
+    $('slots').innerHTML = s.slots.filter(x => x.kind !== 'none').map(x => `<li>${fruitLabel(x)}</li>`).join('');
+    const ev = [
+      { t: log.planted, what: 'Seed planted' },
+      ...log.waterings.map(t => ({ t, what: 'Watered' })),
+      ...log.picks.map(t => ({ t, what: 'Picked a chilli' }))
+    ].sort((a, b) => b.t - a.t).slice(0, 15);
+    $('events').innerHTML = ev.map(e => `<li>${new Date(e.t).toLocaleString()} — ${e.what}</li>`).join('');
+  }
+  const can = !!(user && db);
+  $('water').disabled = !can || !log;
+  $('pick').disabled = !can || !log || !state || state.pickable === 0;
+  $('seed').disabled = !can;
+  $('pick').textContent = state && state.pickable ? `🌶️ Pick a chilli (${state.pickable} ready)` : '🌶️ Pick a chilli';
+}
+
+async function act(okText, fn) {
+  try {
+    say('…');
+    await fn();
+    say(okText, 'ok');
+  } catch (e) {
+    const denied = /PERMISSION_DENIED|permission/i.test(e.message || '');
+    say((denied ? 'Permission denied. Is your user id in the database rules? ' : 'Failed: ') + e.message, 'err');
+  }
+}
+
+async function main() {
+  render();
+  if (!configured) {
+    $('auth-status').textContent = 'Firebase is not configured. Paste your project config into config.js.';
+    $('signin').disabled = true;
+    return;
+  }
+  const [{ initializeApp }, dbm, authm] = await Promise.all([
+    import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js'),
+    import('https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js'),
+    import('https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js')
+  ]);
+  fb = { ...dbm, ...authm };
+  const app = initializeApp(firebaseConfig);
+  db = fb.getDatabase(app);
+  const auth = fb.getAuth(app);
+
+  fb.onAuthStateChanged(auth, u => {
+    user = u;
+    $('auth-status').textContent = u
+      ? `Signed in as ${u.displayName || u.email}.`
+      : 'Not signed in. Anyone can look, only the signed-in owner can water or pick.';
+    $('uid').textContent = u ? u.uid : '–';
+    $('signin').hidden = !!u;
+    $('signout').hidden = !u;
+    render();
+  });
+  $('signin').onclick = async () => {
+    const provider = new fb.GoogleAuthProvider();
+    try { await fb.signInWithPopup(auth, provider); }
+    catch (e) {
+      if (/popup/i.test(e.code || '')) await fb.signInWithRedirect(auth, provider);
+      else say('Sign-in failed: ' + e.message, 'err');
+    }
+  };
+  $('signout').onclick = () => fb.signOut(auth);
+
+  fb.onValue(fb.ref(db, 'plant'),
+    snap => { log = normaliseLog(snap.val()); render(); },
+    err => say('Cannot read the plant: ' + err.message, 'err'));
+
+  $('water').onclick = () => act('Watered the plant.',
+    () => fb.push(fb.ref(db, 'plant/waterings'), fb.serverTimestamp()));
+  $('pick').onclick = () => act('Picked a chilli. It is in the bowl.',
+    () => fb.push(fb.ref(db, 'plant/picks'), fb.serverTimestamp()));
+  $('seed').onclick = () => {
+    if (!confirm('Start over with a new seed? The current plant, its history and the bowl will be gone.')) return;
+    act('A new seed is in the soil. Water it to get it growing.',
+      () => fb.set(fb.ref(db, 'plant'), { planted: fb.serverTimestamp(), seed: Math.floor(Math.random() * 2147483647) }));
+  };
+  setInterval(render, 30000);
+}
+main();
+</script>
+</body>
+</html>

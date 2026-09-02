@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chilli plant demo gallery</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; display: flex; flex-direction: column; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f4f5f7; color: #1d2129; line-height: 1.4; }
+  header { flex: 0 0 auto; padding: 12px 18px; border-bottom: 1px solid #e3e6ea; background: #fff; }
+  header h1 { margin: 0; font-size: 1.2rem; }
+  header p { margin: 4px 0 0; color: #6b7280; font-size: 0.9rem; }
+  .layout { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 350px 1fr; }
+  nav { overflow-y: auto; min-height: 0; border-right: 1px solid #e3e6ea; background: #fff; padding: 6px 0 60px; }
+  nav h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; margin: 16px 16px 2px; }
+  nav p.note { margin: 0 16px 6px; font-size: 0.8rem; color: #6b7280; }
+  nav button, nav a.item { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 5px 16px; font: inherit; font-size: 0.92rem; cursor: pointer; color: #1d2129; text-decoration: none; }
+  nav button:hover, nav a.item:hover { background: #f3f4f6; }
+  nav button.active { background: #dbeafe; color: #1e3a8a; font-weight: 600; }
+  nav button small { display: block; color: #6b7280; font-size: 0.76rem; font-weight: 400; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stage { padding: 14px 18px; overflow: auto; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .toolbar button, .toolbar a { font: inherit; font-size: 0.9rem; padding: 6px 12px; border-radius: 8px; border: 1px solid #c7ccd2; background: #fff; color: #1d2129; text-decoration: none; cursor: pointer; }
+  .toolbar .sizes { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; }
+  .toolbar .sizes button.active { background: #dbeafe; border-color: #93c5fd; }
+  #frame-box { background: #e8dfcf; border: 1px solid #d5d9de; border-radius: 8px; overflow: hidden; width: 100%; max-width: 1112px; aspect-ratio: 1112 / 526; }
+  iframe { width: 100%; height: 100%; border: 0; display: block; }
+  #title { font-size: 1.05rem; font-weight: 600; margin: 12px 0 2px; }
+  #desc { color: #4b5563; margin: 0 0 6px; }
+  #url { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; color: #6b7280; overflow-wrap: anywhere; }
+  @media (max-width: 900px) { body { height: auto; display: block; } .layout { grid-template-columns: 1fr; } nav { max-height: 40vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Chilli plant demo gallery</h1>
+  <p>Every state the scene can be in. Click an item, or use the ← → keys to step through. Each item is a link to index.html with preview parameters. Things not shown here: the plant sways and the clouds drift, so watch a frame for a minute too.</p>
+</header>
+<div class="layout">
+  <nav id="nav"></nav>
+  <div class="stage">
+    <div class="toolbar">
+      <button id="prev" type="button">← Previous</button>
+      <button id="next" type="button">Next →</button>
+      <a id="open" target="_blank" rel="noopener">Open in new tab</a>
+      <button id="reload" type="button">Reload</button>
+      <div class="sizes" id="sizes"></div>
+    </div>
+    <div id="frame-box"><iframe id="frame" title="Preview"></iframe></div>
+    <div id="title"></div>
+    <p id="desc"></p>
+    <div id="url"></div>
+  </div>
+</div>
+
+<script>
+// Sunrise and sunset in the labels below are for Stirling, UK, as computed by weather.js:
+// mid-January 08:38 to 16:11, mid-April 06:11 to 20:21, mid-July 04:49 to 21:54, mid-October 07:46 to 18:17.
+
+const MATURE = { days: 24, picked: 3 };
+const CLEAR_DAY = { month: 6, hour: 11, cloud: 0.2 };
+
+const GROUPS = [
+  {
+    title: 'Live',
+    note: 'No time or weather overrides, so these change as you watch.',
+    base: {},
+    items: [
+      { label: 'Right now, demo plant', note: 'Real office time and the live Stirling weather from Open-Meteo, with a mature demo plant.', p: { ...MATURE } },
+      { label: 'The real shared plant', note: 'Only works once config.js has your Firebase project. Until then it falls back to the demo plant.', href: 'index.html' },
+      { label: 'Control page', note: 'Sign in, water, pick, or start a new seed.', href: 'control.html' }
+    ]
+  },
+  {
+    title: 'Growth',
+    note: 'Watered daily, nothing picked, a clear June morning. "days" is days since planting.',
+    base: { ...CLEAR_DAY, dry: 0.3, picked: 0 },
+    items: [
+      { label: 'Day 0: seed in the soil', note: 'Nothing visible yet. The note reads day 1.', p: { days: 0.1 } },
+      { label: 'Sprout breaking the surface', p: { days: 0.5 } },
+      { label: 'Sprout with seed leaves', p: { days: 1.2 } },
+      { label: 'Seedling, first true leaves', p: { days: 2 } },
+      { label: 'Seedling', p: { days: 3.5 } },
+      { label: 'Young plant, first branches', p: { days: 5 } },
+      { label: 'Young plant, secondary branches', p: { days: 7 } },
+      { label: 'Filling out', p: { days: 9 } },
+      { label: 'Mature, first flower bud', p: { days: 11.5 } },
+      { label: 'Flowering', p: { days: 12.5 } },
+      { label: 'First fruit set, more flowers', p: { days: 13.5 } },
+      { label: 'Small green fruit', p: { days: 15 } },
+      { label: 'Full-size green fruit, pickable', p: { days: 17 } },
+      { label: 'Turning orange', p: { days: 19 } },
+      { label: 'First red chillies', p: { days: 21 } },
+      { label: 'Red, orange and green together', p: { days: 24 } },
+      { label: 'Fully laden', p: { days: 30 } },
+      { label: 'Two months, every slot ripe', p: { days: 60 } }
+    ]
+  },
+  {
+    title: 'Watering and wilt',
+    note: '"dry" is days since the last watering. Growth also stalls while dry.',
+    base: { ...CLEAR_DAY, picked: 0 },
+    items: [
+      { label: 'Mature, just watered', p: { days: 20, dry: 0.05 } },
+      { label: 'Mature, 22 hours dry: note says thirsty', p: { days: 20, dry: 0.9 } },
+      { label: 'Mature, 1.5 days dry: slight droop', p: { days: 20, dry: 1.5 } },
+      { label: 'Mature, 2 days dry: drooping, note says wilting', p: { days: 20, dry: 2 } },
+      { label: 'Mature, 2.5 days dry: badly wilted', p: { days: 20, dry: 2.5 } },
+      { label: 'Mature, 4 days dry: fully wilted', p: { days: 20, dry: 4 } },
+      { label: 'Young plant, just watered', p: { days: 6, dry: 0.05 } },
+      { label: 'Young plant, 2 days dry', p: { days: 6, dry: 2 } },
+      { label: 'Young plant, 4 days dry', p: { days: 6, dry: 4 } },
+      { label: 'Wilted sprout', p: { days: 1.2, dry: 3 } }
+    ]
+  },
+  {
+    title: 'Fruit, picking and the bowl',
+    note: 'Picking takes the ripest fruit that is at least full size. A picked slot flowers again after three care days.',
+    base: { ...CLEAR_DAY },
+    items: [
+      { label: 'Nothing picked', p: { days: 24, picked: 0 } },
+      { label: 'One chilli in the bowl', p: { days: 24, picked: 1 } },
+      { label: 'Three picked', p: { days: 24, picked: 3 } },
+      { label: 'Every fruit picked at once', note: 'Plant left with flowers where the fruit were.', p: { days: 30, picked: 9 } },
+      { label: '1.5 days after picking: buds', p: { days: 24, picked: 3, pickago: 1.5 } },
+      { label: '2.5 days after picking: open flowers', p: { days: 24, picked: 3, pickago: 2.5 } },
+      { label: '3.5 days after picking: new fruit forming', p: { days: 24, picked: 3, pickago: 3.5 } },
+      { label: 'Bowl: green and red mixed', note: 'Picked every 14 hours, so some were still green.', p: { days: 45, picked: 15, pickgap: 0.6 } },
+      { label: 'Bowl: orange and red mixed', note: 'Picked every 17 hours.', p: { days: 50, picked: 20, pickgap: 0.7 } },
+      { label: 'Twelve picked over twelve days', p: { days: 40, picked: 12, pickgap: 1 } },
+      { label: 'Bowl full: 23 shown', p: { days: 70, picked: 23, pickgap: 1 } },
+      { label: 'Forty picked: bowl shows the last 23', p: { days: 90, picked: 40, pickgap: 1 } }
+    ]
+  },
+  {
+    title: 'Plant shape',
+    note: 'Each seed gives a different but stable branching pattern.',
+    base: { ...CLEAR_DAY, days: 24, picked: 2 },
+    items: [1, 2, 3, 4, 5, 6, 7, 8].map(seed => ({ label: 'Seed ' + seed, p: { seed } }))
+  },
+  {
+    title: 'Season',
+    note: 'Mid-month at noon with a mature plant. Boundaries blend over about three weeks.',
+    base: { ...MATURE, hour: 12, cloud: 0.25 },
+    items: [
+      ...['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+        .map((name, i) => ({ label: name, p: { month: i + 1 } })),
+      { label: '1 March: winter to spring, half way', p: { doy: 60 } },
+      { label: '1 June: spring to summer, half way', p: { doy: 152 } },
+      { label: '1 September: summer to autumn, half way', p: { doy: 244 } },
+      { label: '1 December: autumn to winter, half way', p: { doy: 335 } }
+    ]
+  },
+  {
+    title: 'Time of day, summer',
+    note: 'Mid-July in Stirling: sun up 04:49, down 21:54, solar noon 13:22. The sun never gets more than 12° below the horizon, so the night keeps a glow and only the brighter stars show.',
+    base: { ...MATURE, month: 7, cloud: 0.15 },
+    items: [
+      { label: '00:30 as dark as July gets', p: { hour: 0.5 } },
+      { label: '03:00 nautical dawn, sky lightening', p: { hour: 3 } },
+      { label: '03:45 civil dawn, lamp still on', p: { hour: 3.75 } },
+      { label: '04:50 sunrise', p: { hour: 4.8 } },
+      { label: '05:30 early sun', p: { hour: 5.5 } },
+      { label: '08:00 morning', p: { hour: 8 } },
+      { label: '13:20 solar noon, sun above the window', p: { hour: 13.3 } },
+      { label: '17:00 afternoon', p: { hour: 17 } },
+      { label: '21:00 evening, sun low to the west', p: { hour: 21 } },
+      { label: '21:55 sunset', p: { hour: 21.9 } },
+      { label: '22:35 civil dusk, lamp coming on', p: { hour: 22.6 } },
+      { label: '23:00 end of civil twilight', p: { hour: 23 } },
+      { label: '23:30 nautical twilight, first stars', p: { hour: 23.5 } }
+    ]
+  },
+  {
+    title: 'Time of day, winter',
+    note: 'Mid-January in Stirling: sun up 08:38, down 16:11. The sun stays low all day and it is fully dark by 18:00.',
+    base: { ...MATURE, month: 1, cloud: 0.15 },
+    items: [
+      { label: '03:00 night', p: { hour: 3 } },
+      { label: '07:00 end of night', p: { hour: 7 } },
+      { label: '07:30 nautical dawn', p: { hour: 7.5 } },
+      { label: '08:00 civil dawn', p: { hour: 8 } },
+      { label: '08:40 sunrise', p: { hour: 8.65 } },
+      { label: '10:00 morning', p: { hour: 10 } },
+      { label: '12:25 solar noon, sun low', p: { hour: 12.4 } },
+      { label: '15:00 afternoon', p: { hour: 15 } },
+      { label: '16:10 sunset', p: { hour: 16.2 } },
+      { label: '16:50 civil dusk, lamp on', p: { hour: 16.85 } },
+      { label: '17:15 nautical dusk', p: { hour: 17.2 } },
+      { label: '17:35 last glow', p: { hour: 17.6 } },
+      { label: '18:00 night', p: { hour: 18 } },
+      { label: '21:00 night', p: { hour: 21 } }
+    ]
+  },
+  {
+    title: 'Time of day, spring and autumn',
+    note: 'Mid-April in Stirling: 06:11 to 20:21. Mid-October: 07:46 to 18:17.',
+    base: { ...MATURE, cloud: 0.2 },
+    items: [
+      { label: 'April sunrise 06:10', p: { month: 4, hour: 6.2 } },
+      { label: 'April solar noon 13:15', p: { month: 4, hour: 13.25 } },
+      { label: 'April sunset 20:20', p: { month: 4, hour: 20.35 } },
+      { label: 'October sunrise 07:45', p: { month: 10, hour: 7.8 } },
+      { label: 'October solar noon 13:00', p: { month: 10, hour: 13 } },
+      { label: 'October sunset 18:15', p: { month: 10, hour: 18.3 } },
+      { label: 'October 19:00, dark already', p: { month: 10, hour: 19 } }
+    ]
+  },
+  {
+    title: 'Weather',
+    note: 'The live page shows the real Stirling weather from Open-Meteo. Here "cloud" and "rain" are forced, 0 to 1. Snow follows the live data, or the season when forced.',
+    base: { ...MATURE, month: 7, hour: 13 },
+    items: [
+      { label: 'Clear', p: { cloud: 0, rain: 0 } },
+      { label: 'A few clouds', p: { cloud: 0.2, rain: 0 } },
+      { label: 'Partly cloudy', p: { cloud: 0.45, rain: 0 } },
+      { label: 'Mostly cloudy', p: { cloud: 0.7, rain: 0 } },
+      { label: 'Overcast', p: { cloud: 0.9, rain: 0 } },
+      { label: 'Fully overcast', p: { cloud: 1, rain: 0 } },
+      { label: 'Light rain', p: { cloud: 0.7, rain: 0.3 } },
+      { label: 'Steady rain', p: { cloud: 0.9, rain: 0.7 } },
+      { label: 'Downpour', p: { cloud: 1, rain: 1 } },
+      { label: 'Rainy night', p: { cloud: 0.9, rain: 0.8, hour: 23.5 } },
+      { label: 'Overcast dusk', p: { cloud: 1, rain: 0, hour: 22.3 } },
+      { label: 'Cloudy sunrise', p: { cloud: 0.5, rain: 0, hour: 4.85 } },
+      { label: 'Winter, light snow', p: { month: 1, cloud: 0.8, rain: 0.4 } },
+      { label: 'Winter, heavy snow', p: { month: 1, cloud: 1, rain: 1 } },
+      { label: 'Winter, snow at night', p: { month: 1, cloud: 0.9, rain: 0.7, hour: 21 } },
+      { label: 'Winter, clear and cold', p: { month: 1, cloud: 0, rain: 0 } },
+      { label: 'Autumn rain', p: { month: 10, cloud: 0.9, rain: 0.6 } },
+      { label: 'Spring shower', p: { month: 4, cloud: 0.6, rain: 0.4 } },
+      { label: 'Fog', p: { fog: 1, cloud: 0.7, rain: 0 } },
+      { label: 'Fog at night', p: { fog: 1, cloud: 0.7, rain: 0, hour: 23.5 } },
+      { label: 'Snow forced in autumn', p: { month: 10, snow: 1, cloud: 0.9, rain: 0.6 } },
+      { label: 'Live weather now', note: 'Whatever Open-Meteo reports for Stirling at this moment, at 13:00 office time.', p: {} },
+      { label: 'Synthetic weather now', note: 'The built-in fallback weather, used when the live data cannot be fetched.', p: { weather: 'noise' } }
+    ]
+  },
+  {
+    title: 'Other states',
+    note: 'Edge cases and the pinboard note.',
+    base: { ...CLEAR_DAY },
+    items: [
+      { label: 'No seed planted', note: 'What students see before you plant anything: a pot of bare soil, note says no seed yet.', p: { empty: true } },
+      { label: 'Note: thirsty', p: { days: 20, dry: 0.9 } },
+      { label: 'Note: wilting!', p: { days: 20, dry: 2 } },
+      { label: 'Note: picked count', p: { days: 30, picked: 5 } },
+      { label: 'Note: watered in minutes', p: { days: 20, dry: 0.01 } },
+      { label: 'Note: watered days ago', p: { days: 20, dry: 2.3 } },
+      { label: 'Night with nothing planted', p: { empty: true, hour: 23.5 } },
+      { label: 'Wilted plant in the rain', note: 'Rain outside does not water the plant.', p: { days: 20, dry: 3, cloud: 0.9, rain: 0.8 } }
+    ]
+  }
+];
+
+const SIZES = [
+  { label: 'Classroom 1112×526', ar: '1112 / 526', max: '1112px' },
+  { label: '16:9', ar: '16 / 9', max: '1112px' },
+  { label: '4:3', ar: '4 / 3', max: '900px' },
+  { label: 'Ultrawide 3:1', ar: '3 / 1', max: '1112px' },
+  { label: 'Phone', ar: '9 / 16', max: '380px' }
+];
+
+const qs = o => Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== false)
+  .map(([k, v]) => v === true ? k : k + '=' + v).join('&');
+
+const items = [];
+GROUPS.forEach(g => g.items.forEach(it => {
+  const href = it.href || ('index.html?' + qs({ demo: true, ...g.base, ...it.p }));
+  items.push({ group: g.title, label: it.label, note: it.note || '', href, own: it.href || qs(it.p) || 'group defaults' });
+}));
+
+const $ = id => document.getElementById(id);
+const nav = $('nav');
+let current = -1;
+
+GROUPS.forEach(g => {
+  const h = document.createElement('h2'); h.textContent = g.title; nav.appendChild(h);
+  if (g.note) { const p = document.createElement('p'); p.className = 'note'; p.textContent = g.note; nav.appendChild(p); }
+  g.items.forEach(it => {
+    const idx = items.findIndex(x => x.group === g.title && x.label === it.label);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.idx = idx;
+    b.innerHTML = it.label + '<small></small>';
+    b.querySelector('small').textContent = items[idx].own;
+    b.addEventListener('click', () => select(idx));
+    nav.appendChild(b);
+  });
+});
+
+function select(idx, pushHash = true) {
+  if (idx < 0 || idx >= items.length) return;
+  current = idx;
+  const it = items[idx];
+  $('frame').src = it.href;
+  $('open').href = it.href;
+  $('title').textContent = it.group + ': ' + it.label;
+  $('desc').textContent = it.note;
+  $('url').textContent = it.href;
+  nav.querySelectorAll('button').forEach(b => b.classList.toggle('active', Number(b.dataset.idx) === idx));
+  const active = nav.querySelector('button.active');
+  if (active) active.scrollIntoView({ block: 'nearest' });
+  if (pushHash) history.replaceState(null, '', '#' + idx);
+}
+
+$('prev').addEventListener('click', () => select((current - 1 + items.length) % items.length));
+$('next').addEventListener('click', () => select((current + 1) % items.length));
+$('reload').addEventListener('click', () => { $('frame').src = items[current].href; });
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'ArrowLeft') $('prev').click();
+  if (e.key === 'ArrowRight') $('next').click();
+});
+
+const sizes = $('sizes');
+SIZES.forEach((sz, i) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = sz.label;
+  b.addEventListener('click', () => {
+    $('frame-box').style.aspectRatio = sz.ar;
+    $('frame-box').style.maxWidth = sz.max;
+    sizes.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+  });
+  if (i === 0) b.classList.add('active');
+  sizes.appendChild(b);
+});
+
+const start = Number(location.hash.slice(1));
+select(Number.isInteger(start) && start >= 0 && start < items.length ? start : 0, false);
+</script>
+</body>
+</html>

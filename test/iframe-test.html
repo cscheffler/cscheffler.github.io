@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Iframe capability test</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #f4f5f7;
+    color: #1d2129;
+    line-height: 1.45;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  .banner { border-radius: 12px; padding: 18px 22px; margin: 0 0 16px; }
+  .banner h1 { margin: 0 0 6px; font-size: 1.45rem; }
+  .banner p { margin: 0; }
+  .banner.fail { background: #fde8e8; color: #7f1d1d; border: 2px solid #ef4444; }
+  .banner.pass { background: #e6f6ec; color: #14532d; border: 2px solid #22c55e; }
+  section { background: #fff; border: 1px solid #e3e6ea; border-radius: 12px; padding: 14px 18px; margin-bottom: 14px; }
+  section h2 { margin: 0 0 10px; font-size: 1.05rem; }
+  ul.checks { list-style: none; margin: 0; padding: 0; }
+  ul.checks li { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; border-top: 1px solid #eef0f2; }
+  ul.checks li:first-child { border-top: 0; }
+  .pill {
+    flex: 0 0 auto; min-width: 64px; text-align: center;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 999px; margin-top: 2px;
+  }
+  .pill.pass { background: #dcfce7; color: #166534; }
+  .pill.fail { background: #fee2e2; color: #991b1b; }
+  .pill.warn { background: #fef3c7; color: #92400e; }
+  .pill.info { background: #e0e7ff; color: #3730a3; }
+  .pill.pending { background: #e5e7eb; color: #4b5563; }
+  .name { font-weight: 600; }
+  .detail { color: #4b5563; font-size: 0.92rem; overflow-wrap: anywhere; }
+  dl.live { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; }
+  dl.live dt { font-weight: 600; }
+  dl.live dd { margin: 0; font-variant-numeric: tabular-nums; }
+  textarea { width: 100%; min-height: 180px; font: 0.8rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; border: 1px solid #d5d9de; border-radius: 8px; padding: 8px; resize: vertical; }
+  button { font: inherit; padding: 7px 14px; border-radius: 8px; border: 1px solid #c7ccd2; background: #fff; cursor: pointer; }
+  button:hover { background: #f0f2f4; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .muted { color: #6b7280; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<main>
+
+  <!-- Visible by default. JavaScript hides it the moment it runs. -->
+  <div id="js-missing" class="banner fail">
+    <h1>JavaScript did NOT run</h1>
+    <p>The page loaded, but its script never executed. The embedding iframe is most likely
+       sandboxed without <code>allow-scripts</code>. A dynamic page cannot work in this slot.</p>
+  </div>
+
+  <div id="js-ok" class="banner pass" hidden>
+    <h1>JavaScript is running</h1>
+    <p id="summary">Running checks…</p>
+  </div>
+
+  <div id="details" hidden>
+
+    <section>
+      <h2>Checks</h2>
+      <ul class="checks" id="checks"></ul>
+    </section>
+
+    <section>
+      <h2>Live</h2>
+      <p class="muted">These keep updating. If they stall while the page is on screen, the host is throttling the iframe.</p>
+      <dl class="live">
+        <dt>Viewport</dt><dd id="viewport">–</dd>
+        <dt>Clock</dt><dd id="clock">–</dd>
+        <dt>Uptime</dt><dd id="uptime">–</dd>
+        <dt>Timer ticks</dt><dd id="ticks">–</dd>
+        <dt>Animation frames</dt><dd id="fps">–</dd>
+        <dt>Visibility</dt><dd id="visibility">–</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>Report</h2>
+      <div class="row">
+        <button id="copy" type="button">Copy report</button>
+        <button id="rerun" type="button">Re-run checks</button>
+        <span id="copy-status" class="muted"></span>
+      </div>
+      <textarea id="report" readonly spellcheck="false"></textarea>
+    </section>
+
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // Flip the banner first, before anything else can throw.
+  $('js-missing').hidden = true;
+  $('js-ok').hidden = false;
+  $('details').hidden = false;
+
+  var startedAt = new Date();
+  var order = [];
+  var results = {};
+
+  function set(name, status, detail) {
+    if (!results[name]) order.push(name);
+    results[name] = { status: status, detail: detail };
+    render();
+  }
+
+  function render() {
+    var list = $('checks');
+    list.innerHTML = '';
+    var pass = 0, fail = 0, warn = 0, pending = 0;
+    order.forEach(function (name) {
+      var r = results[name];
+      if (r.status === 'pass') pass++;
+      if (r.status === 'fail') fail++;
+      if (r.status === 'warn') warn++;
+      if (r.status === 'pending') pending++;
+      var li = document.createElement('li');
+      var pill = document.createElement('span');
+      pill.className = 'pill ' + r.status;
+      pill.textContent = r.status;
+      var body = document.createElement('div');
+      var n = document.createElement('div');
+      n.className = 'name';
+      n.textContent = name;
+      var d = document.createElement('div');
+      d.className = 'detail';
+      d.textContent = r.detail;
+      body.appendChild(n);
+      body.appendChild(d);
+      li.appendChild(pill);
+      li.appendChild(body);
+      list.appendChild(li);
+    });
+    var msg;
+    if (pending) msg = 'Running checks… ' + pending + ' still in progress.';
+    else if (fail) msg = fail + ' check' + (fail === 1 ? '' : 's') + ' failed. See the list below.';
+    else if (warn) msg = 'No failures, ' + warn + ' warning' + (warn === 1 ? '' : 's') + '. A dynamic page will work in this slot; see the notes below.';
+    else msg = 'All checks passed. A dynamic page will work in this slot.';
+    $('summary').textContent = msg;
+    updateReport();
+  }
+
+  function updateReport() {
+    var lines = [];
+    lines.push('Iframe capability test');
+    lines.push('Page:       ' + location.href);
+    lines.push('Started:    ' + startedAt.toISOString());
+    lines.push('Now:        ' + new Date().toISOString());
+    lines.push('');
+    order.forEach(function (name) {
+      var r = results[name];
+      lines.push('[' + r.status.toUpperCase() + '] ' + name + ': ' + r.detail);
+    });
+    lines.push('');
+    lines.push('Viewport:   ' + $('viewport').textContent);
+    lines.push('Clock:      ' + $('clock').textContent);
+    lines.push('Uptime:     ' + $('uptime').textContent);
+    lines.push('Timers:     ' + $('ticks').textContent);
+    lines.push('Frames:     ' + $('fps').textContent);
+    lines.push('Visibility: ' + $('visibility').textContent);
+    $('report').value = lines.join('\n');
+  }
+
+  // ---------- one-shot checks ----------
+
+  function runChecks() {
+    order = [];
+    results = {};
+
+    // Are we framed, and by whom?
+    var framed = false;
+    try { framed = window.self !== window.top; } catch (e) { framed = true; }
+    var parent = '';
+    try {
+      if (location.ancestorOrigins && location.ancestorOrigins.length) {
+        parent = Array.prototype.join.call(location.ancestorOrigins, ' > ');
+      }
+    } catch (e) {}
+    if (!parent && document.referrer) parent = document.referrer;
+    set('Embedded in an iframe',
+        framed ? 'info' : 'warn',
+        framed ? 'Yes' + (parent ? '. Parent: ' + parent : '. Parent origin not exposed.')
+               : 'No. Open this page inside the classroom for a meaningful result.');
+
+    // Origin. "null" means the sandbox lacks allow-same-origin.
+    var origin = 'unknown';
+    try { origin = String(window.origin || location.origin); } catch (e) {}
+    set('Page origin',
+        origin === 'null' ? 'warn' : 'info',
+        origin === 'null'
+          ? 'Opaque ("null"): the sandbox lacks allow-same-origin. Storage and sign-in will not work here, but a read-only display page is fine.'
+          : origin);
+
+    // localStorage
+    try {
+      localStorage.setItem('iframe-test', '1');
+      localStorage.removeItem('iframe-test');
+      set('localStorage', 'pass', 'Available.');
+    } catch (e) {
+      set('localStorage', 'warn', 'Blocked (' + (e && e.name) + '). Not needed for a display page.');
+    }
+
+    // Browser
+    set('Browser', 'info', navigator.userAgent);
+
+    // External script: the Firebase SDK from Google's CDN.
+    var scriptName = 'External script (Firebase SDK from gstatic.com)';
+    set(scriptName, 'pending', 'Loading…');
+    var scriptDone = false;
+    var s = document.createElement('script');
+    s.src = 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js?t=' + Date.now();
+    s.onload = function () {
+      scriptDone = true;
+      var ok = !!(window.firebase && window.firebase.SDK_VERSION);
+      set(scriptName, ok ? 'pass' : 'fail',
+          ok ? 'Loaded. SDK version ' + window.firebase.SDK_VERSION + '.'
+             : 'Script loaded but the firebase global is missing.');
+    };
+    s.onerror = function () {
+      scriptDone = true;
+      set(scriptName, 'fail', 'The browser refused or failed to load the script.');
+    };
+    document.head.appendChild(s);
+    setTimeout(function () {
+      if (!scriptDone) set(scriptName, 'fail', 'Timed out after 15 s.');
+    }, 15000);
+
+    // Cross-origin fetch. api.github.com sends Access-Control-Allow-Origin: *.
+    var fetchName = 'Cross-origin fetch (api.github.com)';
+    set(fetchName, 'pending', 'Requesting…');
+    if (typeof fetch !== 'function') {
+      set(fetchName, 'fail', 'fetch() is not available in this browser.');
+    } else {
+      fetch('https://api.github.com/zen', { cache: 'no-store' })
+        .then(function (r) {
+          return r.text().then(function (t) {
+            set(fetchName, r.ok ? 'pass' : 'fail', 'HTTP ' + r.status + '. Response: "' + t.trim() + '"');
+          });
+        })
+        .catch(function (e) {
+          set(fetchName, 'fail', 'Request failed: ' + (e && e.message));
+        });
+    }
+
+    // WebSocket. Firebase prefers this but falls back to long polling.
+    var wsName = 'WebSocket (echo.websocket.org)';
+    set(wsName, 'pending', 'Connecting…');
+    var wsDone = false;
+    try {
+      var ws = new WebSocket('wss://echo.websocket.org/');
+      var payload = 'iframe-test ' + Date.now();
+      ws.onopen = function () { ws.send(payload); };
+      ws.onmessage = function (ev) {
+        if (ev.data === payload) {
+          wsDone = true;
+          set(wsName, 'pass', 'Connected and echo received.');
+          ws.close();
+        }
+      };
+      ws.onerror = function () {
+        if (!wsDone) {
+          wsDone = true;
+          set(wsName, 'warn', 'Connection failed. Firebase would fall back to long polling.');
+        }
+      };
+      ws.onclose = function () {
+        if (!wsDone) {
+          wsDone = true;
+          set(wsName, 'warn', 'Closed before echo arrived. Firebase would fall back to long polling.');
+        }
+      };
+      setTimeout(function () {
+        if (!wsDone) {
+          wsDone = true;
+          set(wsName, 'warn', 'Timed out after 15 s. Firebase would fall back to long polling.');
+          try { ws.close(); } catch (e) {}
+        }
+      }, 15000);
+    } catch (e) {
+      set(wsName, 'warn', 'Could not open: ' + (e && e.message));
+    }
+  }
+
+  // ---------- live counters ----------
+
+  var tickCount = 0;
+  var tickWindowStart = Date.now();
+  setInterval(function () { tickCount++; }, 100);
+
+  var frameCount = 0;
+  var frameWindowStart = Date.now();
+  function onFrame() { frameCount++; requestAnimationFrame(onFrame); }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(onFrame);
+  else $('fps').textContent = 'requestAnimationFrame not available';
+
+  var visibilityChanges = 0;
+  function visibilityText() {
+    return (document.visibilityState || 'unknown') + ' (' + visibilityChanges + ' change' + (visibilityChanges === 1 ? '' : 's') + ')';
+  }
+  document.addEventListener('visibilitychange', function () {
+    visibilityChanges++;
+    $('visibility').textContent = visibilityText();
+  });
+  $('visibility').textContent = visibilityText();
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+  function tickUi() {
+    var now = new Date();
+    $('viewport').textContent = window.innerWidth + ' × ' + window.innerHeight + ' px, device pixel ratio ' + window.devicePixelRatio;
+    $('clock').textContent = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    var secs = Math.floor((now - startedAt) / 1000);
+    $('uptime').textContent = Math.floor(secs / 3600) + 'h ' + pad(Math.floor(secs / 60) % 60) + 'm ' + pad(secs % 60) + 's';
+
+    var elapsed = (now - tickWindowStart) / 1000;
+    if (elapsed >= 5) {
+      $('ticks').textContent = tickCount + ' in the last ' + elapsed.toFixed(1) + ' s (expect about ' + Math.round(elapsed * 10) + ')';
+      tickCount = 0;
+      tickWindowStart = now.getTime();
+    }
+    var felapsed = (now - frameWindowStart) / 1000;
+    if (felapsed >= 1 && typeof requestAnimationFrame === 'function') {
+      $('fps').textContent = Math.round(frameCount / felapsed) + ' per second';
+      frameCount = 0;
+      frameWindowStart = now.getTime();
+    }
+    updateReport();
+  }
+  setInterval(tickUi, 1000);
+  tickUi();
+
+  // ---------- buttons ----------
+
+  $('rerun').addEventListener('click', runChecks);
+
+  $('copy').addEventListener('click', function () {
+    var text = $('report').value;
+    var status = $('copy-status');
+    function fallback() {
+      $('report').focus();
+      $('report').select();
+      status.textContent = 'Clipboard blocked here. The text is selected, press Ctrl/Cmd+C.';
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        status.textContent = 'Copied.';
+      }, fallback);
+    } else {
+      fallback();
+    }
+  });
+
+  runChecks();
+})();
+</script>
+</body>
+</html>

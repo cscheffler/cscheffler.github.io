@@ -172,7 +172,7 @@
       <span class="desc">weight toward <i>p</i> = 1</span>
     </div>
     <div class="control-row">
-      <input type="range" id="a-range" min="0.1" max="50" step="0.1" value="2"
+      <input type="range" id="a-range" min="0.1" max="120" step="0.1" value="2"
              aria-label="alpha, weight toward p equals 1">
       <input type="text" id="a-num" class="num-input" value="2"
              inputmode="decimal" autocomplete="off" spellcheck="false"
@@ -186,7 +186,7 @@
       <span class="desc">weight toward <i>p</i> = 0</span>
     </div>
     <div class="control-row">
-      <input type="range" id="b-range" min="0.1" max="50" step="0.1" value="2"
+      <input type="range" id="b-range" min="0.1" max="120" step="0.1" value="2"
              aria-label="beta, weight toward p equals 0">
       <input type="text" id="b-num" class="num-input" value="2"
              inputmode="decimal" autocomplete="off" spellcheck="false"
@@ -220,7 +220,7 @@
 
   <h2>How to use it</h2>
   <ul>
-    <li><b>&alpha;</b> and <b>&beta;</b> &mdash; the two shape parameters, from 0.1 to 50. Raise
+    <li><b>&alpha;</b> and <b>&beta;</b> &mdash; the two shape parameters, from 0.1 to 120. Raise
       them together and the curve narrows; raise one relative to the other and the mass slides
       toward that end.</li>
     <li>Each slider has a text box beside it for typing an exact value; the arrow keys nudge it by
@@ -244,7 +244,7 @@
       Beta(&alpha;, &beta;) is the same function of <i>p</i> as a Binomial likelihood with
       <i>k</i> = &alpha;&minus;1 successes and <i>n</i>&minus;<i>k</i> = &beta;&minus;1 failures.
       Only the vertical scale differs, since the Beta is normalised to area 1.</li>
-    <li>Walk &alpha; and &beta; up together &mdash; (2,2), (5,5), (20,20), (50,50) &mdash; with
+    <li>Walk &alpha; and &beta; up together &mdash; (2,2), (5,5), (20,20), (50,50), (120,120) &mdash; with
       <b>auto-scale off</b> after the first. The mean never moves; the curve just gets taller and
       thinner. That is what accumulating data does to a posterior.</li>
     <li>&alpha; = 1, &beta; = 5. The density is highest exactly at <i>p</i> = 0 and falls away: a
@@ -277,7 +277,7 @@
   /* ------------------------------------------------------------------ state */
 
   var DEFAULTS = { a: 2, b: 2, yFixed: null };   // yFixed null = axis auto-scales
-  var LIMITS   = { min: 0.1, max: 50 };
+  var LIMITS   = { min: 0.1, max: 120 };
   var state    = { a: DEFAULTS.a, b: DEFAULTS.b, yFixed: DEFAULTS.yFixed };
   var hover    = null;   // p currently hovered, or null
 

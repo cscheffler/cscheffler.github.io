@@ -1,0 +1,430 @@
+<title>Inductive Bias Matching</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+  :root {
+    color-scheme: light;
+
+    --ground:     #eef0f3;
+    --card:       #ffffff;
+    --ink:        #1b2430;
+    --ink-soft:   #5a6675;
+    --ink-faint:  #8a94a2;
+    --rule:       #d8dde4;
+    --rule-soft:  #e6e9ee;
+
+    --suit-a:     #b0700c;
+    --suit-a-bg:  #fbf3e3;
+    --suit-r:     #1c6b5e;
+    --suit-r-bg:  #e6f2ef;
+
+    --shadow: 0 1px 2px rgba(27, 36, 48, .06), 0 6px 16px -10px rgba(27, 36, 48, .22);
+
+    --sans:  "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono:  "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --serif: "Source Serif 4", ui-serif, Georgia, "Times New Roman", serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground:     #14181d;
+      --card:       #1c2128;
+      --ink:        #e6eaf0;
+      --ink-soft:   #9aa4b1;
+      --ink-faint:  #6e7887;
+      --rule:       #2c333c;
+      --rule-soft:  #242b33;
+      --suit-a:     #e0a64a;
+      --suit-a-bg:  #2e2416;
+      --suit-r:     #4fb3a0;
+      --suit-r-bg:  #142926;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 16px -10px rgba(0, 0, 0, .7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground:     #14181d;
+    --card:       #1c2128;
+    --ink:        #e6eaf0;
+    --ink-soft:   #9aa4b1;
+    --ink-faint:  #6e7887;
+    --rule:       #2c333c;
+    --rule-soft:  #242b33;
+    --suit-a:     #e0a64a;
+    --suit-a-bg:  #2e2416;
+    --suit-r:     #4fb3a0;
+    --suit-r-bg:  #142926;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 16px -10px rgba(0, 0, 0, .7);
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1140px;
+    margin-inline: auto;
+    padding-inline: 20px;
+    padding-block: 40px 64px;
+  }
+
+  /* ---------- header ---------- */
+
+  header { border-bottom: 1px solid var(--rule); padding-bottom: 22px; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: clamp(25px, 4.4vw, 34px);
+    line-height: 1.12;
+    letter-spacing: -.017em;
+    text-wrap: balance;
+    margin: 0 0 14px;
+  }
+
+  .lede {
+    font-size: 16.5px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    max-width: 60ch;
+    margin: 0;
+  }
+
+  .rules {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    margin: 20px 0 0;
+    padding: 0;
+  }
+
+  .rules li {
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--ink-soft);
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 6px 13px;
+  }
+
+  .rules b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- sections ---------- */
+
+  section { margin-top: 44px; }
+
+  .head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-bottom: 18px;
+  }
+
+  h2 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    margin: 0;
+    padding-left: 12px;
+    border-left: 3px solid var(--accent);
+    color: var(--accent);
+  }
+
+  .head p {
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 58ch;
+  }
+
+  #assumptions { --accent: var(--suit-a); --accent-bg: var(--suit-a-bg); }
+  #architectures { --accent: var(--suit-r); --accent-bg: var(--suit-r-bg); }
+
+  /* ---------- cards ---------- */
+
+  .grid { display: grid; gap: 14px; }
+  #assumptions .grid { grid-template-columns: repeat(4, 1fr); }
+  #architectures .grid { grid-template-columns: repeat(3, 1fr); }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 15px 16px 17px;
+    box-shadow: var(--shadow);
+  }
+
+  .code {
+    align-self: flex-start;
+    position: relative;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    color: var(--accent);
+    background: var(--accent-bg);
+    border: 1px solid transparent;
+    border-radius: 3px;
+    padding: 3px 9px;
+    cursor: pointer;
+    transition: border-color .12s ease, transform .12s ease;
+  }
+
+  .code:hover { border-color: var(--accent); }
+  .code:active { transform: translateY(1px); }
+  .code:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .code::after {
+    content: "copied";
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 7px);
+    transform: translateX(-50%);
+    font-family: var(--sans);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--card);
+    background: var(--ink);
+    border-radius: 3px;
+    padding: 3px 7px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease;
+  }
+
+  .code.copied::after { opacity: 1; }
+
+  .name {
+    font-family: var(--sans);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: .075em;
+    text-transform: uppercase;
+    line-height: 1.3;
+    color: var(--ink);
+    margin: 0;
+  }
+
+  .def {
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule-soft);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ink-faint);
+  }
+
+  /* ---------- narrower ---------- */
+
+  @media (max-width: 900px) {
+    #assumptions .grid, #architectures .grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 520px) {
+    .wrap { padding-inline: 16px; padding-block: 30px 48px; }
+    #assumptions .grid, #architectures .grid { grid-template-columns: 1fr; }
+    section { margin-top: 36px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <h1>Inductive bias matching</h1>
+    <p class="lede">
+      For each data type, decide which assumptions
+      about its structure a model could exploit, then which architecture builds those
+      assumptions in.
+    </p>
+    <p class="lede">
+    Be ready to say what each assumption would <em>cost</em> if it turned out to be false.
+    That, rather than the match itself, is what we will discuss.
+    </p>
+    <ul class="rules">
+      <li>Type the <b>code</b>, not the name — <b>A1</b>, <b>R4</b></li>
+      <li>An assumption card can be used on <b>more than one</b> data type</li>
+      <li><b>One</b> architecture card per data type</li>
+      <li>Click a code to copy it</li>
+    </ul>
+  </header>
+
+  <section id="assumptions">
+    <div class="head">
+      <h2>Assumption</h2>
+      <p>A structural claim about the data. Eight cards, and one of them is a trap.</p>
+    </div>
+    <div class="grid">
+
+      <article class="card">
+        <button class="code" type="button" data-code="A1" aria-label="Copy code A1">A1</button>
+        <h3 class="name">Locality</h3>
+        <p class="def">Elements that are close together are related. Distant ones usually are not — at least not directly.</p>
+      </article>
+
+      <article class="card">
+        <button class="code" type="button" data-code="A2" aria-label="Copy code A2">A2</button>
+        <h3 class="name">Same pattern anywhere</h3>
+        <p class="def">A pattern means the same thing wherever it occurs, so the detector for it can be reused at every position.</p>
+      </article>
+
+      <article class="card">
+        <button class="code" type="button" data-code="A3" aria-label="Copy code A3">A3</button>
+        <h3 class="name">Order matters</h3>
+        <p class="def">The elements come in an order, and reordering them changes the right answer.</p>
+      </article>
+
+      <article class="card">
+        <button class="code" type="button" data-code="A4" aria-label="Copy code A4">A4</button>
+        <h3 class="name">Order does not matter</h3>
+        <p class="def">The input is a set. Reordering the elements must not change the answer at all.</p>
+      </article>
+
+      <article class="card">
+        <button class="code" type="button" data-code="A5" aria-label="Copy code A5">A5</button>
+        <h3 class="name">Anything can depend on anything</h3>
+        <p class="def">Any element may depend on any other, however far apart, and which pairs matter changes from input to input.</p>
+      </article>
+
+      <article class="card">
+        <button class="code" type="button" data-code="A6" aria-label="Copy code A6">A6</button>
+        <h3 class="name">It is a graph</h3>
+        <p class="def">What matters is which elements are connected to which — not the numbers we happened to give them.</p>
+      </article>
+
+      <article class="card">
+        <button class="code" type="button" data-code="A7" aria-label="Copy code A7">A7</button>
+        <h3 class="name">Parts make wholes</h3>
+        <p class="def">Small pieces combine into larger pieces, which combine again. Meaning is built up in layers.</p>
+      </article>
+
+      <article class="card">
+        <button class="code" type="button" data-code="A8" aria-label="Copy code A8">A8</button>
+        <h3 class="name">Every feature is its own thing</h3>
+        <p class="def">No two inputs are interchangeable; each one has its own separate meaning. There is no position, order, or neighbourhood to exploit.</p>
+      </article>
+
+    </div>
+  </section>
+
+  <section id="architectures">
+    <div class="head">
+      <h2>Architecture</h2>
+      <p>The model that builds those assumptions in. One of these is not a neural network.</p>
+    </div>
+    <div class="grid">
+
+      <article class="card">
+        <button class="code" type="button" data-code="R1" aria-label="Copy code R1">R1</button>
+        <h3 class="name">MLP</h3>
+        <p class="def">Fully connected layers. Every input connects to every unit, with its own weight.</p>
+      </article>
+
+      <article class="card">
+        <button class="code" type="button" data-code="R2" aria-label="Copy code R2">R2</button>
+        <h3 class="name">CNN</h3>
+        <p class="def">A small kernel slid over every position, its weights shared across positions. Stacked, with pooling.</p>
+      </article>
+
+      <article class="card">
+        <button class="code" type="button" data-code="R3" aria-label="Copy code R3">R3</button>
+        <h3 class="name">RNN / LSTM</h3>
+        <p class="def">Reads one element at a time, carrying a fixed-size memory from step to step.</p>
+      </article>
+
+      <article class="card">
+        <button class="code" type="button" data-code="R4" aria-label="Copy code R4">R4</button>
+        <h3 class="name">Transformer</h3>
+        <p class="def">Every element attends to every other in one step, with weights computed from the content.</p>
+      </article>
+
+      <article class="card">
+        <button class="code" type="button" data-code="R5" aria-label="Copy code R5">R5</button>
+        <h3 class="name">GNN</h3>
+        <p class="def">Each node repeatedly collects messages from its neighbours and updates itself.</p>
+      </article>
+
+      <article class="card">
+        <button class="code" type="button" data-code="R6" aria-label="Copy code R6">R6</button>
+        <h3 class="name">Gradient-boosted trees</h3>
+        <p class="def">Not a neural network. A committee of decision trees, each splitting on one column at a time.</p>
+      </article>
+
+    </div>
+  </section>
+
+</div>
+
+<script>
+  document.querySelectorAll(".code").forEach(function (btn) {
+    var timer;
+
+    function flash() {
+      btn.classList.add("copied");
+      clearTimeout(timer);
+      timer = setTimeout(function () { btn.classList.remove("copied"); }, 1200);
+    }
+
+    function selectInstead() {
+      try {
+        var range = document.createRange();
+        range.selectNodeContents(btn);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (e) { /* nothing more we can offer */ }
+    }
+
+    btn.addEventListener("click", function () {
+      var code = btn.dataset.code;
+      try {
+        navigator.clipboard.writeText(code).then(flash, selectInstead);
+      } catch (e) {
+        selectInstead();
+      }
+    });
+  });
+</script>

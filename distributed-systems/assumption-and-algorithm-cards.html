@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assumptions &amp; Algorithms</title>
+<style>
+  :root {
+    --bg: #f6f4ef;
+    --surface: #ffffff;
+    --surface-2: #faf9f6;
+    --text: #1d1c1a;
+    --muted: #615e57;
+    --border: #e3dfd6;
+    --border-strong: #cfc9bc;
+    --focus: #2f5bd3;
+    --toast-bg: #1d1c1a;
+    --toast-text: #ffffff;
+    --mark: #fff0b3;
+
+    --c1: #1f7a6d;  --c1-soft: #e3f2ef;
+    --c2: #b4532a;  --c2-soft: #f8e9e1;
+    --c3: #6a4bb5;  --c3-soft: #eee9f8;
+    --c4: #2f6db3;  --c4-soft: #e4edf8;
+    --c5: #8a6a12;  --c5-soft: #f5eed8;
+    --c6: #a33a63;  --c6-soft: #f7e5ec;
+
+    --radius: 12px;
+    --shadow: 0 1px 2px rgba(30, 25, 15, .05), 0 2px 8px rgba(30, 25, 15, .04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161614;
+      --surface: #201f1c;
+      --surface-2: #1b1a18;
+      --text: #ecebe6;
+      --muted: #a29f96;
+      --border: #34322d;
+      --border-strong: #46433c;
+      --focus: #8fb0ff;
+      --toast-bg: #ecebe6;
+      --toast-text: #161614;
+      --mark: #5a4b12;
+
+      --c1: #5cc4b2;  --c1-soft: #1b2f2b;
+      --c2: #ec9067;  --c2-soft: #35231b;
+      --c3: #a993e6;  --c3-soft: #2a2438;
+      --c4: #7fb0ec;  --c4-soft: #1d2a3a;
+      --c5: #d8b85a;  --c5-soft: #312a17;
+      --c6: #e48aae;  --c6-soft: #352029;
+
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161614;
+    --surface: #201f1c;
+    --surface-2: #1b1a18;
+    --text: #ecebe6;
+    --muted: #a29f96;
+    --border: #34322d;
+    --border-strong: #46433c;
+    --focus: #8fb0ff;
+    --toast-bg: #ecebe6;
+    --toast-text: #161614;
+    --mark: #5a4b12;
+
+    --c1: #5cc4b2;  --c1-soft: #1b2f2b;
+    --c2: #ec9067;  --c2-soft: #35231b;
+    --c3: #a993e6;  --c3-soft: #2a2438;
+    --c4: #7fb0ec;  --c4-soft: #1d2a3a;
+    --c5: #d8b85a;  --c5-soft: #312a17;
+    --c6: #e48aae;  --c6-soft: #352029;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+  header.hero { padding: 40px 0 20px; }
+  .eyebrow {
+    font-size: 13px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; margin: 0 0 8px;
+  }
+  h1 {
+    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-weight: 600; font-size: clamp(30px, 5vw, 44px); line-height: 1.1;
+    margin: 0 0 14px; letter-spacing: -.01em;
+  }
+  .lede { max-width: 68ch; color: var(--muted); margin: 0; }
+  .lede strong { color: var(--text); font-weight: 600; }
+
+  .toolbar {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 90%, transparent);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .toolbar .wrap { display: flex; gap: 10px; align-items: center; padding-top: 10px; padding-bottom: 10px; flex-wrap: wrap; }
+  .search {
+    flex: 1 1 240px; min-width: 0; position: relative;
+  }
+  .search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  .search input {
+    width: 100%; font: inherit; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 999px;
+    padding: 8px 14px 8px 38px; outline: none;
+  }
+  .search input:focus { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent); }
+  .jump { display: flex; gap: 6px; }
+  .jump a {
+    text-decoration: none; color: var(--text); font-size: 14px; font-weight: 600;
+    padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface);
+    white-space: nowrap;
+  }
+  .jump a:hover { border-color: var(--text); }
+  .jump .count { color: var(--muted); font-weight: 500; margin-left: 4px; }
+
+  section.part { padding: 28px 0 8px; scroll-margin-top: 64px; }
+  .part-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  h2 {
+    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-size: 28px; font-weight: 600; margin: 0;
+  }
+  .part-sub { color: var(--muted); margin: 0 0 8px; max-width: 70ch; }
+
+  .group { margin: 22px 0 6px; }
+  .group-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex: none; }
+  h3 { font-size: 15px; letter-spacing: .04em; text-transform: uppercase; margin: 0; color: var(--accent); }
+  .group-blurb { color: var(--muted); font-size: 14px; margin: 0; }
+  .group-head .sep { color: var(--border-strong); }
+
+  .grid {
+    display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px 14px 14px 16px; position: relative; overflow: hidden;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .card::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--accent);
+  }
+  .title-row { display: flex; align-items: flex-start; gap: 8px; }
+  .title {
+    flex: 1; min-width: 0;
+    font-weight: 650; font-size: 16.5px; line-height: 1.3;
+    user-select: all; -webkit-user-select: all; cursor: text;
+  }
+  .copy {
+    flex: none; display: inline-flex; align-items: center; gap: 5px;
+    font: 600 12.5px/1 inherit; font-family: inherit;
+    color: var(--accent); background: var(--accent-soft);
+    border: 1px solid transparent; border-radius: 999px; padding: 6px 10px; cursor: pointer;
+  }
+  .copy:hover { border-color: var(--accent); }
+  .copy:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .copy.done { background: var(--accent); color: var(--surface); }
+  .desc { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.5; }
+  mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+  .g1 { --accent: var(--c1); --accent-soft: var(--c1-soft); }
+  .g2 { --accent: var(--c2); --accent-soft: var(--c2-soft); }
+  .g3 { --accent: var(--c3); --accent-soft: var(--c3-soft); }
+  .g4 { --accent: var(--c4); --accent-soft: var(--c4-soft); }
+  .g5 { --accent: var(--c5); --accent-soft: var(--c5-soft); }
+  .g6 { --accent: var(--c6); --accent-soft: var(--c6-soft); }
+
+  .empty { color: var(--muted); padding: 24px 0; display: none; }
+  footer { color: var(--muted); font-size: 13px; padding: 32px 0 48px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
+    background: var(--toast-bg); color: var(--toast-text);
+    padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 500;
+    opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s;
+    max-width: calc(100vw - 32px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 560px) {
+    header.hero { padding-top: 28px; }
+    .jump { width: 100%; }
+    .jump a { flex: 1; text-align: center; }
+  }
+  @media print {
+    .toolbar, .copy, .toast { display: none !important; }
+    body { background: #fff; }
+    .card { box-shadow: none; break-inside: avoid; }
+    section.part { break-before: page; }
+    section.part:first-of-type { break-before: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Distributed Systems · Session 4 · Consensus and Consistency</p>
+    <h1>Assumptions &amp; Algorithms</h1>
+    <p class="lede">For each scenario in your table, pick the <strong>assumptions</strong> you're making about the system and the <strong>algorithm</strong> that fits them. Use the <strong>Copy</strong> button and paste the card title into your table. Most scenarios need several assumptions. Be ready to explain why you picked each one.</p>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="wrap">
+    <label class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Filter cards…" aria-label="Filter cards" autocomplete="off">
+    </label>
+    <nav class="jump">
+      <a href="#assumptions">Assumptions<span class="count" id="n-assumptions"></span></a>
+      <a href="#algorithms">Algorithms<span class="count" id="n-algorithms"></span></a>
+    </nav>
+  </div>
+</div>
+
+<main class="wrap" id="main"></main>
+
+<div class="wrap"><p class="empty" id="empty">No cards match that filter.</p></div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const DATA = [
+  {
+    id: "assumptions",
+    title: "Assumptions",
+    sub: "",
+    groups: [
+      { name: "Network", blurb: "What can go wrong between nodes", items: [
+        ["Fair-loss links", "Messages may be lost, delayed, duplicated or reordered, but a message that is retried often enough eventually gets through."],
+        ["Network partitions possible", "Groups of nodes can be cut off from each other for a while, even though all of them are still running."],
+        ["Long disconnections", "Some nodes (e.g. phones or laptops) are offline for hours or days at a time and still need to be usable."],
+      ]},
+      { name: "Node failures", blurb: "What can go wrong with the nodes themselves", items: [
+        ["Crash-stop", "A node that fails stops and never comes back."],
+        ["Crash-recovery", "A node may crash and later restart. It loses what was in memory but keeps what it had written to disk."],
+        ["Byzantine faults", "Some nodes may behave arbitrarily, including sending wrong, inconsistent or deliberately malicious messages."],
+      ]},
+      { name: "Timing", blurb: "What you may assume about delays and clocks", items: [
+        ["Synchronous", "There is a known upper bound on message delay and on how long a node takes to do each step."],
+        ["Partially synchronous", "The system usually behaves synchronously, but there can be periods of unbounded delay. Timeouts are useful but can be wrong."],
+        ["Asynchronous", "There is no upper bound on message delay or processing time. A slow node can't be told apart from a crashed one."],
+        ["Clocks roughly synchronized", "Node clocks agree to within a small, known error (e.g. kept in sync with NTP)."],
+        ["Processes can pause unexpectedly", "A running node can freeze for an unbounded time (garbage collection, VM migration) and then carry on without noticing that time has passed."],
+      ]},
+      { name: "Availability", blurb: "Who must be reachable, and what happens during a partition", items: [
+        ["A majority of nodes is reachable", "At any time, more than half of the nodes are up and can talk to each other."],
+        ["Every participant must be reachable", "Making progress requires a response from every node involved, not just most of them."],
+        ["Must stay available during a partition", "Every node that is still running must keep answering requests, even when it can't reach the others."],
+        ["May refuse requests during a partition", "During a partition, the system may make clients wait or return an error instead of giving an inconsistent answer."],
+      ]},
+    ],
+  },
+  {
+    id: "algorithms",
+    title: "Algorithms",
+    sub: "",
+    groups: [
+      { name: "Consensus & total order", blurb: "Getting nodes to agree", items: [
+        ["Raft consensus (total order broadcast)", "An elected leader appends commands to a replicated log. An entry is committed once a majority of nodes store it, and every node applies committed entries in the same order. Terms prevent two leaders from both making progress."],
+        ["Linearizable CAS via total order broadcast", "Each CAS(x, expected, new) is sent through total order broadcast. Every replica applies them in log order, so all replicas agree on which CAS succeeded and which failed."],
+        ["Byzantine fault-tolerant consensus", "Consensus that still works when up to f nodes lie or misbehave, provided there are at least 3f + 1 nodes (e.g. PBFT and some blockchains)."],
+      ]},
+      { name: "Quorum replication", blurb: "Reading and writing a majority of replicas", items: [
+        ["Quorum reads/writes with read-repair", "Write to w of n replicas and read from r of them, with r + w > n. Before returning, the reader writes the newest value it saw back to a quorum."],
+        ["Quorum reads/writes without read-repair", "The same quorums (r + w > n), but the reader just returns the newest value it saw and doesn't update replicas that are behind."],
+      ]},
+      { name: "Atomic commit", blurb: "All participants commit, or none do", items: [
+        ["Two-phase commit (2PC)", "A coordinator asks every participant to prepare and vote. If all vote yes, everyone commits; otherwise, everyone aborts. A participant that voted yes must wait for the coordinator's decision."],
+        ["Fault-tolerant two-phase commit", "Like 2PC, but the votes and the commit/abort decision go through total order broadcast, so a crashed coordinator doesn't leave participants stuck."],
+      ]},
+      { name: "Broadcast", blurb: "Getting messages to every node", items: [
+        ["Reliable broadcast", "Every message is eventually delivered to every node that hasn't crashed (e.g. eager reliable broadcast or gossip). No guarantee about delivery order."],
+        ["FIFO broadcast", "Reliable broadcast, plus messages from the same sender are delivered in the order that sender sent them."],
+        ["Causal broadcast", "Reliable broadcast, plus if message A happened before message B, every node delivers A before B. Concurrent messages may be delivered in different orders on different nodes."],
+      ]},
+      { name: "Eventual consistency", blurb: "Accept writes locally, sync later", items: [
+        ["Eventual consistency: last-writer-wins", "Each replica accepts writes locally and syncs in the background. When concurrent writes conflict, the one with the highest timestamp is kept and the others are discarded."],
+        ["Eventual consistency: merge concurrent versions", "Each replica accepts writes locally and syncs in the background. All conflicting concurrent versions are kept and combined by a merge function (e.g. taking the union of two sets)."],
+      ]},
+      { name: "Coordination & other", blurb: "Locks, baselines and dead ends", items: [
+        ["Lease-based lock with fencing tokens", "A node acquires a lock (via CAS) that expires after a fixed time. Each grant comes with a token that only ever increases, and the shared resource rejects any request whose token is older than one it has already seen."],
+        ["Single server (no replication)", "Keep all the data on one machine. Consistency is easy, but nothing works while that machine is down."],
+        ["Impossible under these assumptions", "No algorithm can meet every requirement under these assumptions. Choose this only if you can name the result that rules it out (e.g. CAP or FLP)."],
+      ]},
+    ],
+  },
+];
+
+const COPY_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+const CHECK_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>';
+
+const main = document.getElementById("main");
+const cards = [];
+
+function el(tag, attrs = {}, html = "") {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (html) e.innerHTML = html;
+  return e;
+}
+
+for (const part of DATA) {
+  const sec = el("section", { class: "part", id: part.id });
+  const head = el("div", { class: "part-head" });
+  head.appendChild(el("h2", {}, part.title));
+  sec.appendChild(head);
+  sec.appendChild(el("p", { class: "part-sub" }, part.sub));
+  let total = 0;
+  part.groups.forEach((g, gi) => {
+    const group = el("div", { class: `group g${(gi % 6) + 1}` });
+    const gh = el("div", { class: "group-head" });
+    gh.appendChild(el("span", { class: "dot" }));
+    gh.appendChild(el("h3", {}, g.name));
+    gh.appendChild(el("span", { class: "sep" }, "·"));
+    gh.appendChild(el("p", { class: "group-blurb" }, g.blurb));
+    group.appendChild(gh);
+    const grid = el("div", { class: "grid" });
+    for (const [title, desc] of g.items) {
+      total++;
+      const card = el("article", { class: "card" });
+      const row = el("div", { class: "title-row" });
+      const t = el("div", { class: "title" });
+      t.textContent = title;
+      const btn = el("button", { class: "copy", type: "button", "aria-label": `Copy “${title}”` }, COPY_ICON + "<span>Copy</span>");
+      btn.addEventListener("click", () => copy(title, btn));
+      row.append(t, btn);
+      const d = el("p", { class: "desc" });
+      d.textContent = desc;
+      card.append(row, d);
+      grid.appendChild(card);
+      cards.push({ card, group, t, d, title, desc });
+    }
+    group.appendChild(grid);
+    sec.appendChild(group);
+  });
+  document.getElementById(`n-${part.id}`).textContent = total;
+  main.appendChild(sec);
+}
+
+const toast = document.getElementById("toast");
+let toastTimer;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 1600);
+}
+
+async function copy(text, btn) {
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    ok = true;
+  } catch (e) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      ok = document.execCommand("copy");
+      ta.remove();
+    } catch (e2) { ok = false; }
+  }
+  if (ok) {
+    btn.classList.add("done");
+    btn.innerHTML = CHECK_ICON + "<span>Copied</span>";
+    setTimeout(() => { btn.classList.remove("done"); btn.innerHTML = COPY_ICON + "<span>Copy</span>"; }, 1400);
+    showToast(`Copied “${text}”`);
+  } else {
+    showToast("Couldn't copy. Select the title and copy it manually.");
+  }
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function highlight(text, q) {
+  if (!q) return escapeHtml(text);
+  const i = text.toLowerCase().indexOf(q);
+  if (i < 0) return escapeHtml(text);
+  return escapeHtml(text.slice(0, i)) + "<mark>" + escapeHtml(text.slice(i, i + q.length)) + "</mark>" + escapeHtml(text.slice(i + q.length));
+}
+
+const q = document.getElementById("q");
+q.addEventListener("input", () => {
+  const term = q.value.trim().toLowerCase();
+  let shown = 0;
+  const groupsShown = new Map();
+  for (const c of cards) {
+    const hit = !term || c.title.toLowerCase().includes(term) || c.desc.toLowerCase().includes(term);
+    c.card.style.display = hit ? "" : "none";
+    c.t.innerHTML = highlight(c.title, term);
+    c.d.innerHTML = highlight(c.desc, term);
+    if (hit) shown++;
+    groupsShown.set(c.group, (groupsShown.get(c.group) || 0) + (hit ? 1 : 0));
+  }
+  for (const [g, n] of groupsShown) g.style.display = n ? "" : "none";
+  document.querySelectorAll("section.part").forEach(s => {
+    const any = [...s.querySelectorAll(".group")].some(g => g.style.display !== "none");
+    s.style.display = any ? "" : "none";
+  });
+  document.getElementById("empty").style.display = shown ? "none" : "block";
+});
+</script>
+</body>
+</html>

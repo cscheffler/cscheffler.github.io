@@ -685,7 +685,7 @@ function update(dt) {
       t.cd -= dt * (1 + buff);
       if (t.cd > 0) continue;
       const R = tRange(t) * T;
-      const inR = S.enemies.filter(e => !e.dead && (e.x - t.cx) ** 2 + (e.y - 3 - t.cy) ** 2 <= R * R);
+      const inR = S.enemies.filter(e => !e.dead && (e.x - t.cx) ** 2 + (e.y - t.cy) ** 2 <= R * R); // measured to where the enemy walks, so reach is the same on every side
       if (!inR.length) continue;
       const pri = e => t.type === 'archer' && (e.type === 'welsh' || e.type === 'bishop') ? 1e6 : 0;
       const tg = t.type === 'gallo' ? inR.reduce((a, b) => b.hp > a.hp ? b : a) : inR.reduce((a, b) => b.d + pri(b) > a.d + pri(a) ? b : a);

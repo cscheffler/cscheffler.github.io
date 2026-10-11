@@ -556,7 +556,7 @@ const TIPS = {
   4: 'Armoured knights! Arrows glance off - try cabers or galloglass.',
   5: 'A battering ram! Cabers bounce off it - galloglass axes split timber.',
   6: 'Welsh archers pin down your units. Bowmen shoot them first.',
-  7: 'War bishops heal the host. Kill them first!',
+  7: 'War bishops heal the host but cannae heal each other. Kill them first!',
   9: 'Heavy horse: fast AND armoured!',
   10: 'An English earl leads the charge! Galloglass and spike pits will bring him down.',
   15: 'Another earl rides north wi\' his host!',
@@ -648,7 +648,7 @@ function update(dt) {
         if (best) { S.proj.push({ k:'earrow', x:e.x, y:e.y - 6, tw:best, ang:0 }); e.cd = 3.6; } else e.cd = 0.3;
       } else {
         e.cd = 2.5; let healed = false;
-        for (const o of S.enemies) if (!o.dead && o.hp < o.maxhp && (o.x - e.x) ** 2 + (o.y - e.y) ** 2 < 34 * 34) {
+        for (const o of S.enemies) if (!o.dead && o.type !== 'bishop' && o.hp < o.maxhp && (o.x - e.x) ** 2 + (o.y - e.y) ** 2 < 34 * 34) { // bishops heal others, never themselves or each other
           o.hp = Math.min(o.maxhp, o.hp + o.maxhp * 0.12); healed = true;
           S.parts.push({ x:o.x, y:o.y - 10, vx:0, vy:-12, t:0, life:0.8, c:'#7ddc5a', plus:true });
         }

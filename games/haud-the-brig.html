@@ -76,7 +76,7 @@ canvas#c{width:100%;image-rendering:pixelated;image-rendering:crisp-edges;displa
   <div id="hud">
     <span id="hLives">CASTLE 20</span>
     <span id="hGold">MERKS 200</span>
-    <span id="hWave">WAVE 0/20</span>
+    <span id="hWave">WAVE 0/30</span>
     <button id="fsBtn" class="hidden" title="Full screen">&#x26F6;</button>
   </div>
   <div id="stage">
@@ -85,7 +85,7 @@ canvas#c{width:100%;image-rendering:pixelated;image-rendering:crisp-edges;displa
     <div id="title" class="overlay">
       <h1>HAUD THE BRIG!</h1>
       <h2>Stirling, September 1297</h2>
-      <p>An English host marches north tae cross the Forth at Stirling Bridge. Raise bowmen, schiltrons, caber tossers, galloglass and pipers along the glen, dig spike pits in the road, and keep the crofts working tae pay for it all. Haud the castle gate for 20 waves.</p>
+      <p>An English host marches north tae cross the Forth at Stirling Bridge. Raise bowmen, schiltrons, caber tossers, galloglass and pipers along the glen, dig spike pits in the road, and keep the crofts working tae pay for it all. Haud the castle gate for 30 waves.</p>
       <button class="btn" id="startBtn">TAE ARMS!</button>
       <p class="keys">Keys: 1-7 pick unit &middot; Space next wave &middot; F speed &middot; U upgrade &middot; S sell</p>
     </div>
@@ -109,7 +109,7 @@ canvas#c{width:100%;image-rendering:pixelated;image-rendering:crisp-edges;displa
 <script>
 (() => {
 'use strict';
-const T = 16, COLS = 20, ROWS = 12, W = COLS * T, H = ROWS * T, MAXW = 20;
+const T = 16, COLS = 20, ROWS = 12, W = COLS * T, H = ROWS * T, MAXW = 20, END_WAVE = 30; // MAXW: where the difficulty curve switches to +10%/wave; END_WAVE: victory
 const cv = document.getElementById('c');
 cv.width = W; cv.height = H;
 const ctx = cv.getContext('2d');
@@ -562,7 +562,7 @@ const TIPS = {
   15: 'Another earl rides north wi\' his host!',
   16: 'Reinforcements fae the south - the host grows!',
   18: 'Heavy horse in force! Ready the spears.',
-  20: 'The final assault! Twa earls lead the host - haud fast!'
+  20: 'Twa earls lead the host - haud fast!'
 };
 function startWave() {
   if (S.state !== 'build') return;
@@ -739,7 +739,7 @@ function update(dt) {
         S.floats.push({ x:t.cx, y:t.cy - 12, s:'+' + inc, t:-0.3 });
       }
       S.gold += bonus;
-      if (S.wave === MAXW && !S.endless) { S.state = 'won'; setTimeout(() => showEnd(true), 600); }
+      if (S.wave === END_WAVE && !S.endless) { S.state = 'won'; setTimeout(() => showEnd(true), 600); }
       else { S.state = 'build'; banner(`Wave ${S.wave} beaten! +${bonus} merks`); }
       updateHUD();
     }
@@ -891,7 +891,7 @@ function refreshButtons() {
 function updateHUD() {
   $('hLives').textContent = `CASTLE ${S.lives}`;
   $('hGold').textContent = `MERKS ${Math.floor(S.gold)}`;
-  $('hWave').textContent = S.endless ? `WAVE ${S.wave} \u221E` : `WAVE ${S.wave}/${MAXW}`;
+  $('hWave').textContent = S.endless ? `WAVE ${S.wave} \u221E` : `WAVE ${S.wave}/${END_WAVE}`;
   refreshButtons();
   if (sel) updateInfo();
 }

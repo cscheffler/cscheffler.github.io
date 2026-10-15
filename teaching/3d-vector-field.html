@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Interactive 3D wind vector field for teaching vectors: six airflow patterns, time toggle, tracers, slice view and a vector probe.">
+<title>Wind in Three Dimensions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-screen instrument — a framed 3D viewport on the left, a scrolling control rail on the right (stacks under the view on phones). Committed dark look, like a night-sky weather display. */
+:root {
+  --bg: #0a1120;
+  --surface: #101a2d;
+  --surface-2: #16223a;
+  --line: #24324d;
+  --fg: #e6edf8;
+  --muted: #8d9cb8;
+  --accent: #f4b33d;
+  --accent-ink: #1b1405;
+  --ax-x: #ff7d6e;
+  --ax-y: #5fdea0;
+  --ax-z: #6cb6ff;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+* { box-sizing: border-box; }
+
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 348px;
+  gap: 16px;
+  padding-block: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app.collapsed { grid-template-columns: minmax(0, 1fr); }
+.app.collapsed aside { display: none; }
+
+.viewport {
+  position: relative; min-width: 0; min-height: 0;
+  border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 0%, #142240 0%, var(--bg) 70%);
+}
+.viewport canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+.hud { position: absolute; left: 14px; top: 12px; right: 120px; pointer-events: none; display: flex; flex-direction: column; gap: 4px; }
+.hud-name { font-family: var(--font-display); font-weight: 700; font-size: clamp(18px, 2.4vw, 28px); letter-spacing: -0.01em; text-wrap: balance; }
+.hud-eq { font-family: var(--font-mono); font-size: clamp(12px, 1.3vw, 15px); color: var(--muted); }
+.hud-eq b { color: var(--fg); font-weight: 500; }
+.hud-time { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: rgba(10,17,32,0.7); font-size: 12px; }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.chip.live .dot { background: var(--ax-y); box-shadow: 0 0 8px var(--ax-y); }
+
+.vbtns { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+.vbtn {
+  font: 500 12px var(--font-body); color: var(--fg); background: rgba(16,26,45,0.85);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer;
+}
+.vbtn:hover { border-color: var(--muted); }
+
+.legend { position: absolute; left: 14px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+.legend-label { font-size: 11px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.bar { width: 220px; max-width: 46vw; height: 9px; border-radius: 5px; }
+.ticks { position: relative; width: 220px; max-width: 46vw; height: 14px; font: 11px var(--font-mono); color: var(--muted); }
+.ticks span { position: absolute; transform: translateX(-50%); }
+.hint { position: absolute; right: 12px; bottom: 12px; font-size: 11px; color: var(--muted); pointer-events: none; text-align: right; }
+
+aside { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; padding-right: 4px; }
+aside header h1 { font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1.1; margin: 0 0 6px; letter-spacing: -0.015em; }
+aside header p { margin: 0; color: var(--muted); }
+section { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+h2 { margin: 0; font: 600 11px var(--font-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+.scen { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.scen button {
+  text-align: left; font: 500 13px var(--font-body); color: var(--fg);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer;
+  display: flex; gap: 8px; align-items: baseline;
+}
+.scen button kbd { font: 11px var(--font-mono); color: var(--muted); }
+.scen button:hover { border-color: var(--muted); }
+.scen button[aria-pressed="true"] { border-color: var(--accent); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--accent); }
+.blurb { margin: 0; }
+.look { margin: 0; color: var(--muted); font-size: 13px; }
+.look strong { color: var(--fg); font-weight: 600; }
+
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.play {
+  font: 600 14px var(--font-body); border-radius: 9px; padding: 9px 16px; cursor: pointer; min-width: 128px;
+  background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent);
+}
+.play.paused { background: transparent; color: var(--accent); }
+.ghost { font: 500 13px var(--font-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+.ghost:hover { border-color: var(--muted); }
+.note { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+.slider { display: grid; grid-template-columns: 68px minmax(0,1fr) 72px; align-items: center; gap: 10px; }
+.slider label { font-size: 13px; }
+.slider output { font: 12px var(--font-mono); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+.toggle input { appearance: none; width: 34px; height: 20px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); position: relative; cursor: pointer; flex: none; margin: 0; transition: background .15s; }
+.toggle input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform .15s, background .15s; }
+.toggle input:checked { background: var(--accent); border-color: var(--accent); }
+.toggle input:checked::after { transform: translateX(14px); background: var(--accent-ink); }
+.toggle span small { display: block; color: var(--muted); font-size: 12px; }
+
+.seg { display: inline-grid; grid-auto-flow: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: 500 12.5px var(--font-body); color: var(--fg); background: var(--surface); border: 0; padding: 6px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+.readout { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: 12.5px var(--font-mono); font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 6px; overflow-x: auto; }
+.readout .big { font-size: 13.5px; color: var(--fg); white-space: nowrap; }
+.comps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.comps div { display: flex; flex-direction: column; }
+.comps i { font-style: normal; font-size: 11px; color: var(--muted); }
+.cx { color: var(--ax-x); } .cy { color: var(--ax-y); } .cz { color: var(--ax-z); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; color: var(--muted); }
+.kv b { color: var(--fg); font-weight: 500; text-align: right; }
+
+footer { font-size: 12px; color: var(--muted); padding-top: 14px; border-top: 1px solid var(--line); }
+kbd { font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 760px) {
+  html, body { height: auto; }
+  .app { height: auto; grid-template-columns: minmax(0,1fr); }
+  .viewport { height: 62vh; min-height: 340px; }
+  aside { overflow: visible; }
+  .hud { right: 100px; }
+  .hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <div class="viewport" id="viewport">
+    <div class="hud">
+      <div class="hud-name" id="hudName">Thunderstorm cell</div>
+      <div class="hud-eq"><b>F</b>(x, y, z, t) = (<span class="cx">u</span>, <span class="cy">v</span>, <span class="cz">w</span>) &nbsp;in m/s</div>
+      <div class="hud-time"><span class="chip" id="hudChip"><span class="dot"></span><span id="hudState">time running</span></span><span id="hudT">t = 0.0 s</span></div>
+    </div>
+    <div class="vbtns">
+      <button class="vbtn" id="btnFull" type="button">Fullscreen</button>
+      <button class="vbtn" id="btnPanel" type="button">Hide controls</button>
+    </div>
+    <div class="legend">
+      <div class="legend-label">Speed |F| (m/s)</div>
+      <div class="bar" id="bar"></div>
+      <div class="ticks" id="ticks"></div>
+    </div>
+    <div class="hint">Drag to orbit · scroll or pinch to zoom · right-drag to pan</div>
+  </div>
+
+  <aside id="panel">
+    <header>
+      <h1>Wind in Three Dimensions</h1>
+      <p>Every point in the box carries a 3D velocity vector. Real air moves up and down as well as across a map.</p>
+    </header>
+
+    <section>
+      <h2>Airflow pattern</h2>
+      <div class="scen" id="scen"></div>
+      <p class="blurb" id="blurb"></p>
+      <p class="look" id="look"></p>
+    </section>
+
+    <section>
+      <h2>Time</h2>
+      <div class="row">
+        <button class="play" id="btnPlay" type="button">Pause time</button>
+        <button class="ghost" id="btnResetT" type="button">t = 0</button>
+      </div>
+      <div class="slider"><label for="spd">Speed</label><input id="spd" type="range" min="0.25" max="3" step="0.05" value="1"><output id="spdOut">1.00×</output></div>
+      <p class="note">Pausing freezes the field at one instant, so you see a static F(x, y, z). Tracers keep drifting along the frozen arrows.</p>
+    </section>
+
+    <section>
+      <h2>Display</h2>
+      <label class="toggle"><span>Arrows</span><input id="tArrows" type="checkbox" checked></label>
+      <label class="toggle"><span>Tracer particles</span><input id="tTracers" type="checkbox" checked></label>
+      <label class="toggle"><span>Arrow length shows speed<small>Off: all arrows equal length, colour alone shows speed</small></span><input id="tScale" type="checkbox" checked></label>
+      <label class="toggle"><span>Slowly rotate the camera</span><input id="tRotate" type="checkbox"></label>
+      <div class="row"><span>Arrow grid</span><div class="seg" id="dens">
+        <button type="button" data-d="coarse">Coarse</button><button type="button" data-d="medium" aria-pressed="true">Medium</button><button type="button" data-d="fine">Fine</button>
+      </div></div>
+    </section>
+
+    <section>
+      <h2>Horizontal slice</h2>
+      <label class="toggle"><span>Show one height only<small>The layer a weather map shows</small></span><input id="tSlice" type="checkbox"></label>
+      <div class="slider"><label for="sliceZ">Height</label><input id="sliceZ" type="range" min="0.02" max="0.98" step="0.01" value="0.3"><output id="sliceOut"></output></div>
+      <label class="toggle"><span>Drop the vertical part w<small>Flattens arrows to (u, v), like a 2D map</small></span><input id="tFlat" type="checkbox"></label>
+    </section>
+
+    <section>
+      <h2>Probe one vector</h2>
+      <label class="toggle"><span>Show probe</span><input id="tProbe" type="checkbox" checked></label>
+      <label class="toggle"><span>Show components u, v, w</span><input id="tComp" type="checkbox" checked></label>
+      <div class="slider"><label for="px" class="cx">x · east</label><input id="px" type="range" min="-1" max="1" step="0.01"><output id="pxOut"></output></div>
+      <div class="slider"><label for="py" class="cy">y · north</label><input id="py" type="range" min="-1" max="1" step="0.01"><output id="pyOut"></output></div>
+      <div class="slider"><label for="pz" class="cz">z · up</label><input id="pz" type="range" min="0" max="1" step="0.01"><output id="pzOut"></output></div>
+      <div class="readout" id="readout"></div>
+    </section>
+
+    <footer>
+      Keys: <kbd>Space</kbd> play/pause · <kbd>1</kbd>–<kbd>6</kbd> patterns · <kbd>S</kbd> slice · <kbd>P</kbd> probe · <kbd>H</kbd> hide controls.<br>
+      Idealised flows for teaching, not live data. The box is not to scale: height is stretched so vertical motion is easy to see.
+    </footer>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(() => {
+const PI = Math.PI, exp = Math.exp, sin = Math.sin, cos = Math.cos, hypot = Math.hypot;
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+/* ---------- Scenarios: domain x,y in [-1,1], z in [0,1]; velocities in m/s ---------- */
+const SC = {
+  storm: {
+    name: 'Thunderstorm cell', key: '1', ext: { h: 15, v: 12 }, ref: 20, ground: 'field', probe: [-0.12, 0.1, 0.5],
+    blurb: 'Air converges near the ground, rises in a rotating updraft, and spreads out near the top. A ring of gently sinking air surrounds the core. The whole cell drifts with the steering wind.',
+    look: '<strong>Try:</strong> put the probe in the core. w dominates there. Raise the probe and the horizontal part flips from inflow to outflow.',
+    f(x, y, z, t, o) {
+      const cx = -0.15 + 0.25 * sin(0.25 * t), cy = 0.12 * cos(0.25 * t);
+      const A = 1 + 0.35 * sin(0.9 * t), s2 = 0.42 * 0.42;
+      const dx = x - cx, dy = y - cy, r2 = dx * dx + dy * dy, e = exp(-r2 / s2);
+      const K = 10 * A, c = cos(PI * z), sn = sin(PI * z);
+      let u = -K * PI * e * c * dx, v = -K * PI * e * c * dy;
+      const w = K * (2 - 2 * r2 / s2) * e * sn;
+      const sw = 9 * A / 0.42 * e * (0.4 + 0.6 * sn);
+      u += -sw * dy + 4 + 8 * z; v += sw * dx + 1.5;
+      o[0] = u; o[1] = v; o[2] = w;
+    }
+  },
+  tornado: {
+    name: 'Tornado vortex', key: '2', ext: { h: 1, v: 2 }, ref: 26, ground: 'field', probe: [0.14, 0, 0.08],
+    blurb: 'A tight column spins anticlockwise (seen from above). Near the ground air spirals inward, then shoots upward in the core and spreads out aloft. The column wobbles and tilts over time.',
+    look: '<strong>Try:</strong> a slice near the ground with w dropped looks like a 2D whirlpool. Turn w back on and the tracers corkscrew upward.',
+    f(x, y, z, t, o) {
+      const cx = 0.06 * sin(1.1 * t) + 0.14 * z * sin(0.35 * t), cy = 0.06 * cos(0.8 * t) + 0.14 * z * cos(0.35 * t);
+      const P = 1 + 0.2 * sin(1.7 * t), c = 0.12;
+      const dx = x - cx, dy = y - cy, r2 = dx * dx + dy * dy, r = Math.sqrt(r2) + 1e-6;
+      const prof = 2 * r * c / (r2 + c * c);
+      const vt = 26 * P * prof * (0.55 + 0.45 * exp(-z / 0.5));
+      const ur = -13 * P * prof * exp(-z / 0.12) + 7 * P * (2 * r * 0.25 / (r2 + 0.0625)) * exp(-(1 - z) / 0.15);
+      const w = 24 * P * exp(-r2 / 0.0324) * (1 - exp(-z / 0.08)) * (1 - 0.3 * z);
+      o[0] = ur * dx / r - vt * dy / r + 3; o[1] = ur * dy / r + vt * dx / r; o[2] = w;
+    }
+  },
+  microburst: {
+    name: 'Microburst', key: '3', ext: { h: 4, v: 3 }, ref: 18, ground: 'field', probe: [0.32, 0, 0.05],
+    blurb: 'A column of cold air plunges downward, hits the ground and fans out in every direction. This is the gust front pilots dread on approach. It strengthens and weakens over time.',
+    look: '<strong>Try:</strong> probe directly under the centre (mostly −w) and then near the ground off to one side (mostly horizontal, pointing away).',
+    f(x, y, z, t, o) {
+      const L = 0.55 + 0.45 * sin(0.6 * t), K = 11 * L, s2 = 0.35 * 0.35, H = 0.3;
+      const dx = x - 0.05 * sin(0.2 * t), dy = y, r2 = dx * dx + dy * dy, e = exp(-r2 / s2);
+      const g = (z / H) * exp(1 - z / H), gp = (1 / H) * exp(1 - z / H) * (1 - z / H);
+      const ur_over_r = K * e * gp;
+      o[0] = ur_over_r * dx + 3; o[1] = ur_over_r * dy; o[2] = -K * (2 - 2 * r2 / s2) * e * g;
+    }
+  },
+  seabreeze: {
+    name: 'Sea breeze', key: '4', ext: { h: 30, v: 2 }, ref: 9, ground: 'coast', probe: [0.25, 0, 0.12], clock: true,
+    blurb: 'Sea on the left, land on the right. By day the land warms, air rises over it, and cool sea air flows in underneath while a return current flows back out to sea aloft. At night the loop reverses into a weaker land breeze.',
+    look: '<strong>Try:</strong> play time and watch the local clock. The circulation is a closed loop in the x–z plane, which a map of (u, v) alone can never show.',
+    f(x, y, z, t, o) {
+      const ph = 0.35 * t, s = sin(ph), A = 7 * s * (s < 0 ? 0.6 : 1), sg2 = 0.55 * 0.55;
+      const G = exp(-x * x / sg2), c = cos(PI * z);
+      o[0] = A * c * G; o[1] = 2.5 + 0.25 * A * c; o[2] = A * sin(PI * z) * (2 * x / sg2) * G / PI;
+    },
+    hour(t) { const h = ((9 + 0.35 * t * 24 / (2 * PI)) % 24 + 24) % 24; const hh = Math.floor(h), mm = Math.floor((h - hh) * 60); return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); }
+  },
+  ridge: {
+    name: 'Wind over a ridge', key: '5', ext: { h: 15, v: 6 }, ref: 20, ground: 'hills', probe: [-0.18, 0, 0.3],
+    terrain: (x, y) => 0.22 * exp(-x * x / 0.05) * (0.75 + 0.25 * cos(1.2 * PI * y)),
+    blurb: 'A westerly wind strengthens with height and meets a ridge. Air is pushed up the windward slope, speeds up over the crest, and sets up standing lee waves downstream. Gusts come and go.',
+    look: '<strong>Try:</strong> probe the windward slope (w &gt; 0) then the lee side (w &lt; 0). The lee-wave crests are where glider pilots find lift.',
+    f(x, y, z, t, o) {
+      const hh = SC.ridge.terrain(x, y), above = z - hh;
+      if (above < 0) { o[0] = o[1] = o[2] = 0; return; }
+      const g = 1 + 0.25 * sin(0.6 * t), U = g * (8 + 10 * z), fac = exp(-above / 0.3);
+      const dhdx = hh * (-2 * x / 0.05);
+      let w = U * dhdx * fac;
+      const k = 2 * PI / 0.45, env = smooth(0.05, 0.3, x) * exp(-(x - 0.1) / 0.9) * sin(PI * z);
+      w += 5 * g * sin(k * (x - 0.1)) * env;
+      o[0] = U * (1 + 0.5 * (hh / 0.22) * fac); o[1] = 1 + 2 * z; o[2] = w;
+    }
+  },
+  ekman: {
+    name: 'Turning with height', key: '6', ext: { h: 10, v: 3 }, ref: 14, ground: 'plain', probe: [0, 0, 0.06],
+    blurb: 'The Ekman spiral. Friction slows air near the ground and the Coriolis effect turns it, so wind direction rotates as you go up. The flow is the same everywhere across the map and changes only with height. Here w = 0 everywhere.',
+    look: '<strong>Try:</strong> move the probe straight up. Speed grows and direction swings about 45°. Same (x, y), different z, different vector.',
+    f(x, y, z, t, o) {
+      const th = 0.12 * t, G = 14, d = 0.11, e = exp(-z / d);
+      const a = G * (1 - e * cos(z / d)), b = G * e * sin(z / d);
+      o[0] = a * cos(th) - b * sin(th); o[1] = a * sin(th) + b * cos(th); o[2] = 0;
+    }
+  }
+};
+const ORDER = ['storm', 'tornado', 'microburst', 'seabreeze', 'ridge', 'ekman'];
+const terrainOf = sc => sc.terrain || (() => 0);
+
+/* ---------- Colour map (absolute m/s) ---------- */
+const VMAX = 35;
+const STOPS = [[0, '#3b56d6'], [5, '#2a9ed2'], [10, '#2cc2a2'], [15, '#83d64b'], [20, '#f1d23b'], [25, '#f39233'], [35, '#e0457b']]
+  .map(([v, h]) => [v, new THREE.Color(h)]);
+function speedColor(s, out) {
+  if (s <= 0) return out.copy(STOPS[0][1]);
+  for (let i = 1; i < STOPS.length; i++) {
+    if (s <= STOPS[i][0]) { const [a, ca] = STOPS[i - 1], [b, cb] = STOPS[i]; return out.copy(ca).lerp(cb, (s - a) / (b - a)); }
+  }
+  return out.copy(STOPS[STOPS.length - 1][1]);
+}
+document.getElementById('bar').style.background = 'linear-gradient(90deg,' + STOPS.map(([v, c]) => '#' + c.getHexString() + ' ' + (v / VMAX * 100).toFixed(1) + '%').join(',') + ')';
+document.getElementById('ticks').innerHTML = [0, 10, 20, 30].map(v => `<span style="left:${v / VMAX * 100}%">${v}</span>`).join('');
+
+/* ---------- State ---------- */
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const S = {
+  scenario: 'storm', t: 0, playing: !reduce, speed: 1,
+  arrows: true, tracers: true, scaleByMag: true, rotate: false, density: 'medium',
+  slice: false, sliceZ: 0.3, flatten: false,
+  probe: true, comps: true, p: [0, 0, 0.5]
+};
+const DENS = { coarse: [7, 4], medium: [10, 6], fine: [14, 8] };
+
+/* ---------- Three.js setup ---------- */
+const vp = document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.setClearColor(0x0b1324, 1);
+vp.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0b1324, 5, 10);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.02, 50);
+camera.position.set(2.45, 1.55, 2.7);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.35, 0);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 0.8; controls.maxDistance = 8;
+controls.autoRotateSpeed = 0.6;
+controls.update();
+
+scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x223044, 0.85));
+const sun = new THREE.DirectionalLight(0xffffff, 0.65); sun.position.set(2, 4, 1.5); scene.add(sun);
+
+// physics (x east, y north, z up) -> three (X, Y up, Z south)
+const T = (x, y, z, v) => v.set(x, z, -y);
+
+/* Domain box */
+{
+  const g = new THREE.EdgesGeometry(new THREE.BoxGeometry(2, 1, 2));
+  g.translate(0, 0.5, 0);
+  scene.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x3a4a6a, transparent: true, opacity: 0.55 })));
+}
+
+/* Ground (rebuilt per scenario) */
+let ground = null;
+function paintGround(kind) {
+  const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
+  const base = { field: '#1c2d27', hills: '#2b2b24', plain: '#18233a', coast: '#2a3a27' }[kind];
+  g.fillStyle = base; g.fillRect(0, 0, 512, 512);
+  if (kind === 'coast') {
+    const gr = g.createLinearGradient(0, 0, 256, 0); gr.addColorStop(0, '#0f2a4a'); gr.addColorStop(1, '#174067');
+    g.fillStyle = gr; g.fillRect(0, 0, 256, 512);
+    g.fillStyle = '#c9b27a'; g.fillRect(252, 0, 8, 512);
+    g.font = '600 26px "IBM Plex Sans", sans-serif'; g.fillStyle = 'rgba(255,255,255,0.38)';
+    g.fillText('SEA', 96, 40); g.fillText('LAND', 352, 40);
+  }
+  if (kind === 'hills') {
+    const gr = g.createLinearGradient(0, 0, 512, 0);
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.42, 'rgba(120,110,80,0.35)'); gr.addColorStop(0.5, 'rgba(200,200,190,0.35)'); gr.addColorStop(0.58, 'rgba(120,110,80,0.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 512, 512);
+  }
+  g.strokeStyle = 'rgba(255,255,255,0.08)'; g.lineWidth = 1.5;
+  for (let i = 0; i <= 10; i++) { const p = i * 51.2; g.beginPath(); g.moveTo(p, 0); g.lineTo(p, 512); g.stroke(); g.beginPath(); g.moveTo(0, p); g.lineTo(512, p); g.stroke(); }
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4; return tex;
+}
+function buildGround() {
+  const sc = SC[S.scenario];
+  if (ground) { scene.remove(ground); ground.geometry.dispose(); ground.material.map.dispose(); ground.material.dispose(); }
+  const geo = new THREE.PlaneGeometry(2, 2, 90, 90); geo.rotateX(-PI / 2);
+  const pos = geo.attributes.position, h = terrainOf(sc);
+  for (let i = 0; i < pos.count; i++) { const X = pos.getX(i), Z = pos.getZ(i); pos.setY(i, h(X, -Z)); }
+  geo.computeVertexNormals();
+  ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: paintGround(sc.ground) }));
+  scene.add(ground);
+}
+
+/* Axes with labels */
+const labelGroup = new THREE.Group(); scene.add(labelGroup);
+function makeLabel(text, color, size) {
+  const c = document.createElement('canvas'), g = c.getContext('2d'), fs = 56;
+  g.font = `500 ${fs}px "IBM Plex Mono", monospace`;
+  c.width = Math.ceil(g.measureText(text).width) + 20; c.height = fs + 20;
+  g.font = `500 ${fs}px "IBM Plex Mono", monospace`; g.fillStyle = color; g.textBaseline = 'middle'; g.fillText(text, 10, c.height / 2);
+  const tex = new THREE.CanvasTexture(c); tex.minFilter = THREE.LinearFilter;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
+  s.scale.set(size * c.width / c.height, size, 1); return s;
+}
+const O = new THREE.Vector3(-1, 0.003, 1);
+[[new THREE.Vector3(1, 0, 0), 2.25, 0xff7d6e], [new THREE.Vector3(0, 1, 0), 1.25, 0x6cb6ff], [new THREE.Vector3(0, 0, -1), 2.25, 0x5fdea0]]
+  .forEach(([d, l, c]) => scene.add(new THREE.ArrowHelper(d, O, l, c, 0.07, 0.04)));
+function buildLabels() {
+  while (labelGroup.children.length) { const s = labelGroup.children.pop(); s.material.map.dispose(); s.material.dispose(); }
+  const sc = SC[S.scenario], add = (txt, col, x, y, z, sz) => { const s = makeLabel(txt, col, sz); s.position.set(x, y, z); labelGroup.add(s); };
+  add('x · east', '#ff7d6e', 1.42, 0.02, 1.08, 0.075);
+  add('z · up', '#6cb6ff', -1, 1.36, 1, 0.075);
+  add('y · north', '#5fdea0', -1.1, 0.02, -1.42, 0.075);
+  add(`+${sc.ext.h} km`, '#8d9cb8', 1, -0.07, 1.12, 0.055);
+  add(`−${sc.ext.h} km`, '#8d9cb8', -1, -0.07, 1.16, 0.055);
+  add(`${sc.ext.v} km`, '#8d9cb8', -1.17, 1, 1, 0.055);
+  add(`+${sc.ext.h} km`, '#8d9cb8', -1.2, -0.05, -1, 0.055);
+}
+
+/* Arrow geometry (unit length along +Y) */
+function arrowGeometry() {
+  const a = new THREE.CylinderGeometry(0.035, 0.035, 0.68, 8, 1); a.translate(0, 0.34, 0);
+  const b = new THREE.ConeGeometry(0.11, 0.32, 12, 1); b.translate(0, 0.84, 0);
+  const A = a.toNonIndexed(), B = b.toNonIndexed();
+  const g = new THREE.BufferGeometry();
+  for (const name of ['position', 'normal']) {
+    const x = A.attributes[name].array, y = B.attributes[name].array, m = new Float32Array(x.length + y.length);
+    m.set(x); m.set(y, x.length); g.setAttribute(name, new THREE.BufferAttribute(m, 3));
+  }
+  return g;
+}
+const ARROW = arrowGeometry();
+const MAXA = 2100;
+const arrows = new THREE.InstancedMesh(ARROW, new THREE.MeshLambertMaterial({ color: 0xffffff }), MAXA);
+arrows.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+arrows.setColorAt(0, new THREE.Color());
+arrows.frustumCulled = false;
+scene.add(arrows);
+
+/* Slice plane */
+const slicePlane = new THREE.Group();
+{
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: 0x6cb6ff, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false }));
+  m.rotateX(-PI / 2); slicePlane.add(m);
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(2, 2)), new THREE.LineBasicMaterial({ color: 0x6cb6ff, transparent: true, opacity: 0.5 }));
+  e.rotateX(-PI / 2); slicePlane.add(e);
+}
+scene.add(slicePlane);
+
+/* Probe */
+const probe = new THREE.Group(); scene.add(probe);
+const probeArrow = new THREE.Mesh(ARROW, new THREE.MeshLambertMaterial({ color: 0xf4b33d, emissive: 0x3a2400 }));
+const probeBall = new THREE.Mesh(new THREE.SphereGeometry(0.026, 16, 12), new THREE.MeshBasicMaterial({ color: 0xf4b33d }));
+const dropGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+const dropLine = new THREE.Line(dropGeo, new THREE.LineDashedMaterial({ color: 0xf4b33d, dashSize: 0.03, gapSize: 0.025, transparent: true, opacity: 0.7 }));
+const compArrows = [0xff7d6e, 0x5fdea0, 0x6cb6ff].map(c => new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 0.1, c, 0.05, 0.03));
+probe.add(probeArrow, probeBall, dropLine, ...compArrows);
+
+/* Tracer particles */
+const NP = 2200, TL = 16;
+const hx = new Float32Array(NP * TL), hy = new Float32Array(NP * TL), hz = new Float32Array(NP * TL);
+const age = new Float32Array(NP), life = new Float32Array(NP);
+const segPos = new Float32Array(NP * (TL - 1) * 6), segCol = new Float32Array(NP * (TL - 1) * 6);
+const trailGeo = new THREE.BufferGeometry();
+trailGeo.setAttribute('position', new THREE.BufferAttribute(segPos, 3).setUsage(THREE.DynamicDrawUsage));
+trailGeo.setAttribute('color', new THREE.BufferAttribute(segCol, 3).setUsage(THREE.DynamicDrawUsage));
+const trails = new THREE.LineSegments(trailGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+trails.frustumCulled = false; scene.add(trails);
+
+function spawn(i, randomAge) {
+  const h = terrainOf(SC[S.scenario]);
+  let x, y, z;
+  for (let tries = 0; tries < 8; tries++) {
+    x = Math.random() * 2 - 1; y = Math.random() * 2 - 1;
+    const g = h(x, y);
+    z = S.slice ? S.sliceZ : g + 0.01 + Math.random() * (1 - g - 0.01);
+    if (z > g + 0.005) break;
+  }
+  for (let k = 0; k < TL; k++) { hx[i * TL + k] = x; hy[i * TL + k] = y; hz[i * TL + k] = z; }
+  life[i] = S.slice ? 2.2 + Math.random() * 2.5 : 3 + Math.random() * 4;
+  age[i] = randomAge ? Math.random() * life[i] : 0;
+}
+const respawnAll = () => { for (let i = 0; i < NP; i++) spawn(i, true); };
+
+const F = [0, 0, 0], F2 = [0, 0, 0];
+function stepParticles(dt) {
+  const sc = SC[S.scenario], h = terrainOf(sc), rate = 0.35 / sc.ref * dt, flat = S.slice && S.flatten;
+  for (let i = 0; i < NP; i++) {
+    const b = i * TL;
+    for (let k = TL - 1; k > 0; k--) { hx[b + k] = hx[b + k - 1]; hy[b + k] = hy[b + k - 1]; hz[b + k] = hz[b + k - 1]; }
+    let x = hx[b], y = hy[b], z = hz[b];
+    sc.f(x, y, z, S.t, F); if (flat) F[2] = 0;
+    sc.f(x + 0.5 * rate * F[0], y + 0.5 * rate * F[1], z + 0.5 * rate * F[2], S.t, F2); if (flat) F2[2] = 0;
+    x += rate * F2[0]; y += rate * F2[1]; z += rate * F2[2];
+    hx[b] = x; hy[b] = y; hz[b] = z;
+    age[i] += dt;
+    if (age[i] > life[i] || x < -1.02 || x > 1.02 || y < -1.02 || y > 1.02 || z > 1.02 || z < h(x, y) - 0.002) spawn(i, false);
+  }
+}
+function writeTrails() {
+  let p = 0;
+  for (let i = 0; i < NP; i++) {
+    const b = i * TL, a = age[i], fade = Math.min(1, a * 2.5) * Math.min(1, (life[i] - a) * 2) * 0.85;
+    for (let k = 0; k < TL - 1; k++) {
+      const f0 = fade * (1 - k / (TL - 1)), f1 = fade * (1 - (k + 1) / (TL - 1));
+      segPos[p] = hx[b + k]; segPos[p + 1] = hz[b + k]; segPos[p + 2] = -hy[b + k];
+      segPos[p + 3] = hx[b + k + 1]; segPos[p + 4] = hz[b + k + 1]; segPos[p + 5] = -hy[b + k + 1];
+      segCol[p] = 0.86 * f0; segCol[p + 1] = 0.91 * f0; segCol[p + 2] = f0;
+      segCol[p + 3] = 0.86 * f1; segCol[p + 4] = 0.91 * f1; segCol[p + 5] = f1;
+      p += 6;
+    }
+  }
+  trailGeo.attributes.position.needsUpdate = true; trailGeo.attributes.color.needsUpdate = true;
+}
+
+/* Arrow field */
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _d = new THREE.Vector3(), _c = new THREE.Color();
+const UP = new THREE.Vector3(0, 1, 0);
+let nA = 0;
+function placeArrow(sc, x, y, z, sp, flat) {
+  sc.f(x, y, z, S.t, F);
+  const u = F[0], v = F[1], w = flat ? 0 : F[2], spd = hypot(u, v, w);
+  if (spd < 1e-3) return;
+  _d.set(u, w, -v).divideScalar(spd);
+  _q.setFromUnitVectors(UP, _d);
+  let L, W;
+  if (S.scaleByMag) { L = sp * 1.7 * Math.min(spd / sc.ref, 1.4); W = sp * 0.9 * Math.min(1, L / (sp * 0.5)); }
+  else { L = sp * 0.85; W = sp * 0.9; }
+  _m.compose(T(x, y, z, _p), _q, _s.set(W, L, W));
+  arrows.setMatrixAt(nA, _m);
+  arrows.setColorAt(nA, speedColor(spd, _c));
+  nA++;
+}
+function updateArrows() {
+  const sc = SC[S.scenario], h = terrainOf(sc);
+  nA = 0;
+  if (S.arrows) {
+    if (S.slice) {
+      const m = 15, sp = 1.86 / (m - 1), z = S.sliceZ;
+      for (let i = 0; i < m; i++) for (let j = 0; j < m; j++) {
+        const x = -0.93 + sp * i, y = -0.93 + sp * j;
+        if (z > h(x, y) + 0.01) placeArrow(sc, x, y, z, sp, S.flatten);
+      }
+    } else {
+      const [n, nz] = DENS[S.density], sp = 1.8 / (n - 1);
+      for (let k = 0; k < nz; k++) {
+        const z = 0.06 + 0.88 * k / (nz - 1);
+        for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+          const x = -0.9 + sp * i, y = -0.9 + sp * j;
+          if (z > h(x, y) + 0.02) placeArrow(sc, x, y, z, sp, false);
+        }
+      }
+    }
+  }
+  arrows.count = nA;
+  arrows.instanceMatrix.needsUpdate = true;
+  if (arrows.instanceColor) arrows.instanceColor.needsUpdate = true;
+}
+
+/* Probe update + readout */
+const readout = document.getElementById('readout');
+const fmt = (v, d = 1) => (v < 0 ? '−' : v > 0 ? '+' : ' ') + Math.abs(v).toFixed(d);
+const fmtU = (v, d = 1) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
+let readTick = 0;
+function updateProbe() {
+  probe.visible = S.probe;
+  if (!S.probe) return;
+  const sc = SC[S.scenario], [x, y, z0] = S.p, h = terrainOf(sc), z = Math.max(z0, h(x, y) + 0.005);
+  sc.f(x, y, z, S.t, F);
+  const u = F[0], v = F[1], w = (S.slice && S.flatten) ? 0 : F[2], spd = hypot(u, v, w), k = 0.55 / sc.ref;
+  T(x, y, z, _p);
+  probeBall.position.copy(_p);
+  probeArrow.position.copy(_p);
+  if (spd > 1e-3) {
+    _d.set(u, w, -v).divideScalar(spd); probeArrow.quaternion.setFromUnitVectors(UP, _d);
+    const L = Math.max(0.04, spd * k); probeArrow.scale.set(0.24, L, 0.24); probeArrow.visible = true;
+  } else probeArrow.visible = false;
+  const pa = dropGeo.attributes.position; pa.setXYZ(0, _p.x, _p.y, _p.z); pa.setXYZ(1, _p.x, h(x, y) + 0.002, _p.z); pa.needsUpdate = true; dropLine.computeLineDistances();
+  const comps = [[u, new THREE.Vector3(1, 0, 0)], [v, new THREE.Vector3(0, 0, -1)], [w, new THREE.Vector3(0, 1, 0)]];
+  compArrows.forEach((a, i) => {
+    const [c, dir] = comps[i], L = Math.abs(c) * k;
+    a.visible = S.comps && L > 0.02;
+    if (a.visible) { a.position.copy(_p); a.setDirection(c < 0 ? dir.negate() : dir); a.setLength(L, Math.min(0.05, L * 0.35), Math.min(0.03, L * 0.22)); }
+  });
+  if ((readTick++ % 4) !== 0) return;
+  const kx = x * sc.ext.h, ky = y * sc.ext.h, kz = z * sc.ext.v, hs = hypot(u, v);
+  const heading = ((Math.atan2(u, v) * 180 / PI) + 360) % 360, elev = Math.atan2(w, hs) * 180 / PI;
+  readout.innerHTML =
+    `<div class="big">F(${fmtU(kx)}, ${fmtU(ky)}, ${fmtU(kz, 2)} km, ${S.t.toFixed(1)} s)</div>` +
+    `<div class="comps"><div><i>u (east)</i><span class="cx">${fmt(u)}</span></div><div><i>v (north)</i><span class="cy">${fmt(v)}</span></div><div><i>w (up)</i><span class="cz">${fmt(w)}</span></div></div>` +
+    `<div class="kv"><span>|F| = √(u²+v²+w²)</span><b>${spd.toFixed(1)} m/s</b>` +
+    `<span>horizontal speed √(u²+v²)</span><b>${hs.toFixed(1)} m/s</b>` +
+    `<span>blowing toward</span><b>${hs > 0.05 ? heading.toFixed(0).padStart(3, '0') + '°' : '—'}</b>` +
+    `<span>angle above horizontal</span><b>${spd > 0.05 ? fmtU(elev, 0) + '°' : '—'}</b></div>`;
+}
+
+/* ---------- UI ---------- */
+const $ = id => document.getElementById(id);
+const scenBox = $('scen');
+ORDER.forEach(id => {
+  const b = document.createElement('button'); b.type = 'button'; b.dataset.id = id;
+  b.innerHTML = `<kbd>${SC[id].key}</kbd><span>${SC[id].name}</span>`;
+  b.addEventListener('click', () => setScenario(id));
+  scenBox.appendChild(b);
+});
+function syncProbeUI() {
+  const sc = SC[S.scenario];
+  ['px', 'py', 'pz'].forEach((id, i) => { $(id).value = S.p[i]; });
+  $('pxOut').textContent = fmtU(S.p[0] * sc.ext.h) + ' km';
+  $('pyOut').textContent = fmtU(S.p[1] * sc.ext.h) + ' km';
+  $('pzOut').textContent = (S.p[2] * sc.ext.v).toFixed(2) + ' km';
+  $('sliceOut').textContent = (S.sliceZ * sc.ext.v).toFixed(2) + ' km';
+}
+function setScenario(id) {
+  S.scenario = id; const sc = SC[id];
+  scenBox.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.id === id));
+  $('hudName').textContent = sc.name; $('blurb').textContent = sc.blurb; $('look').innerHTML = sc.look;
+  S.p = sc.probe.slice();
+  buildGround(); buildLabels(); syncProbeUI(); respawnAll();
+}
+function setPlaying(on) {
+  S.playing = on;
+  $('btnPlay').textContent = on ? 'Pause time' : 'Run time';
+  $('btnPlay').classList.toggle('paused', !on);
+  $('hudChip').classList.toggle('live', on);
+  $('hudState').textContent = on ? 'time running' : 'time frozen';
+}
+function setSlice(on) {
+  S.slice = on; $('tSlice').checked = on; slicePlane.visible = on;
+  respawnAll();
+}
+$('btnPlay').addEventListener('click', () => setPlaying(!S.playing));
+$('btnResetT').addEventListener('click', () => { S.t = 0; });
+$('spd').addEventListener('input', e => { S.speed = +e.target.value; $('spdOut').textContent = S.speed.toFixed(2) + '×'; });
+$('tArrows').addEventListener('change', e => { S.arrows = e.target.checked; });
+$('tTracers').addEventListener('change', e => { S.tracers = e.target.checked; trails.visible = S.tracers; });
+$('tScale').addEventListener('change', e => { S.scaleByMag = e.target.checked; });
+$('tRotate').addEventListener('change', e => { S.rotate = e.target.checked; controls.autoRotate = S.rotate; });
+$('dens').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.density = b.dataset.d; $('dens').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+});
+$('tSlice').addEventListener('change', e => setSlice(e.target.checked));
+$('sliceZ').addEventListener('input', e => { S.sliceZ = +e.target.value; slicePlane.position.y = S.sliceZ; syncProbeUI(); if (S.slice) respawnAll(); });
+$('tFlat').addEventListener('change', e => { S.flatten = e.target.checked; if (S.slice) respawnAll(); });
+$('tProbe').addEventListener('change', e => { S.probe = e.target.checked; });
+$('tComp').addEventListener('change', e => { S.comps = e.target.checked; });
+['px', 'py', 'pz'].forEach((id, i) => $(id).addEventListener('input', e => { S.p[i] = +e.target.value; syncProbeUI(); }));
+const app = $('app');
+function togglePanel() { const c = app.classList.toggle('collapsed'); $('btnPanel').textContent = c ? 'Show controls' : 'Hide controls'; }
+$('btnPanel').addEventListener('click', togglePanel);
+$('btnFull').addEventListener('click', () => {
+  try {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else { const r = vp.requestFullscreen && vp.requestFullscreen(); if (r && r.catch) r.catch(() => {}); }
+  } catch (_) {}
+});
+document.addEventListener('fullscreenchange', () => { $('btnFull').textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'; });
+addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.code === 'Space' && tag !== 'button' && tag !== 'input') { e.preventDefault(); setPlaying(!S.playing); return; }
+  if (tag === 'input' && e.target.type !== 'checkbox') return;
+  const idx = '123456'.indexOf(e.key); if (idx >= 0) { setScenario(ORDER[idx]); return; }
+  const k = e.key.toLowerCase();
+  if (k === 's') setSlice(!S.slice);
+  else if (k === 'p') { S.probe = !S.probe; $('tProbe').checked = S.probe; }
+  else if (k === 'h') togglePanel();
+});
+
+/* Resize */
+function resize() {
+  const r = vp.getBoundingClientRect(), w = Math.max(1, r.width), h = Math.max(1, r.height);
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(vp);
+
+/* Init */
+slicePlane.visible = false; slicePlane.position.y = S.sliceZ;
+$('sliceZ').value = S.sliceZ;
+setPlaying(S.playing);
+setScenario('storm');
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(buildLabels);
+resize();
+
+/* Loop */
+const clock = new THREE.Clock();
+function frame() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (S.playing) S.t += dt * S.speed;
+  const sc = SC[S.scenario];
+  $('hudT').textContent = `t = ${S.t.toFixed(1)} s` + (sc.clock ? `  ·  ${sc.hour(S.t)} local` : '');
+  updateArrows();
+  if (S.tracers) { stepParticles(dt * S.speed); writeTrails(); }
+  updateProbe();
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>

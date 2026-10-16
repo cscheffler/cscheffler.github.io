@@ -401,6 +401,12 @@ button{font:inherit;color:inherit}
 .ghost{background:transparent;border:1px solid var(--seam);border-radius:3px;padding:7px 12px;font-size:13px;color:var(--dust);cursor:pointer}
 .ghost:hover{color:var(--sand);border-color:var(--dust)}
 .kbd{font-family:var(--f-mono);font-size:11px;color:var(--faint)}
+.exopts{margin-top:10px;background:var(--basalt);border-left:2px solid var(--spice);padding:10px 12px;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--sand)}
+.exopts p{margin:0;color:var(--dust)}
+.exopts label{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:start;cursor:pointer;line-height:1.45}
+.exopts input[type=radio]{accent-color:var(--spice);margin-top:3px}
+.exopts input[type=number]{width:3.6em;background:var(--void);color:var(--sand);border:1px solid var(--seam);border-radius:3px;padding:1px 4px;font:inherit}
+.exrow{display:flex;gap:10px}
 .problems{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
 .problems li button{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;width:100%;text-align:left;background:var(--basalt);border:0;border-left:2px solid var(--blood);padding:7px 10px;font-size:13px;cursor:pointer;color:var(--sand)}
 .problems li.w button{border-left-color:var(--amber)}
@@ -500,6 +506,12 @@ button{font:inherit;color:inherit}
         <div class="edbar">
           <span class="status" id="status">–</span>
           <span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="kbd">Ctrl/⌘ + Enter plays</span><button class="ghost" type="button" id="revert">Revert to original</button><button class="ghost" type="button" id="export" hidden>Export MP3</button></span>
+        </div>
+        <div class="exopts" id="exOpts" hidden>
+          <p>This score loops for ever. Export it as:</p>
+          <label><input type="radio" name="exMode" value="loop" checked><span><b>A seamless loop file</b> (WAV): one pass of the loop that joins end to start without a gap, for a game, a DAW or a loop player. WAV rather than MP3, because MP3 adds a short silence at each end.</span></label>
+          <label><input type="radio" name="exMode" value="times"><span><b>An MP3</b> of the score with the loop played <input type="number" id="exTimes" min="1" max="99" step="1" value="2" aria-label="How many times to play the loop"> times, then ending.</span></label>
+          <div class="exrow"><button class="ghost" type="button" id="exGo">Export</button><button class="ghost" type="button" id="exCancel">Cancel</button></div>
         </div>
         <ul class="problems" id="problems"></ul>
       </section>
@@ -2145,13 +2157,51 @@ function compile(text) {
         if (S.sections[name]) W(ln, `section "${name}" is defined twice; the later one wins`); else S.sorder.push(name);
         const s = { name, ln, bars, lines: [] }; S.sections[name] = s; block = s; break;
       }
-      case 'play':
-        arg.forEach(tok => {
-          const m = /^([^*\s]+)(?:\*(\d+))?$/.exec(tok);
-          if (!m) { E(ln, `can't read "${tok}" in play`); return; }
-          for (let r = 0; r < (m[2] ? parseInt(m[2], 10) : 1); r++) S.play.push({ name: m[1], ln });
+      case 'play': {
+        // play intro (verse chorus)*2 (groove fill)*forever : groups in ( ), *N repeats, *forever loops the
+        // last item for ever (only at the outer level, and only once; anything after it is never reached)
+        const toks = line.slice(4).match(/\(|\)(?:\*[^\s()]*)?|[^\s()]+/g) || [];
+        let i = 0;
+        const rep = (sfx, tok) => {
+          if (!sfx) return 1;
+          const m = /^\*(\d+|forever|inf|∞)$/i.exec(sfx);
+          if (!m) { E(ln, `can't read "${tok}" in play: repeats are written *2, *3 … or *forever`); return 1; }
+          return /^\d+$/.test(m[1]) ? parseInt(m[1], 10) : Infinity;
+        };
+        const seq = depth => {
+          const items = [];
+          while (i < toks.length) {
+            const t = toks[i];
+            if (t === '(') {
+              i++; const inner = seq(depth + 1), close = toks[i];
+              if (!close || close[0] !== ')') { E(ln, 'play: a "(" is never closed'); return items; }
+              i++; items.push({ group: inner, n: rep(close.slice(1), close) });
+            } else if (t[0] === ')') {
+              if (depth) return items;
+              E(ln, 'play: ")" without a matching "("'); i++;
+            } else {
+              i++; const m = /^([^*]+)(\*.*)?$/.exec(t);
+              if (!m) { E(ln, `can't read "${t}" in play`); continue; }
+              items.push({ name: m[1], n: rep(m[2], t) });
+            }
+          }
+          return items;
+        };
+        const flat = it => { // names inside a repeat that is itself finite
+          let one = it.group ? [].concat(...it.group.map(flat)) : [it.name];
+          if (it.n === Infinity) { E(ln, 'play: *forever only works at the outer level of the play line, not inside a repeated group'); return one; }
+          let out = []; for (let r = 0; r < it.n; r++) out = out.concat(one); return out;
+        };
+        seq(0).forEach(it => {
+          if (S.loopLn) { if (!S.unreach) { S.unreach = true; W(ln, 'play: everything after a *forever loop is never reached'); } return; }
+          if (it.n === Infinity) {
+            const body = flat(Object.assign({}, it, { n: 1 }));
+            if (!body.length) { E(ln, 'play: there is nothing inside the *forever group'); return; }
+            S.loopLn = ln; body.forEach(name => S.play.push({ name, ln, loop: true }));
+          } else flat(it).forEach(name => S.play.push({ name, ln }));
         });
         break;
+      }
     }
   });
 
@@ -2190,14 +2240,15 @@ function compile(text) {
   const sd = 60 / S.tempo / 4;
   const stepT = s => s * sd + ((Math.floor(s + 1e-9) % 2 === 1) ? S.swing * sd : 0);
   const events = [], autos = [], secs = [], lastF = {}, hr = mulberry(hashStr(text));
-  let cur = 0;
-  S.play.forEach(({ name, ln }) => {
+  let cur = 0, loopStart = null;
+  S.play.forEach(({ name, ln, loop: lb }) => {
+    if (lb && loopStart == null) loopStart = cur * sd;
     const s = S.sections[name];
     if (!s) { E(ln, `play: no section called "${name}"`); return; }
     const n = s.bars * S.steps;
     s.rows.forEach(row => {
       const v = row.v;
-      for (const k in TRACKP) { const base = v.P[k], ov = row.ov[k]; autos.push({ t: cur * sd, dur: n * sd, voice: v.name, k, from: ov ? ov[0] : base, to: ov ? ov[1] : base }); }
+      for (const k in TRACKP) { const base = v.P[k], ov = row.ov[k]; autos.push({ t: cur * sd, dur: n * sd, voice: v.name, k, from: ov ? ov[0] : base, to: ov ? ov[1] : base, lb }); }
       const pat = row.pat; if (!pat) return;
       const shift = row.tr + 12 * (row.oct + (v.P.oct || 0));
       const dflt = v.P.note != null ? v.P.note : noteMidi(v.inst.defNote);
@@ -2214,21 +2265,37 @@ function compile(text) {
           nt.keys.forEach((key, ki) => {
             const midi = (key == null ? dflt : key) + shift, f = mtof(midi);
             const strum = ki && H > 0 && hm[2] ? hr() * hm[2] / 1000 * H : 0;
-            events.push({ t: Math.max(0, t + toff + strum), dur, voice: v.name, inst: v.inst, P: v.P, f, midi, vel: clamp(nt.vel * vmul, 0.05, 1.5), gf: ratio ? f * ratio : null });
+            events.push({ t: Math.max(0, t + toff + strum), dur, voice: v.name, inst: v.inst, P: v.P, f, midi, vel: clamp(nt.vel * vmul, 0.05, 1.5), gf: ratio ? f * ratio : null, lb });
           });
           lastF[v.name] = f0;
         }
       }
     });
-    secs.push({ name, t: cur * sd, dur: n * sd, bars: s.bars });
+    secs.push({ name, t: cur * sd, dur: n * sd, bars: s.bars, lb });
     cur += n;
   });
   events.sort((a, b) => a.t - b.t);
   autos.sort((a, b) => a.t - b.t);
+  events.forEach((e, i) => { e.sid = i; }); // seeds each note's randomness; repeats of a loop keep their seed
+  const loop = loopStart != null && cur * sd > loopStart + 1e-6 ? { start: loopStart, len: cur * sd - loopStart, bars: secs.filter(x => x.lb).reduce((a, x) => a + x.bars, 0) } : null;
   const used = new Set(events.map(e => e.voice).concat(autos.map(a => a.voice)));
   const voices = Object.values(S.voices).filter(v => used.has(v.name)).map(v => ({ name: v.name, inst: v.inst.name, fam: v.inst.fam, P: v.P }));
   const bars = secs.reduce((a, s) => a + s.bars, 0);
-  return { errors, warnings, title: S.title, tempo: S.tempo, steps: S.steps, duration: cur * sd, bars, sections: secs, events, autos, voices, reverb: S.reverb, delaySec: S.delay * sd };
+  return { errors, warnings, title: S.title, tempo: S.tempo, steps: S.steps, duration: cur * sd, bars, sections: secs, events, autos, voices, reverb: S.reverb, delaySec: S.delay * sd, loop };
+}
+
+// A looping score compiles to the part before the loop plus one pass of the loop. This spells out the loop
+// `passes` times as an ordinary finite score (copies of a note keep its seed, so every pass renders alike).
+function unrollLoop(comp, passes) {
+  const lp = comp.loop; if (!lp) return comp;
+  const ev = comp.events.filter(e => !e.lb), au = comp.autos.filter(a => !a.lb), secs = comp.sections.filter(x => !x.lb);
+  const bev = comp.events.filter(e => e.lb), bau = comp.autos.filter(a => a.lb), bsec = comp.sections.filter(x => x.lb);
+  for (let p = 0; p < passes; p++) {
+    const d = p * lp.len, sh = o => (p ? Object.assign({}, o, { t: o.t + d }) : o);
+    bev.forEach(e => ev.push(sh(e))); bau.forEach(a => au.push(sh(a))); bsec.forEach(x => secs.push(sh(x)));
+  }
+  ev.sort((a, b) => a.t - b.t); au.sort((a, b) => a.t - b.t);
+  return Object.assign({}, comp, { events: ev, autos: au, sections: secs, duration: lp.start + passes * lp.len, bars: comp.bars + (passes - 1) * lp.bars, loop: null, passes });
 }
 
 
@@ -4201,6 +4268,937 @@ section no_signal bars=8
 play black_screen system_online surveillance concrete_chase no_exit white_room false_choice code_collapse the_core null_protocol no_signal
 ` },
 
+{ id: 'atlas', title: 'The Endless Atlas', ref: 'an endless exploration', key: 'D major', blurb: 'Ambient geography with no edge: harp, Rhodes, felt piano, strings and air drifting through twenty quiet regions, a ten-minute cycle that loops for ever.',
+src: String.raw`// THE ENDLESS ATLAS
+// CONTINUOUS EDITION
+//
+// Ambient geography for an infinitely scrolling atlas.
+//
+// Tempo: 64 BPM
+// Introduction: 8 bars / 30 seconds, once only.
+// Main cycle: 160 bars / 10 minutes, repeating forever.
+//
+// Quiet exploration. Distant horizons. Unmarked places.
+// The sensation of travelling without needing to arrive.
+//
+// Soft harp, Rhodes, felt piano, strings, airy synthesizers,
+// occasional vibraphone, distant flute and nylon guitar.
+//
+// No drums. No strong hook. No dramatic crescendos.
+// No ending, no terminal fade, no obvious loop point.
+//
+// D major and neighbouring modal colours.
+// Eight harmonic regions connected by shared tones.
+// Twenty changing arrangements over one extended cycle.
+//
+// The final region returns naturally to the first.
+// The atlas has no edge.
+
+title The Endless Atlas
+tempo 64
+steps 16
+swing 0
+human 1.2
+reverb 6.8
+delay q.
+
+
+// ================================================
+// INSTRUMENTS
+// ================================================
+
+// The atmosphere
+
+voice air      pad.air       vol=0.18 pan=0.26 rev=0.74 atk=3 rel=4
+voice warmth   pad.warm      vol=0.24 pan=-0.10 cut=2200 rev=0.63 atk=2 rel=3
+voice strings  pad.strings   vol=0.18 pan=0.12 rev=0.67 atk=1.7 rel=2.6
+voice glass    pad.glass     vol=0.14 pan=0.32 rev=0.77 atk=2.3 rel=3
+voice low      bass.sub      vol=0.23 cut=820 rev=0.20 atk=0.8 rel=2.3
+
+// Small details appearing across the landscape
+
+voice harp     pluck.harp    vol=0.28 pan=-0.22 rev=0.61 dly=0.11
+voice keys     keys.rhodes   vol=0.25 pan=0.15 rev=0.50
+voice piano    keys.piano    vol=0.21 pan=-0.14 rev=0.57
+voice vibes    keys.vibes    vol=0.18 pan=0.30 rev=0.72 dly=0.15
+voice flute    lead.whistle  vol=0.24 pan=0.22 rev=0.78 atk=0.32 rel=1.4
+voice guitar   guitar.nylon  vol=0.23 pan=-0.28 rev=0.54
+
+
+// ================================================
+// EIGHT HARMONIC REGIONS
+// ================================================
+
+// Four slow, two-bar harmonies per region.
+// Added seconds, sixths and ninths.
+// No strong dominant-to-tonic resolution.
+
+pattern land_a len=8
+  [D3 A3 C#4 E4]:w | _:w
+  | [C#3 A3 B3 E4]:w | _:w
+  | [B2 F#3 A3 D4]:w | _:w
+  | [G2 D3 F#3 A3]:w | _:w
+
+pattern land_b len=8
+  [D3 A3 C#4 E4]:w | _:w
+  | [F#2 C#3 A3 E4]:w | _:w
+  | [E2 B2 F#3 G3]:w | _:w
+  | [A2 E3 B3 D4]:w | _:w
+
+pattern land_c len=8
+  [G2 D3 F#3 A3]:w | _:w
+  | [D2 A2 F#3 E4]:w | _:w
+  | [E2 B2 F#3 G3]:w | _:w
+  | [A2 E3 B3 D4]:w | _:w
+
+pattern land_d len=8
+  [B2 F#3 A3 D4]:w | _:w
+  | [G2 D3 F#3 A3]:w | _:w
+  | [D2 A2 F#3 E4]:w | _:w
+  | [A2 E3 B3 D4]:w | _:w
+
+pattern land_e len=8
+  [D3 A3 E4 F#4]:w | _:w
+  | [C#3 G#3 B3 E4]:w | _:w
+  | [B2 F#3 A3 C#4]:w | _:w
+  | [G2 D3 A3 B3]:w | _:w
+
+pattern land_f len=8
+  [G2 D3 A3 B3]:w | _:w
+  | [F#2 C#3 A3 E4]:w | _:w
+  | [E2 B2 F#3 G3]:w | _:w
+  | [A2 E3 B3 D4]:w | _:w
+
+pattern land_g len=8
+  [D3 A3 E4 F#4]:w | _:w
+  | [A2 E3 B3 C#4]:w | _:w
+  | [G2 D3 A3 B3]:w | _:w
+  | [G2 D3 F#3 A3]:w | _:w
+
+pattern land_h len=8
+  [B2 F#3 A3 D4]:w | _:w
+  | [F#2 C#3 A3 E4]:w | _:w
+  | [G2 D3 A3 B3]:w | _:w
+  | [A2 E3 B3 D4]:w | _:w
+
+
+// ================================================
+// THE OPEN SKY
+// ================================================
+
+// Airy fifths and ninths.
+// One note group every two bars.
+// A nearly imperceptible moving atmosphere.
+
+pattern sky_a len=8
+  [A3 E4]:w | _:w
+  | [A3 E4]:w | _:w
+  | [F#3 C#4]:w | _:w
+  | [A3 D4]:w | _:w
+
+pattern sky_b len=8
+  [A3 E4]:w | _:w
+  | [F#3 C#4]:w | _:w
+  | [B3 F#4]:w | _:w
+  | [A3 E4]:w | _:w
+
+pattern sky_c len=8
+  [A3 D4]:w | _:w
+  | [A3 E4]:w | _:w
+  | [B3 E4]:w | _:w
+  | [A3 E4]:w | _:w
+
+pattern sky_d len=8
+  [A3 D4]:w | _:w
+  | [A3 D4]:w | _:w
+  | [A3 E4]:w | _:w
+  | [A3 E4]:w | _:w
+
+pattern sky_e len=8
+  [A3 E4]:w | _:w
+  | [G#3 E4]:w | _:w
+  | [F#3 C#4]:w | _:w
+  | [A3 D4]:w | _:w
+
+pattern sky_f len=8
+  [A3 D4]:w | _:w
+  | [A3 E4]:w | _:w
+  | [B3 E4]:w | _:w
+  | [A3 E4]:w | _:w
+
+pattern sky_g len=8
+  [A3 E4]:w | _:w
+  | [A3 E4]:w | _:w
+  | [A3 D4]:w | _:w
+  | [A3 D4]:w | _:w
+
+pattern sky_h len=8
+  [A3 D4]:w | _:w
+  | [A3 E4]:w | _:w
+  | [A3 D4]:w | _:w
+  | [A3 E4]:w | _:w
+
+
+// ================================================
+// THE QUIET CONTINENT
+// ================================================
+
+// Very soft sub-bass, one note every two bars.
+// A sense of geographical ground rather than rhythm.
+
+pattern ground_a len=8
+  D2:w | .:w
+  | C#2:w | .:w
+  | B1:w | .:w
+  | G1:w | .:w
+
+pattern ground_b len=8
+  D2:w | .:w
+  | F#1:w | .:w
+  | E2:w | .:w
+  | A1:w | .:w
+
+pattern ground_c len=8
+  G1:w | .:w
+  | D2:w | .:w
+  | E2:w | .:w
+  | A1:w | .:w
+
+pattern ground_d len=8
+  B1:w | .:w
+  | G1:w | .:w
+  | D2:w | .:w
+  | A1:w | .:w
+
+pattern ground_e len=8
+  D2:w | .:w
+  | C#2:w | .:w
+  | B1:w | .:w
+  | G1:w | .:w
+
+pattern ground_f len=8
+  G1:w | .:w
+  | F#1:w | .:w
+  | E2:w | .:w
+  | A1:w | .:w
+
+pattern ground_g len=8
+  D2:w | .:w
+  | A1:w | .:w
+  | G1:w | .:w
+  | G1:w | .:w
+
+pattern ground_h len=8
+  B1:w | .:w
+  | F#1:w | .:w
+  | G1:w | .:w
+  | A1:w | .:w
+
+
+// ================================================
+// STRINGS — CLOUD SHADOWS
+// ================================================
+
+// Gentle changes of inner harmony.
+// Always subordinate to the atmosphere.
+
+pattern strings_a len=8
+  [F#3 A3 E4]:w | [F#3 A3 D4]:w
+  | [E3 A3 B3]:w | [E3 A3 C#4]:w
+  | [F#3 A3 D4]:w | [F#3 A3 E4]:w
+  | [G3 B3 D4]:w | [G3 A3 D4]:w
+
+pattern strings_b len=8
+  [F#3 A3 E4]:w | [F#3 A3 D4]:w
+  | [F#3 A3 C#4]:w | [F#3 A3 E4]:w
+  | [E3 G3 B3]:w | [E3 F#3 B3]:w
+  | [E3 A3 D4]:w | [E3 A3 B3]:w
+
+pattern strings_c len=8
+  [G3 A3 D4]:w | [G3 B3 D4]:w
+  | [F#3 A3 E4]:w | [F#3 A3 D4]:w
+  | [E3 G3 B3]:w | [E3 G3 D4]:w
+  | [E3 A3 D4]:w | [E3 A3 B3]:w
+
+pattern strings_d len=8
+  [F#3 A3 D4]:w | [F#3 A3 E4]:w
+  | [G3 B3 D4]:w | [G3 A3 D4]:w
+  | [F#3 A3 E4]:w | [F#3 A3 D4]:w
+  | [E3 A3 D4]:w | [E3 A3 B3]:w
+
+pattern strings_e len=8
+  [F#3 A3 E4]:w | [F#3 A3 D4]:w
+  | [E3 G#3 B3]:w | [E3 G#3 C#4]:w
+  | [F#3 A3 C#4]:w | [F#3 A3 E4]:w
+  | [G3 B3 D4]:w | [G3 A3 D4]:w
+
+pattern strings_h len=8
+  [F#3 A3 D4]:w | [F#3 A3 E4]:w
+  | [F#3 A3 C#4]:w | [F#3 A3 E4]:w
+  | [G3 B3 D4]:w | [G3 A3 D4]:w
+  | [E3 A3 D4]:w | [E3 A3 B3]:w
+
+
+// ================================================
+// HARP — LINES ACROSS THE MAP
+// ================================================
+
+// Several alternative figures, rather than
+// one repeating arpeggio for the whole piece.
+//
+// Gentle variation in spacing and register.
+
+pattern harp_a len=8
+  D4:q A4:e E5:e .:h | .:h F#4:q E5:q
+  | C#4:q A4:e E5:e .:h | .:h B4:q E5:q
+  | B3:q F#4:e A4:e .:h | .:h D4:q F#4:q
+  | G3:q D4:e A4:e .:h | .:h B3:q D4:q
+
+pattern harp_a2 len=8
+  .:q D4:q A4:e E5:e .:q | F#4:h .:h
+  | C#4:q E4:q A4:e B4:e .:q | .:h E5:q B4:q
+  | .:q B3:q F#4:e A4:e .:q | D4:h .:h
+  | G3:q B3:q D4:e A4:e .:q | .:h F#4:q E4:q
+
+pattern harp_b len=8
+  D4:q A4:e E5:e .:h | .:h C#5:q A4:q
+  | F#3:q C#4:e E4:e .:h | .:h A4:q C#5:q
+  | E3:q B3:e F#4:e .:h | .:h G4:q B4:q
+  | A3:q E4:e B4:e .:h | .:h D5:q B4:q
+
+pattern harp_c len=8
+  G3:q D4:e A4:e .:h | .:h B4:q D5:q
+  | D4:q A4:e E5:e .:h | .:h F#4:q E5:q
+  | E3:q B3:e G4:e .:h | .:h F#4:q B4:q
+  | A3:q E4:e B4:e .:h | .:h D5:q E5:q
+
+pattern harp_d len=8
+  B3:q F#4:e A4:e .:h | .:h D4:q F#4:q
+  | G3:q D4:e A4:e .:h | .:h B3:q D4:q
+  | D4:q A4:e E5:e .:h | .:h F#4:q A4:q
+  | A3:q E4:e B4:e .:h | .:h D5:q C#5:q
+
+pattern harp_e len=8
+  D4:q A4:e E5:e .:h | .:h F#4:q A4:q
+  | C#4:q G#4:e B4:e .:h | .:h E5:q G#4:q
+  | B3:q F#4:e C#5:e .:h | .:h A4:q F#4:q
+  | G3:q D4:e A4:e .:h | .:h B3:q D4:q
+
+pattern harp_f len=8
+  .:q G3:q D4:e A4:e .:q | B4:h .:h
+  | F#3:q A3:q C#4:e E4:e .:q | .:h A4:q E4:q
+  | E3:q B3:q F#4:e G4:e .:q | B4:h .:h
+  | A3:q E4:q B4:e D5:e .:q | .:h C#5:q A4:q
+
+pattern harp_g len=8
+  D4:q A4:e F#4:e .:h | .:h E5:q A4:q
+  | A3:q E4:e C#5:e .:h | .:h B4:q E4:q
+  | G3:q D4:e A4:e .:h | .:h B3:q D4:q
+  | .:q G3:q B3:e D4:e .:q | A4:h .:h
+
+pattern harp_h len=8
+  B3:q F#4:e A4:e .:h | .:h D4:q F#4:q
+  | F#3:q C#4:e E4:e .:h | .:h A4:q E4:q
+  | G3:q D4:e B4:e .:h | .:h A4:q D4:q
+  | A3:q E4:e B4:e .:h | .:h D5:q B4:q
+
+
+// A unique, sparse introductory pattern.
+
+pattern harp_intro len=8
+  .:w | .:w
+  | D4:q A4:q .:h | .:w
+  | B3:q F#4:q .:h | .:w
+  | G3:q D4:q .:h | .:w
+
+
+// ================================================
+// RHODES — WARM INNER HARMONY
+// ================================================
+
+pattern keys_a len=8
+  [F#3 C#4 E4]:h .:h | .:h [A3 D4]:h
+  | [E3 A3 B3]:h .:h | .:w
+  | [F#3 A3 D4]:h .:h | .:h [A3 D4]:h
+  | [G3 B3 D4]:h .:h | .:w
+
+pattern keys_a2 len=8
+  .:h [A3 C#4 E4]:h | .:w
+  | [E3 A3 B3]:h .:h | .:h [A3 C#4]:h
+  | [F#3 A3 D4]:h .:h | .:w
+  | [G3 B3 D4]:h .:h | .:h [A3 D4]:h
+
+pattern keys_b len=8
+  [F#3 C#4 E4]:h .:h | .:w
+  | .:h [F#3 A3 C#4]:h | .:w
+  | [E3 G3 B3]:h .:h | .:h [G3 B3]:h
+  | [E3 A3 D4]:h .:h | .:w
+
+pattern keys_c len=8
+  [G3 B3 D4]:h .:h | .:w
+  | .:h [F#3 A3 E4]:h | .:w
+  | [E3 G3 B3]:h .:h | .:h [G3 D4]:h
+  | [E3 A3 D4]:h .:h | .:w
+
+pattern keys_d len=8
+  [F#3 A3 D4]:h .:h | .:h [A3 D4]:h
+  | [G3 B3 D4]:h .:h | .:w
+  | [F#3 A3 E4]:h .:h | .:w
+  | [E3 A3 B3]:h .:h | .:w
+
+pattern keys_e len=8
+  [F#3 A3 E4]:h .:h | .:w
+  | [E3 G#3 B3]:h .:h | .:h [G#3 C#4]:h
+  | [F#3 A3 C#4]:h .:h | .:w
+  | [G3 B3 D4]:h .:h | .:w
+
+pattern keys_f len=8
+  [G3 B3 D4]:h .:h | .:w
+  | [F#3 A3 C#4]:h .:h | .:w
+  | [E3 G3 B3]:h .:h | .:w
+  | [E3 A3 D4]:h .:h | .:w
+
+
+// ================================================
+// PIANO — DISTANT LANDMARKS
+// ================================================
+
+// A few solitary notes, with substantial space
+// for their natural decay.
+
+pattern piano_a len=8
+  F#4:h .:h | .:w
+  | E4:q B4:q .:h | .:w
+  | D4:h .:h | .:w
+  | B3:q D4:q .:h | .:w
+
+pattern piano_b len=8
+  .:w | A4:h .:h
+  | C#5:q A4:q .:h | .:w
+  | E4:h .:h | .:w
+  | B3:q D4:q .:h | .:w
+
+pattern piano_c len=8
+  B3:q D4:q .:h | .:w
+  | F#4:h .:h | .:w
+  | E4:q G4:q .:h | .:w
+  | C#4:h .:h | .:w
+
+pattern piano_g len=8
+  F#4:h .:h | .:w
+  | C#5:q B4:q .:h | .:w
+  | D4:q A4:q .:h | .:w
+  | G4:h .:h | .:w
+
+
+// ================================================
+// VIBRAPHONE — LIGHT ON WATER
+// ================================================
+
+// Soft metallic reflections.
+
+pattern vibes_a len=8
+  .:w | .:h E5:q F#5:q
+  | .:w | B4:h .:h
+  | .:w | .:h D5:q E5:q
+  | .:w | A4:h .:h
+
+pattern vibes_c len=8
+  .:w | .:h A4:q B4:q
+  | .:w | E5:h .:h
+  | .:w | .:h G4:q B4:q
+  | .:w | C#5:h .:h
+
+pattern vibes_e len=8
+  .:w | A4:h .:h
+  | .:w | .:h G#4:q B4:q
+  | .:w | .:h C#5:q B4:q
+  | .:w | A4:h .:h
+
+
+// ================================================
+// FLUTE — UNEXPLORED DISTANCES
+// ================================================
+
+// Gentle fragments of melody.
+// Not a recurring theme.
+// A little curiosity on the horizon.
+
+pattern flute_far len=8
+  .:w | .:h A4:q B4:q
+  | C#5:h .:h | .:w
+  | .:h F#4:q A4:q | B4:h A4:h
+  | .:w | .:w
+
+pattern flute_c len=8
+  .:w | .:h B4:q D5:q
+  | A4:h .:h | .:w
+  | .:h G4:q B4:q | D5:h B4:h
+  | .:w | .:w
+
+pattern flute_d len=8
+  .:w | .:h F#4:q A4:q
+  | B4:h .:h | .:w
+  | .:h A4:q E5:q | D5:h C#5:h
+  | .:w | .:w
+
+pattern flute_e len=8
+  .:w | .:h F#4:q A4:q
+  | G#4:h .:h | .:w
+  | .:h F#4:q C#5:q | B4:h A4:h
+  | .:w | .:w
+
+
+// ================================================
+// NYLON GUITAR — THE HUMAN SCALE
+// ================================================
+
+// Sparse fingerpicked notes.
+// These should feel close and intimate
+// against the much larger atmospheric landscape.
+
+pattern guitar_a len=8
+  D3:e A3:e E4:q .:h | .:w
+  | C#3:e A3:e B3:q .:h | .:w
+  | B2:e F#3:e D4:q .:h | .:w
+  | G2:e D3:e A3:q .:h | .:w
+
+pattern guitar_c len=8
+  G2:e D3:e A3:q .:h | .:w
+  | D3:e A3:e E4:q .:h | .:w
+  | E2:e B2:e G3:q .:h | .:w
+  | A2:e E3:e B3:q .:h | .:w
+
+pattern guitar_f len=8
+  G2:e D3:e B3:q .:h | .:w
+  | F#2:e C#3:e A3:q .:h | .:w
+  | E2:e B2:e G3:q .:h | .:w
+  | A2:e E3:e D4:q .:h | .:w
+
+
+// ================================================
+// THE ONE-TIME INTRODUCTION
+// 8 bars / 30 seconds
+// ================================================
+
+// Ease into the music gently.
+// Start with almost no audible sound.
+//
+// The underlying harmonies are already the same
+// as those in the opening of the repeating cycle.
+//
+// This section is NOT included in the forever loop.
+
+section first_coordinates bars=8
+  air     sky_a        vol=0.04>0.18
+  warmth  land_a       vol=0.06>0.24
+  low     ground_a     vol=0.08>0.23
+  harp    harp_intro   vol=0.08>0.27
+
+
+// ================================================
+// THE INFINITE ATLAS
+// ================================================
+
+// TWENTY REGIONS.
+// Each region is 8 bars / 30 seconds.
+//
+// Total repeating cycle: 160 bars / 10 minutes.
+//
+// Small instrumental changes, different voicings,
+// occasional harmonic detours and long quiet passages.
+//
+// Nothing builds toward a climax.
+// Nothing fades toward an ending.
+//
+// This is ambient geography, not a journey
+// with a predetermined destination.
+
+
+// -----------------------------------------------
+// REGION 01 — QUIET MERIDIAN
+// 00:00–00:30 within the loop
+// -----------------------------------------------
+
+// The central identity of the piece.
+//
+// Gentle harp, Rhodes and broad atmospheric harmonies.
+// Unhurried and quietly curious.
+
+section quiet_meridian bars=8
+  air     sky_a       vol=0.18
+  warmth  land_a      vol=0.24
+  low     ground_a    vol=0.23
+  harp    harp_a      vol=0.27
+  keys    keys_a      vol=0.20
+
+
+// -----------------------------------------------
+// REGION 02 — WOODED INTERIORS
+// 00:30–01:00
+// -----------------------------------------------
+
+// A little darker, a little greener.
+// Warm strings enter almost imperceptibly.
+
+section wooded_interiors bars=8
+  air     sky_b       vol=0.19
+  warmth  land_b      vol=0.23
+  strings strings_b   vol=0.13
+  low     ground_b    vol=0.22
+  harp    harp_b      vol=0.25
+  keys    keys_b      vol=0.14
+
+
+// -----------------------------------------------
+// REGION 03 — COASTAL LINES
+// 01:00–01:30
+// -----------------------------------------------
+
+// Gentle acoustic texture and a more open harmony.
+// Small points of light moving across the shore.
+
+section coastal_lines bars=8
+  air     sky_c       vol=0.19
+  warmth  land_c      vol=0.24
+  low     ground_c    vol=0.23
+  guitar  guitar_c    vol=0.20
+  harp    harp_c      vol=0.23
+  keys    keys_c      vol=0.18
+
+
+// -----------------------------------------------
+// REGION 04 — CLOUD SHADOWS
+// 01:30–02:00
+// -----------------------------------------------
+
+// A quieter, more abstract passage.
+// Harp disappears.
+// Felt piano takes its place.
+
+section cloud_shadows bars=8
+  air     sky_d       vol=0.20
+  warmth  land_d      vol=0.23
+  glass   sky_d       vol=0.09
+  piano   piano_c     vol=0.19
+  low     ground_d    vol=0.21
+
+
+// -----------------------------------------------
+// REGION 05 — INLAND WATER
+// 02:00–02:30
+// -----------------------------------------------
+
+// Warmth returns through different harmonies.
+// Subtle C# minor colouring.
+// Like sunlight on a distant lake.
+
+section inland_water bars=8
+  warmth  land_e      vol=0.25
+  strings strings_e   vol=0.17
+  low     ground_e    vol=0.22
+  harp    harp_e      vol=0.25
+  keys    keys_e      vol=0.20
+
+
+// -----------------------------------------------
+// REGION 06 — FAINT ROUTES
+// 02:30–03:00
+// -----------------------------------------------
+
+// Small glimmers of vibraphone.
+// The music continues to drift without a pulse.
+
+section faint_routes bars=8
+  air     sky_f       vol=0.19
+  warmth  land_f      vol=0.23
+  low     ground_f    vol=0.23
+  harp    harp_f      vol=0.25
+  vibes   vibes_c     vol=0.14
+
+
+// -----------------------------------------------
+// REGION 07 — AFTER RAIN
+// 03:00–03:30
+// -----------------------------------------------
+
+// Pale light and soft reflections.
+// Piano and vibraphone briefly coexist.
+// A very distant flute.
+
+section after_rain bars=8
+  air     sky_d       vol=0.21
+  warmth  land_d      vol=0.22
+  glass   sky_d       vol=0.12
+  piano   piano_c     vol=0.19
+  low     ground_d    vol=0.21
+  vibes   vibes_a     vol=0.12
+  flute   flute_d     vol=0.13
+
+
+// -----------------------------------------------
+// REGION 08 — HIGH CONTOURS
+// 03:30–04:00
+// -----------------------------------------------
+
+// Mountains or high plateaus.
+// A little more orchestral warmth.
+// The flute has space to wander.
+
+section high_contours bars=8
+  air     sky_c       vol=0.20
+  warmth  land_c      vol=0.24
+  strings strings_c   vol=0.17
+  flute   flute_c     vol=0.20
+  guitar  guitar_c    vol=0.18
+  low     ground_c    vol=0.20
+
+
+// -----------------------------------------------
+// REGION 09 — THE UNINHABITED QUARTER
+// 04:00–04:30
+// -----------------------------------------------
+
+// Large regions of empty space.
+// A few isolated piano notes.
+// No suggestion that anything is missing.
+
+section uninhabited bars=8
+  air     sky_g       vol=0.22
+  warmth  land_g      vol=0.20
+  glass   sky_g       vol=0.11
+  piano   piano_g     vol=0.18
+  low     ground_g    vol=0.22
+  harp    harp_g      vol=0.12
+
+
+// -----------------------------------------------
+// REGION 10 — DISTANT LIGHTS
+// 04:30–05:00
+// -----------------------------------------------
+
+// The appearance of settlements on the horizon.
+// Slightly warmer harmonic colours.
+// Still calm, without a sense of arrival.
+
+section distant_lights bars=8
+  air     sky_e       vol=0.19
+  warmth  land_e      vol=0.24
+  low     ground_e    vol=0.22
+  harp    harp_e      vol=0.25
+  keys    keys_e      vol=0.18
+  vibes   vibes_e     vol=0.13
+
+
+// -----------------------------------------------
+// REGION 11 — RIVERS OF INK
+// 05:00–05:30
+// -----------------------------------------------
+
+// Familiar harmony heard from a different angle.
+// A new harp phrase replaces the opening figure.
+
+section rivers_of_ink bars=8
+  air     sky_a       vol=0.19
+  warmth  land_a      vol=0.24
+  strings strings_a   vol=0.16
+  low     ground_a    vol=0.22
+  harp    harp_a2     vol=0.26
+  piano   piano_a     vol=0.17
+
+
+// -----------------------------------------------
+// REGION 12 — THE LONG PLAINS
+// 05:30–06:00
+// -----------------------------------------------
+
+// Broad, unbroken space.
+// A little acoustic guitar.
+// The piano plays rare landmarks.
+
+section long_plains bars=8
+  air     sky_b       vol=0.20
+  warmth  land_b      vol=0.23
+  harp    harp_b      vol=0.22
+  guitar  guitar_a    vol=0.19
+  low     ground_b    vol=0.23
+  piano   piano_b     vol=0.14
+
+
+// -----------------------------------------------
+// REGION 13 — SMALL ISLANDS
+// 06:00–06:30
+// -----------------------------------------------
+
+// Light, gently animated, a little more curious.
+// Small notes like islands in a large sea.
+
+section small_islands bars=8
+  air     sky_c       vol=0.19
+  warmth  land_c      vol=0.25
+  harp    harp_c      vol=0.26
+  vibes   vibes_c     vol=0.16
+  flute   flute_c     vol=0.18
+  low     ground_c    vol=0.21
+
+
+// -----------------------------------------------
+// REGION 14 — NIGHT LATITUDES
+// 06:30–07:00
+// -----------------------------------------------
+
+// The quietest sense of melancholy.
+// B minor and F# minor colours.
+// No sadness, just distance.
+
+section night_latitudes bars=8
+  warmth  land_h      vol=0.23
+  strings strings_h   vol=0.18
+  keys    keys_d      vol=0.21
+  low     ground_h    vol=0.22
+  air     sky_h       vol=0.16
+  harp    harp_h      vol=0.17
+
+
+// -----------------------------------------------
+// REGION 15 — WIDE ESTUARY
+// 07:00–07:30
+// -----------------------------------------------
+
+// Gentle rhythmic interplay between harp and guitar.
+// Still no percussion, no implied urgency.
+
+section wide_estuary bars=8
+  air     sky_f       vol=0.19
+  warmth  land_f      vol=0.24
+  low     ground_f    vol=0.22
+  harp    harp_f      vol=0.25
+  guitar  guitar_f    vol=0.19
+  keys    keys_f      vol=0.18
+
+
+// -----------------------------------------------
+// REGION 16 — THE UNMARKED SEA
+// 07:30–08:00
+// -----------------------------------------------
+
+// A broad, open and sparsely populated passage.
+// Solitary flute and piano.
+// Vast space around every note.
+
+section open_sound bars=8
+  air     sky_a       vol=0.21
+  warmth  land_a      vol=0.22
+  flute   flute_far   vol=0.20
+  piano   piano_a     vol=0.16
+  low     ground_a    vol=0.20
+
+
+// -----------------------------------------------
+// REGION 17 — ABOVE THE CLOUDS
+// 08:00–08:30
+// -----------------------------------------------
+
+// A higher, airier part of the harmonic landscape.
+// The metallic shimmer returns, gently.
+
+section above_clouds bars=8
+  air     sky_e       vol=0.20
+  warmth  land_e      vol=0.23
+  glass   sky_e       vol=0.12
+  vibes   vibes_e     vol=0.14
+  low     ground_e    vol=0.22
+  flute   flute_e     vol=0.18
+
+
+// -----------------------------------------------
+// REGION 18 — FORGOTTEN ROADS
+// 08:30–09:00
+// -----------------------------------------------
+
+// Gradually return to warmer, more familiar sounds.
+// Strings, Rhodes and harp.
+// Nothing quite identical to the first few minutes.
+
+section forgotten_roads bars=8
+  air     sky_d       vol=0.19
+  warmth  land_d      vol=0.24
+  strings strings_d   vol=0.16
+  harp    harp_d      vol=0.24
+  keys    keys_d      vol=0.20
+  low     ground_d    vol=0.22
+
+
+// -----------------------------------------------
+// REGION 19 — THE WIDE QUIET
+// 09:00–09:30
+// -----------------------------------------------
+
+// A little less motion.
+// The flute looks across an empty horizon.
+// The entire sound world gently settles.
+
+section open_quiet bars=8
+  air     sky_g       vol=0.21
+  warmth  land_g      vol=0.22
+  flute   flute_far   vol=0.17
+  piano   piano_g     vol=0.17
+  low     ground_g    vol=0.22
+
+
+// -----------------------------------------------
+// REGION 20 — NO EDGE
+// 09:30–10:00
+// -----------------------------------------------
+
+// THE LOOP SEAM.
+//
+// Return to exactly the same five instruments
+// and mixer levels as REGION 01.
+//
+// However, the harp and keyboard phrases differ,
+// so the music does not simply repeat the last
+// thirty seconds at the boundary.
+//
+// The final Gmaj9 flows naturally into Dmaj9.
+// There is no final cadence or fade.
+//
+// The atlas simply continues.
+
+section no_edge bars=8
+  air     sky_a       vol=0.18
+  warmth  land_a      vol=0.24
+  low     ground_a    vol=0.23
+  harp    harp_a2     vol=0.27
+  keys    keys_a2     vol=0.20
+
+
+// ================================================
+// THE INFINITE ARRANGEMENT
+// ================================================
+//
+// First coordinates plays ONCE.
+//
+// The following twenty regions are a SINGLE GROUP
+// which loops forever.
+//
+// 8 introductory bars = 30 seconds.
+// 160 loop bars = 600 seconds / 10 minutes.
+//
+// After the introduction:
+// 10 minutes -> return to quiet_meridian.
+// 20 minutes -> return to quiet_meridian.
+// 30 minutes -> return to quiet_meridian.
+// And so on, indefinitely.
+//
+// No loop ramps, terminal fades or final chords.
+//
+// The atlas has no edge.
+// ================================================
+
+play first_coordinates (quiet_meridian wooded_interiors coastal_lines cloud_shadows inland_water faint_routes after_rain high_contours uninhabited distant_lights rivers_of_ink long_plains small_islands night_latitudes wide_estuary open_sound above_clouds forgotten_roads open_quiet no_edge)*forever
+` },
+
 { id: 'custom', title: 'Your score', ref: 'paste or write', key: '', blurb: 'Paste a score from an LLM here, or start from this sketch.',
 src: String.raw`// Paste a score from your LLM here, or edit this sketch.
 // Ctrl/Cmd + Enter plays. Problems show up under the editor as you type.
@@ -4285,7 +5283,9 @@ One directive per line. "//" starts a comment. Indentation is optional but helps
     <pattern body: one or more lines>
   section <name> [bars=<n>]              default 4 bars
     <voice> <pattern> [param=value | param=start>end ...]
-  play <section> <section>*2 ...         section order; *N repeats. Omit to play sections in written order.
+  play <section> <section>*2 (<a> <b>)*3 (<c> <d>)*forever
+                                         section order; *N repeats a section or a ( ) group; *forever
+                                         loops the last item endlessly. Omit to play sections in written order.
 
 Names are single words (letters, digits, - or _). The keywords title tempo steps swing human reverb delay voice pattern section play are reserved.
 
@@ -4355,7 +5355,8 @@ SECTIONS AND ARRANGEMENT
     hat   -                            // "-" = voice listed but silent
 
 Only voices listed in a section play in it. Each section starts every listed voice at its declared mixer settings unless the line overrides them; "a>b" ramps linearly (cutoff ramps exponentially) over the whole section.
-Sections can be reused any number of times in the play line.
+Sections can be reused any number of times in the play line. Groups in ( ) repeat as a unit and can nest: play intro (verse chorus)*2 bridge (verse chorus)*2 outro.
+For background, game or ambient music that should run indefinitely, end the play line with a *forever group: play intro (groove groove groove fill)*forever. Rules: only one *forever, at the outer level (never inside another repeated group), and it must be last (nothing after it is ever reached). Everything before it plays once. Make the loop's last bar lead back naturally into its first. Put variation inside the loop body (e.g. a fill section every fourth pass) so it doesn't feel static. Ramps (a>b) restart on every pass, so a fade inside the loop happens every time round.
 
 ========================================================================
 INSTRUMENTS  (name  [useful range]  description)
@@ -4506,8 +5507,11 @@ pattern acid
   bass  line    tr=-2           <span class="c">// transpose; oct=-1 also works</span>
 
 play intro build rise drop break rise drop2 outro
-play verse*2 chorus             <span class="c">// *N repeats a section</span></pre>
+play verse*2 chorus             <span class="c">// *N repeats a section</span>
+play intro (verse chorus)*3 outro   <span class="c">// ( ) groups sections; *N repeats the group</span>
+play intro (groove fill)*forever    <span class="c">// *forever (or *∞) loops until you press Stop</span></pre>
 <p>Only voices listed in a section play in it. Every section restarts each listed voice at its declared mixer settings unless the line overrides them; <code>a&gt;b</code> ramps across the section. Without a <code>play</code> line, sections play in the order written.</p>
+<p>Groups can be nested. <code>*forever</code> must be the last thing in the play line, outside any other repeat; whatever comes before it plays once, and the score map marks the looping stretch with an amber rule and ↻. The join is seamless: the end of each pass rings on into the next, reverb included. A loop up to 2 minutes long is rendered once and replayed, so it costs nothing after the first pass; a longer one is rendered pass by pass. To export a looping score, choose either a seamless loop file (WAV, one pass that joins end to start) or an MP3 with the loop played a set number of times.</p>
 `;
 
 /* ================= EXPORT: offline render -> MP3 (LAME) -> zip ================= */
@@ -4601,10 +5605,10 @@ async function renderWindow(comp, s, e, opts) {
   for (const k in sess.tracks) if (opts.muted && opts.muted.has(k)) sess.tracks[k].mute.gain.value = 0;
   for (const a of comp.autos) { if (a.t >= end) break; autoAt(c, sess, a, r0); }
   const realRandom = Math.random;
-  const fire = i => { Math.random = mulberry(0x9e3779b1 ^ (i * 2654435761)); try { fireEvent(c, sess, evs[i], evs[i].t - r0); } finally { Math.random = realRandom; } };
+  const fire = i => { const sd = evs[i].sid != null ? evs[i].sid : i; Math.random = mulberry(0x9e3779b1 ^ (sd * 2654435761)); try { fireEvent(c, sess, evs[i], evs[i].t - r0); } finally { Math.random = realRandom; } };
   if (opts.suspend && typeof c.suspend === 'function') {
     let k = 0;
-    const tick = now => { while (k < idx.length && evs[idx[k]].t - r0 < now + 1) fire(idx[k++]); sweep(c, sess); };
+    const tick = now => { while (k < idx.length && evs[idx[k]].t - r0 < now + 1) fire(idx[k++]); sweep(c, sess); if (opts.onProgress) opts.onProgress(now / (end - r0)); };
     tick(0);
     const len = end - r0;
     for (let t = 0.5; t < len - 0.02; t += 0.5) { const tt = Math.round(t / Q) * Q; c.suspend(tt).then(() => { tick(tt); c.resume(); }, e => { console.warn('suspend', tt, len, e && e.message); tick(len); }); }
@@ -4612,6 +5616,38 @@ async function renderWindow(comp, s, e, opts) {
   const buf = await c.startRendering();
   return { buf, off: Math.round((s - r0) * sr), s, e, last: e >= comp.duration + 4 - 1e-6 };
 }
+// ---- loops ----
+// A loop that is short enough is rendered once and replayed. The pass that is kept starts late enough that its
+// pre-roll holds only earlier passes of the loop (so it carries their ringing notes and reverb in, exactly as a
+// steady repeat would), and its seam is a short cross-fade from the audio that really follows the loop's end
+// back into its start, so the join is continuous whatever the note, reverb or modulation state.
+const LOOP_CACHE_MAX = 120; // seconds; longer loops are re-rendered on every pass instead of held in memory
+function loopPlan(comp) {
+  const lp = comp.loop, k = Math.max(1, Math.ceil(41 / lp.len));
+  const s = lp.start + k * lp.len;
+  return { wc: unrollLoop(comp, k + 2), s, e: s + lp.len };
+}
+async function renderLoopBuffer(comp, opts) {
+  const sr = opts.sr || 44100, { wc, s, e } = loopPlan(comp);
+  const w = await renderWindow(wc, s, e, Object.assign({}, opts, { sr }));
+  const n = Math.round(comp.loop.len * sr), x = Math.min(Math.round(SEG_XF * sr), n >> 2), out = [];
+  for (let ch = 0; ch < 2; ch++) {
+    const src = w.buf.getChannelData(ch), d = new Float32Array(n);
+    for (let j = 0; j < n; j++) d[j] = src[w.off + j] || 0;
+    for (let j = 0; j < x; j++) { const t = j / x; d[j] = (src[w.off + n + j] || 0) * (1 - t) + d[j] * t; }
+    out.push(d);
+  }
+  return { sampleRate: sr, length: n, getChannelData: ch => out[ch] };
+}
+function encodeWav(buf) {
+  const L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length, sr = buf.sampleRate;
+  const dv = new DataView(new ArrayBuffer(44 + n * 4)); let o = 0;
+  const str = t => { for (const ch of t) dv.setUint8(o++, ch.charCodeAt(0)); }, u32 = v => { dv.setUint32(o, v, true); o += 4; }, u16 = v => { dv.setUint16(o, v, true); o += 2; };
+  str('RIFF'); u32(36 + n * 4); str('WAVE'); str('fmt '); u32(16); u16(1); u16(2); u32(sr); u32(sr * 4); u16(4); u16(16); str('data'); u32(n * 4);
+  for (let j = 0; j < n; j++) { dv.setInt16(o, Math.max(-32768, Math.min(32767, Math.round(L[j] * 32767))), true); dv.setInt16(o + 2, Math.max(-32768, Math.min(32767, Math.round(R[j] * 32767))), true); o += 4; }
+  return [new Uint8Array(dv.buffer)];
+}
+
 async function renderSegmented(comp, opts) {
   const sr = 44100, total = comp.duration + 4, SEG = opts.seg || 6;
   const n = Math.ceil(total * sr), outL = new Float32Array(n), outR = new Float32Array(n);
@@ -4777,12 +5813,31 @@ function zipOne(name, parts) {
     ST.out = null; ST.srcs = [];
   }
   async function playStream(comp, fromT, cb) {
-    const c = getCtx(), tok = ++ST.tok, sr = c.sampleRate, total = comp.duration + 4, XF = SEG_XF;
+    const c = getCtx(), tok = ++ST.tok, sr = c.sampleRate, XF = SEG_XF, lp = comp.loop;
     const out = c.createGain(); out.connect(L.master.analyser); ST.out = out; ST.srcs = [];
     const canSusp = typeof OfflineAudioContext !== 'undefined' && typeof OfflineAudioContext.prototype.suspend === 'function';
-    const segs = []; for (let s0 = fromT, len = 4; s0 < total - 1e-6; s0 += len, len = 10) segs.push([s0, Math.min(total, s0 + len)]);
-    const banked = [], obs = [], obsAll = []; let startAt = null, rSecs = 0, aSecs = 0, wDone = 0, lamNow = 0.002;
-    const weights = segs.map(([a, b]) => windowWeight(comp, a, b, sr, !canSusp));
+    // What gets rendered: a finite score to its end; a short loop up to a pass boundary J (late enough for the
+    // loop to have settled), after which one cached pass repeats; a long loop pass after pass, for ever.
+    const cached = !!lp && lp.len <= LOOP_CACHE_MAX;
+    let wc = comp, J = Infinity, plan = null, passes = 0;
+    if (cached) {
+      const need = Math.max(fromT + 4, lp.start + comp.reverb + 6);
+      J = lp.start + lp.len * Math.max(1, Math.ceil((need - lp.start) / lp.len - 1e-9));
+      passes = Math.round((J - lp.start) / lp.len) + 1; wc = unrollLoop(comp, passes); plan = loopPlan(comp);
+    } else if (lp) { passes = Math.max(2, Math.ceil((fromT - lp.start) / lp.len) + 2); wc = unrollLoop(comp, passes); }
+    const finalT = lp ? (cached ? J : Infinity) : comp.duration + 4;
+    const segs = [], weights = [];
+    let nextS = fromT, nextLen = 4;
+    const grow = upTo => { // add windows until they reach upTo (an endless loop gets more passes as it needs them)
+      while (nextS < Math.min(upTo, finalT) - 1e-6) {
+        const e = Math.min(finalT, nextS + nextLen);
+        if (lp && !cached) while (e + 45 > wc.duration) { passes++; wc = unrollLoop(comp, passes); }
+        segs.push([nextS, e]); weights.push(windowWeight(wc, nextS, e, sr, !canSusp)); nextS = e; nextLen = 10;
+      }
+      if (cached && nextS >= J - 1e-6 && !segs.some(x => x.cache)) { const x = [J, J + lp.len]; x.cache = true; segs.push(x); weights.push(windowWeight(plan.wc, plan.s, plan.e, sr, !canSusp)); }
+    };
+    grow(lp && !cached ? Math.max(fromT, lp.start + lp.len) + 60 : finalT);
+    const banked = [], obs = [], obsAll = []; let startAt = null, rSecs = 0, aSecs = 0, lamNow = 0.002;
     const place = w => {
       const segLen = w.e - w.s, src = c.createBufferSource(), g = c.createGain();
       src.buffer = w.buf; src.connect(g); g.connect(out);
@@ -4795,11 +5850,20 @@ function zipOne(name, parts) {
       dur = Math.min(dur, w.buf.duration - off);
       if (dur > 0) { src.start(at, off, dur); ST.srcs.push(src); src.onended = () => { const i = ST.srcs.indexOf(src); if (i >= 0) ST.srcs.splice(i, 1); }; }
     };
+    const placeLoop = buf => { // the cached pass, repeating from J for as long as playback runs
+      const ab = c.createBuffer(2, buf.length, sr); ab.copyToChannel(buf.getChannelData(0), 0); ab.copyToChannel(buf.getChannelData(1), 1);
+      const src = c.createBufferSource(), g = c.createGain(); src.buffer = ab; src.loop = true; src.connect(g); g.connect(out);
+      let at = startAt + J, off = 0; const now = c.currentTime + 0.02;
+      if (at < now) { off = (now - at) % lp.len; at = now; window.__undertowLate = (window.__undertowLate || 0) + 1; }
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(1, at + XF);
+      src.start(at, off); ST.srcs.push(src);
+    };
     for (let k = 0; k < segs.length; k++) {
       if (tok !== ST.tok) return;
-      // stay a bounded distance ahead of the playhead (memory; mutes take effect sooner), but always far enough
-      // ahead that this window (and the next) will be finished before they are needed
-      // when rendering is slower than real time, never pause: every second of head start is needed to the end
+      if (lp && !cached) grow(segs[k][1] + 60);
+      // stay a bounded distance ahead of the playhead (memory), but always far enough ahead that this window
+      // (and the next) will be finished before they are needed; when rendering is slower than real time,
+      // never pause: every second of head start is needed to the end
       const lead = Math.max(20, lamNow * (weights[k] + (weights[k + 1] || 0)) * 1.5 + 6);
       const spare = () => { // worst-case margin over the remaining windows if rendering continued from now
         const song = c.currentTime - startAt; let acc = 0, m = Infinity;
@@ -4809,29 +5873,38 @@ function zipOne(name, parts) {
       while (startAt !== null && segs[k][0] - (c.currentTime - startAt) > lead && spare() > 8) { await new Promise(r => setTimeout(r, 250)); if (tok !== ST.tok) return; }
       const t0 = performance.now();
       let w;
-      try { w = await renderWindow(comp, segs[k][0], segs[k][1], { sr, muted: mutes, suspend: canSusp }); }
-      catch (e) { if (tok === ST.tok) cb.onError(e); return; }
+      try {
+        w = segs[k].cache ? await renderLoopBuffer(comp, { sr, muted: mutes, suspend: canSusp })
+          : await renderWindow(wc, segs[k][0], segs[k][1], { sr, muted: mutes, suspend: canSusp });
+      } catch (e) { if (tok === ST.tok) cb.onError(e); return; }
       if (tok !== ST.tok) return;
-      rSecs += (performance.now() - t0) / 1000; aSecs += segs[k][1] - segs[k][0];
-      window.__undertowRatio = rSecs / aSecs;
-      wDone += weights[k]; (window.__undertowLog = window.__undertowLog || []).push([k, +weights[k].toFixed(0), +((performance.now() - t0) / 1000).toFixed(2), segs[k][1] - segs[k][0]]);
-      obsAll.push((performance.now() - t0) / 1000 / weights[k]); lamNow = Math.max(...obsAll.slice(obsAll.length > 1 ? 1 : 0));
-      if (startAt !== null) { place(w); continue; }
-      banked.push(w);
+      const took = (performance.now() - t0) / 1000;
+      rSecs += took; aSecs += segs[k][1] - segs[k][0]; window.__undertowRatio = rSecs / aSecs;
+      obsAll.push(took / weights[k]); lamNow = Math.max(...obsAll.slice(obsAll.length > 1 ? 1 : 0));
+      const put = segs[k].cache ? () => placeLoop(w) : () => place(w);
+      if (startAt !== null) { put(); continue; }
+      banked.push(put);
       // predict when each remaining window will be ready (seconds of render time per unit of work, with a safety
       // factor) and delay the start just enough that every window is ready, with margin, before it is needed
       // the first window is short and has no pre-roll, so it under-predicts; trust later windows once available
-      obs.push([weights[k], (performance.now() - t0) / 1000]);
+      obs.push([weights[k], took]);
       const use = obs.length > 1 ? obs.slice(1) : obs;
       const lam = Math.max(1.4 * use.reduce((a, o) => a + o[1], 0) / use.reduce((a, o) => a + o[0], 0), 1.2 * Math.max(...use.map(o => o[1] / o[0])));
       let acc = 0, delay = 0;
       for (let j = k + 1; j < segs.length; j++) { acc += lam * weights[j]; delay = Math.max(delay, acc - (segs[j][0] - fromT) + 1.5); }
       const need = (!canSusp && obs.length < 2 && k < segs.length - 1) ? Infinity : delay;
       if (need <= 0.15 || k === segs.length - 1) {
-        startAt = c.currentTime + 0.12 - fromT; banked.forEach(place); banked.length = 0; window.__undertowStartK = k;
+        startAt = c.currentTime + 0.12 - fromT; banked.forEach(f => f()); banked.length = 0;
         cb.onStart(startAt);
       } else if (isFinite(need)) cb.onWait(Math.max(1, need));
     }
+  }
+  // where a moment of playback falls in the score map: inside a loop, the matching point of its one written pass
+  function foldTime(comp, t) {
+    const lp = comp && comp.loop;
+    if (!lp || t < lp.start + lp.len) return { t, pass: lp && t >= lp.start ? 1 : 0 };
+    const k = Math.floor((t - lp.start) / lp.len);
+    return { t: t - k * lp.len, pass: k + 1 };
   }
 
   /* ---------- transport ---------- */
@@ -4871,7 +5944,7 @@ function zipOne(name, parts) {
       onStart: startAt => {
         if (tok !== loadTok) return;
         isLoading = false; L.comp = comp; L.audition = null; L.startAt = startAt; L.playing = true; L.streaming = true;
-        L.timer = setInterval(() => { if (L.ctx.currentTime > L.startAt + comp.duration + 0.2) { clearInterval(L.timer); L.timer = 0; L.playing = false; L.streaming = false; updateTransport(); } }, 200);
+        if (!comp.loop) L.timer = setInterval(() => { if (L.ctx.currentTime > L.startAt + comp.duration + 0.2) { clearInterval(L.timer); L.timer = 0; L.playing = false; L.streaming = false; updateTransport(); } }, 200);
         updateTransport(); requestAnimationFrame(frame);
       },
     });
@@ -4892,11 +5965,11 @@ function zipOne(name, parts) {
       sctx.stroke();
     }
     if (L.playing && !L.audition && L.comp) {
-      const t = songTime(), comp = L.comp;
-      $('tNow').textContent = fmt(t);
+      const real = songTime(), comp = L.comp, ft = foldTime(comp, real), t = ft.t;
+      $('tNow').textContent = fmt(real);
       const sec = comp.sections.find(s => t >= s.t && t < s.t + s.dur) || comp.sections[comp.sections.length - 1];
       if (sec) {
-        $('tSec').textContent = sec.name;
+        $('tSec').textContent = sec.name + (ft.pass > 1 ? ' ↻' + ft.pass : '');
         const before = comp.sections.filter(s => s.t < sec.t).reduce((a, s) => a + s.bars, 0);
         $('tBar').textContent = Math.min(comp.bars, before + 1 + Math.floor((t - sec.t) / (sec.dur / sec.bars)));
       }
@@ -4922,9 +5995,14 @@ function zipOne(name, parts) {
       g.fillStyle = i % 2 ? '#1d1612' : '#18120f'; g.fillRect(X(s.t), 0, X(s.t + s.dur) - X(s.t), H);
       g.fillStyle = '#3a2e25'; g.fillRect(X(s.t), 0, 1, H);
       g.fillStyle = '#a6957b'; g.font = '9px Michroma, Arial, sans-serif';
-      const label = s.name.toUpperCase(), room = X(s.t + s.dur) - X(s.t) - 8;
+      const label = s.name.toUpperCase(), room = X(s.t + s.dur) - X(s.t) - 8 - (comp.loop && Math.abs(s.t + s.dur - comp.loop.start - comp.loop.len) < 1e-6 ? 14 : 0);
       if (room > 14) { g.save(); g.beginPath(); g.rect(X(s.t), 0, room + 4, TOP); g.clip(); g.fillText(label, X(s.t) + 5, 14); g.restore(); }
     });
+    if (comp.loop) { // the looping stretch: an amber rule along the top, ↻ at its end
+      const x0 = X(comp.loop.start), x1 = X(comp.loop.start + comp.loop.len);
+      g.fillStyle = '#e0913f'; g.fillRect(x0 + 1, 0, x1 - x0 - 1, 2);
+      g.font = '12px "Martian Mono", Menlo, monospace'; g.fillText('↻', x1 - 13, 15);
+    }
     const lane = {};
     comp.voices.forEach((v, i) => {
       lane[v.name] = i; const y = TOP + i * LANE;
@@ -4945,7 +6023,7 @@ function zipOne(name, parts) {
       g.fillRect(X(e.t), y, Math.max(1.4, X(e.t + e.dur) - X(e.t) - 0.6), 3);
     });
     g.globalAlpha = 1;
-    drawHead(L.playing && !L.audition ? songTime() : null);
+    drawHead(L.playing && !L.audition && L.comp ? foldTime(L.comp, songTime()).t : null);
   }
   function drawHead(t) {
     if (!geom) return;
@@ -4986,10 +6064,11 @@ function zipOne(name, parts) {
   src.addEventListener('scroll', () => { gutter.scrollTop = src.scrollTop; });
   function showCompile(comp) {
     view = comp;
+    if (!EX.busy) { exBtn.textContent = exLabel(); if (!comp.loop) $('exOpts').hidden = true; }
     const st = $('status'), pr = $('problems');
     st.className = 'status' + (comp.errors.length ? ' err' : comp.warnings.length ? ' warn' : '');
     if (comp.errors.length) st.textContent = `${comp.errors.length} problem${comp.errors.length > 1 ? 's' : ''} to fix before it can play`;
-    else st.textContent = `Ready · ${comp.bars} bars · ${fmt(comp.duration)} · ${comp.voices.length} voices · ${comp.events.length.toLocaleString()} notes` + (comp.warnings.length ? ` · ${comp.warnings.length} warning${comp.warnings.length > 1 ? 's' : ''}` : '');
+    else st.textContent = `Ready · ${comp.bars} bars · ${comp.loop ? (comp.loop.start > 0 ? fmt(comp.loop.start) + ' then ' : '') + 'a ' + fmt(comp.loop.len) + ' loop ↻ for ever' : fmt(comp.duration)} · ${comp.voices.length} voices · ${comp.events.length.toLocaleString()} notes` + (comp.warnings.length ? ` · ${comp.warnings.length} warning${comp.warnings.length > 1 ? 's' : ''}` : '');
     pr.innerHTML = '';
     comp.errors.map(e => [e, 'e']).concat(comp.warnings.map(w => [w, 'w'])).slice(0, 30).forEach(([p, k]) => {
       const li = document.createElement('li'); li.className = k;
@@ -4999,8 +6078,8 @@ function zipOne(name, parts) {
     });
     renderGutter(comp);
     if (!comp.errors.length) {
-      $('tTotal').textContent = fmt(comp.duration);
-      $('facts').innerHTML = `<span><b>${+comp.tempo.toFixed(1)}</b> BPM</span><span><b>${comp.steps}</b> steps/bar</span><span><b>${comp.bars}</b> bars</span><span><b>${fmt(comp.duration)}</b></span>`;
+      $('tTotal').textContent = comp.loop ? '∞' : fmt(comp.duration);
+      $('facts').innerHTML = `<span><b>${+comp.tempo.toFixed(1)}</b> BPM</span><span><b>${comp.steps}</b> steps/bar</span><span><b>${comp.bars}</b> bars</span><span><b>${comp.loop ? fmt(comp.loop.start) + ' + ' + fmt(comp.loop.len) + ' ↻' : fmt(comp.duration)}</b></span>`;
       $('scoreTitle').textContent = comp.title;
       drawMap();
       if (!L.playing) updateTransport();
@@ -5041,7 +6120,7 @@ function zipOne(name, parts) {
       const comp = sc.id === 'custom' ? null : compile(sc.src);
       const li = document.createElement('li'), b = document.createElement('button');
       b.type = 'button'; b.className = 'track'; b.setAttribute('aria-current', sc.id === current ? 'true' : 'false');
-      const meta = comp ? `${comp.tempo} BPM · ${sc.key} · ${fmt(comp.duration)}` : 'paste · edit · play';
+      const meta = comp ? `${comp.tempo} BPM · ${sc.key} · ${comp.loop ? 'loops ↻' : fmt(comp.duration)}` : 'paste · edit · play';
       b.innerHTML = `<span class="t"></span><span class="r"></span><span class="m"></span>`;
       b.children[0].textContent = sc.title; b.children[1].textContent = sc.ref; b.children[2].textContent = meta;
       b.addEventListener('click', () => select(sc.id, true));
@@ -5125,40 +6204,56 @@ function zipOne(name, parts) {
   const EX = { busy: false, cancel: false, dl: null };
   const exBtn = $('export');
   function exStatus(text, cls) { const st = $('status'); st.className = 'status' + (cls ? ' ' + cls : ''); st.textContent = text; }
-  async function exportMp3() {
+  // A finite score exports straight to MP3. A looping score first asks how: as a seamless loop file (WAV, because
+  // MP3 encoders pad the start and end with silence, which breaks a loop) or as an MP3 of the loop played N times.
+  const exLabel = () => (view && view.loop ? 'Export…' : 'Export MP3');
+  async function exportMp3(choice) {
     if (EX.busy) { EX.cancel = true; exBtn.textContent = 'Cancelling…'; return; }
     const comp = compile(src.value);
     showCompile(comp);
     if (comp.errors.length) return;
+    if (comp.loop && !choice) { $('exOpts').hidden = !$('exOpts').hidden; return; }
+    $('exOpts').hidden = true;
+    const asLoop = !!comp.loop && choice.mode === 'loop', rc = comp.loop && !asLoop ? unrollLoop(comp, choice.n) : comp;
     EX.busy = true; EX.cancel = false; exBtn.textContent = 'Cancel export';
     const title = (comp.title || 'Untitled').replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'Untitled';
+    const fname = asLoop ? title + ' (loop).wav' : title + (comp.loop ? ` (${choice.n}x)` : '') + '.mp3', kind = asLoop ? 'WAV' : 'MP3';
     const t0 = Date.now();
     const phase = (name, p) => {
       const pct = Math.round(p * 100);
       let eta = '';
       if (name === 'Rendering' && p > 0.03) { const left = (Date.now() - t0) / 1000 * (1 - p) / p; eta = ' · about ' + (left > 90 ? Math.round(left / 60) + ' min' : Math.max(1, Math.round(left)) + ' s') + ' left'; }
-      exStatus(`Exporting "${title}": ${name.toLowerCase()} ${pct}%${eta}`, 'warn');
+      exStatus(`Exporting "${fname}": ${name.toLowerCase()} ${pct}%${eta}`, 'warn');
     };
     try {
-      const lame = loadLame();
-      const ro = { muted: mutes, onPhase: phase, cancelled: () => EX.cancel };
-      const buf = canSuspendOffline() ? await renderOffline(comp, ro) : await renderSegmented(comp, ro);
-      if (EX.cancel || !buf) throw { cancelled: true };
-      await lame;
-      const t1 = Date.now();
-      const parts = await encodeMp3(buf, title, phase, () => EX.cancel);
-      if (!parts) throw { cancelled: true };
-      if (!EX.dl) { // standalone copy of the page: an ordinary browser download of the MP3 itself
-        const url = URL.createObjectURL(new Blob(parts, { type: 'audio/mpeg' })), a = document.createElement('a');
-        a.href = url; a.download = title + '.mp3'; document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        exStatus(`Saved "${title}.mp3".`, ''); return;
+      let parts;
+      if (asLoop) {
+        await prepare(comp, new OfflineAudioContext(2, 128, 44100), p => phase('Tuning', p));
+        if (EX.cancel) throw { cancelled: true };
+        phase('Rendering', 0);
+        const buf = await renderLoopBuffer(comp, { sr: 44100, muted: mutes, suspend: canSuspendOffline(), onProgress: p => phase('Rendering', Math.min(1, p)) });
+        if (EX.cancel) throw { cancelled: true };
+        parts = encodeWav(buf);
+      } else {
+        const lame = loadLame();
+        const ro = { muted: mutes, onPhase: phase, cancelled: () => EX.cancel };
+        const buf = canSuspendOffline() ? await renderOffline(rc, ro) : await renderSegmented(rc, ro);
+        if (EX.cancel || !buf) throw { cancelled: true };
+        await lame;
+        parts = await encodeMp3(buf, title, phase, () => EX.cancel);
+        if (!parts) throw { cancelled: true };
       }
-      const zip = zipOne(title + '.mp3', parts);
-      exStatus(`"${title}.mp3" is ready (${(zip.size / 1048576).toFixed(1)} MB, zipped). Confirm the save in the prompt.`, '');
+      if (!EX.dl) { // standalone copy of the page: an ordinary browser download of the file itself
+        const url = URL.createObjectURL(new Blob(parts, { type: asLoop ? 'audio/wav' : 'audio/mpeg' })), a = document.createElement('a');
+        a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        exStatus(`Saved "${fname}".`, ''); return;
+      }
+      const zname = fname.replace(/\.\w+$/, '.zip'), zip = zipOne(fname, parts);
+      exStatus(`"${fname}" is ready (${(zip.size / 1048576).toFixed(1)} MB, zipped). Confirm the save in the prompt.`, '');
       try {
-        await EX.dl.save({ filename: title + '.zip', data: zip });
-        exStatus(`Saved "${title}.zip". Unzip it to get the MP3.`, '');
+        await EX.dl.save({ filename: zname, data: zip });
+        exStatus(`Saved "${zname}". Unzip it to get the ${kind}.`, '');
       } catch (e) {
         if (e && e.code === 'declined') exStatus('Export not saved: the save prompt was declined.', 'warn');
         else if (e && e.code === 'rate_limited') exStatus('Another save prompt is already open. Close it and export again.', 'warn');
@@ -5169,10 +6264,18 @@ function zipOne(name, parts) {
       if (e && e.cancelled) exStatus('Export cancelled.', 'warn');
       else exStatus('Export failed: ' + (e && e.message ? e.message : 'something went wrong while rendering.'), 'err');
     } finally {
-      EX.busy = false; EX.cancel = false; exBtn.textContent = 'Export MP3';
+      EX.busy = false; EX.cancel = false; exBtn.textContent = exLabel();
     }
   }
-  exBtn.addEventListener('click', exportMp3);
+  $('exGo').addEventListener('click', () => {
+    const mode = document.querySelector('input[name="exMode"]:checked').value;
+    const n = Math.round(+$('exTimes').value);
+    if (mode === 'times' && !(n >= 1 && n <= 99)) { exStatus('Choose how many times to play the loop: 1 to 99.', 'err'); $('exTimes').focus(); return; }
+    exportMp3({ mode, n });
+  });
+  $('exCancel').addEventListener('click', () => { $('exOpts').hidden = true; });
+  $('exTimes').addEventListener('focus', () => { document.querySelector('input[name="exMode"][value="times"]').checked = true; });
+  exBtn.addEventListener('click', () => exportMp3());
   if (!window.claude) exBtn.hidden = false; // standalone file: export downloads directly
   else if (window.claude.use) window.claude.use('downloads').then(dl => { if (dl) { EX.dl = dl; exBtn.hidden = false; } }).catch(() => {});
 

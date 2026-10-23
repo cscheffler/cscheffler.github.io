@@ -1,0 +1,1937 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Importance Sampling Lab</title>
+<meta name="description" content="Step through importance sampling on a continuous distribution, and compare importance distributions.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&family=Zilla+Slab:wght@600;700&display=swap">
+<style>
+/* Layout: same lab bench as the Rejection Sampling Lab. Controls on top; one canvas with three panels
+   (g and f, weights, running estimate); procedure sidebar; a full-width card that compares importance distributions.
+   Colours: pink = target g, blue = importance distribution f, orange = weights and contributions, green = true mean. */
+:root {
+  --bg: #f1f4f7;
+  --surface: #ffffff;
+  --surface-2: #e8edf2;
+  --ink: #14202d;
+  --muted: #586777;
+  --line: #d2dae3;
+  --grid: #e6ebf0;
+  --target: #c0177a;
+  --prop: #1c6bcf;
+  --weight: #d8700c;
+  --truth: #1f7d4b;
+  --warn: #c22a2a;
+  --good: #1f7d4b;
+  --tour: #e0a100;
+  --scrim: #070b12;
+  --font-display: "Zilla Slab", Rockwell, "Roboto Slab", Georgia, serif;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e141b; --surface: #151d26; --surface-2: #1d2733; --ink: #e3eaf1; --muted: #93a1b0;
+    --line: #2b3745; --grid: #1f2a36; --target: #ff64b1; --prop: #5fa5ff; --weight: #ffa346;
+    --truth: #52cf8c; --warn: #ff7070; --good: #52cf8c; --tour: #ffcf3a; --scrim: #000000; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e141b; --surface: #151d26; --surface-2: #1d2733; --ink: #e3eaf1; --muted: #93a1b0;
+  --line: #2b3745; --grid: #1f2a36; --target: #ff64b1; --prop: #5fa5ff; --weight: #ffa346;
+  --truth: #52cf8c; --warn: #ff7070; --good: #52cf8c; --tour: #ffcf3a; --scrim: #000000; color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scrollbar-gutter: stable; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 22px 48px;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 1200px; margin: 0 auto; display: grid; gap: 16px; }
+.top { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: flex-end; justify-content: space-between; }
+.top > div { min-width: 0; }
+h1 {
+  font-family: var(--font-display); font-weight: 700; margin: 0;
+  font-size: clamp(1.75rem, 1.3rem + 1.6vw, 2.45rem); line-height: 1.08; letter-spacing: -0.01em; text-wrap: balance;
+}
+.lede { margin: 6px 0 0; color: var(--muted); max-width: 70ch; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.18rem; margin: 0 0 10px; text-wrap: balance; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+
+/* Controls */
+.controls { display: grid; gap: 14px; }
+.ctl-row { display: flex; flex-wrap: wrap; gap: 14px 30px; align-items: flex-start; }
+.ctl { display: grid; gap: 6px; min-width: 0; align-content: start; }
+.field-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.seg {
+  display: flex; flex-wrap: wrap; gap: 3px; padding: 3px; width: max-content; max-width: 100%;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+}
+.seg button {
+  font: inherit; font-size: 0.93rem; border: 0; background: transparent; color: var(--ink);
+  padding: 6px 12px; border-radius: 7px; cursor: pointer;
+}
+.seg button:hover { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); font-weight: 700; }
+.goal { margin: 0; max-width: 92ch; }
+.goal .math, .propdesc { font-family: var(--font-mono); }
+.goal .math sup { font-size: 0.72em; }
+.propdesc { margin: 0; font-size: 0.86rem; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn {
+  font: inherit; font-weight: 700; font-size: 0.95rem; padding: 8px 16px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); min-width: 8.5em; }
+.btn.primary:hover { background: color-mix(in srgb, var(--ink) 86%, var(--prop)); }
+.btn.small { padding: 5px 10px; font-size: 0.85rem; font-weight: 600; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--prop); outline-offset: 2px; }
+.hint { font-size: 0.82rem; color: var(--muted); }
+.hint kbd {
+  font-family: var(--font-mono); font-size: 0.78rem; padding: 0 5px; border: 1px solid var(--line);
+  border-bottom-width: 2px; border-radius: 4px; background: var(--surface);
+}
+.slider-row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.slider-row label { font-size: 0.85rem; color: var(--muted); min-width: 3.6em; }
+input[type="range"] { accent-color: var(--ink); width: min(220px, 56vw); margin: 0; }
+output, .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+#rateOut { display: inline-block; min-width: 15ch; }
+#cmOut, #csOut { display: inline-block; min-width: 4ch; }
+#rateCtl { width: min(100%, 25rem); }
+input[type="number"] {
+  font-family: var(--font-mono); font-size: 0.9rem; width: 7.5em; padding: 5px 8px;
+  border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink);
+}
+.restart-note { font-size: 0.82rem; color: var(--muted); margin: 0; }
+
+/* Lab area */
+.lab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); gap: 16px; align-items: start; }
+@media (max-width: 960px) { .lab { grid-template-columns: minmax(0, 1fr); } }
+.figure { display: grid; gap: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.84rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend svg { flex: none; }
+.narration {
+  margin: 0; padding: 10px 12px; background: var(--surface-2); border-radius: 8px;
+  min-height: 4.7em; font-size: 0.98rem; font-variant-numeric: tabular-nums;
+}
+.canvas-wrap { width: 100%; min-width: 0; }
+/* Run bar: the controls for stepping through the simulation sit on top of the plot.
+   On screens with enough room, the bar stays in view while you scroll down the plot. */
+.runbar {
+  display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: flex-start;
+  margin: -14px -16px 0; padding: 12px 16px 12px;
+  background: var(--surface); border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0;
+}
+@media (min-width: 700px) and (min-height: 640px) {
+  .runbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+  body::before {
+    content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+    z-index: 10; background: var(--bg);
+  }
+}
+canvas { display: block; width: 100%; }
+.side { display: grid; gap: 16px; min-width: 0; }
+
+/* Procedure */
+.proc { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.proc li {
+  display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 10px; row-gap: 1px;
+  padding: 7px 8px; border-radius: 8px; transition: background-color 0.18s;
+}
+.proc .num {
+  grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  font-family: var(--font-mono); font-weight: 600; font-size: 0.82rem;
+  border: 1.5px solid var(--line); color: var(--muted); transition: background-color 0.18s, color 0.18s, border-color 0.18s;
+}
+.proc .txt { font-size: 0.92rem; line-height: 1.4; }
+.proc .txt sub { font-size: 0.72em; }
+.proc .val { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); min-height: 1.25em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.proc li.done .num { border-color: var(--ink); color: var(--ink); }
+.proc li.next .num { border-color: var(--ink); color: var(--ink); border-style: dashed; }
+.proc li.current { background: var(--surface-2); }
+.proc li.current .num { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.proc li.current .val { color: var(--ink); font-weight: 600; }
+.proc li.loop .num { border-color: var(--ink); color: var(--ink); }
+
+/* Results */
+.rlist { display: grid; gap: 2px; margin: 0; }
+.rlist > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 4px 8px; border-radius: 6px; }
+.rlist dt { font-size: 0.84rem; color: var(--muted); }
+.rlist dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.95rem; text-align: right; white-space: nowrap; }
+.rlist > div.big dd { font-size: 1.15rem; font-weight: 600; }
+.rlist > div.active { background: var(--surface-2); }
+.rlist > div.active dt { color: var(--ink); font-weight: 700; }
+.rlist > div.sep { border-top: 1px solid var(--line); border-radius: 0; margin-top: 6px; padding-top: 8px; }
+.meter-block { margin-top: 8px; display: grid; gap: 6px; padding: 0 8px; }
+.meter { position: relative; height: 10px; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
+.meter-fill { position: absolute; inset: 0 auto 0 0; background: var(--weight); border-radius: 5px; width: 0; }
+.meter-cap { margin: 0; font-size: 0.84rem; color: var(--muted); }
+
+/* Recent samples */
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-family: var(--font-mono); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+th {
+  font-family: var(--font-body); font-weight: 700; font-size: 0.7rem; letter-spacing: 0.04em;
+  color: var(--muted); text-align: right; padding: 4px 5px; border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+td { text-align: right; padding: 4px 5px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+td.empty { text-align: left; color: var(--muted); font-family: var(--font-body); }
+tr.inprog td { background: var(--surface-2); }
+td.wcol { color: var(--weight); font-weight: 600; }
+
+/* Experiments */
+.exp { margin: 0; padding-left: 1.3em; display: grid; gap: 9px; font-size: 0.92rem; line-height: 1.45; }
+.exp li::marker { font-family: var(--font-mono); color: var(--muted); }
+
+/* Compare card */
+.cmp-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px 20px; }
+.cmp-head h2 { margin: 0; }
+.cmp-ctl { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.cmp-intro { margin: 8px 0 12px; color: var(--muted); max-width: 92ch; font-size: 0.92rem; }
+.cmp-rows { display: grid; gap: 4px; }
+.cmp-row {
+  display: grid; grid-template-columns: minmax(140px, 190px) minmax(0, 1fr) 80px 84px 76px;
+  gap: 4px 14px; align-items: center; padding: 6px 8px; border-radius: 8px;
+}
+.cmp-row.current { background: var(--surface-2); }
+.cmp-name { font-weight: 700; font-size: 0.92rem; line-height: 1.25; min-width: 0; }
+.cmp-name small { display: block; font-weight: 400; color: var(--muted); font-size: 0.78rem; }
+.cmp-strip { display: block; width: 100%; height: 44px; }
+.cmp-row.last .cmp-strip { height: 62px; }
+.cmp-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.9rem; text-align: right; }
+.cmp-num.bad { color: var(--warn); font-weight: 600; }
+.cmp-num span { display: block; font-family: var(--font-body); font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+@media (max-width: 640px) {
+  .cmp-row { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+  .cmp-strip { grid-column: 1 / -1; grid-row: 2; }
+}
+.cmp-status { margin: 8px 0 0; font-size: 0.85rem; color: var(--muted); min-height: 1.3em; }
+
+/* Guided tour */
+.tour { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
+.tour-shade { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tour-shade path { fill: color-mix(in srgb, var(--scrim) 60%, transparent); }
+.tour-ring { fill: none; stroke: var(--tour); stroke-width: 2.5; }
+.tour-ring.pulse { stroke-width: 3.5; animation: tourPulse 1.1s ease-in-out infinite; }
+@keyframes tourPulse { 50% { stroke-width: 7; stroke-opacity: 0.45; } }
+.tour-bubble {
+  position: absolute; left: 12px; top: 12px; pointer-events: auto;
+  width: min(370px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto;
+  background: var(--surface); color: var(--ink); border: 2px solid var(--tour); border-radius: 14px;
+  box-shadow: 0 18px 50px color-mix(in srgb, var(--scrim) 45%, transparent); padding: 0 16px 14px;
+}
+.tour-bubble.modal { width: min(500px, calc(100vw - 24px)); }
+.tour-progress { height: 5px; margin: 0 -16px 10px; background: var(--surface-2); }
+.tour-progress div { height: 100%; width: 0; background: var(--tour); transition: width 0.3s; }
+.tour-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 1.6em;
+  font-size: 0.74rem; color: var(--muted); font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+}
+.tour-skip {
+  font: inherit; text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 0.85rem; color: var(--muted);
+  background: none; border: 0; padding: 4px 0; margin-left: auto; cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.tour-bubble h3 { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; line-height: 1.15; margin: 6px 0; text-wrap: balance; }
+.tour-body { margin: 0; }
+.tour-art { display: block; width: 100%; max-width: 100%; height: auto; margin: 4px 0 10px; }
+.tour-task {
+  margin: 12px 0 0; display: flex; gap: 10px; align-items: center; font-weight: 700; padding: 8px 10px; border-radius: 8px;
+  background: color-mix(in srgb, var(--tour) 20%, transparent); font-variant-numeric: tabular-nums;
+}
+.tour-task::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--tour); animation: tourBlink 1s ease-in-out infinite; }
+.tour-task.done::before { animation: none; background: var(--good); }
+@keyframes tourBlink { 50% { opacity: 0.25; } }
+.tour-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.tour-btns .btn.primary { min-width: 7em; }
+
+@media (prefers-reduced-motion: reduce) {
+  .proc li, .proc .num { transition: none; }
+  .tour-ring.pulse, .tour-task::before { animation: none; }
+  .tour-progress div { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Importance Sampling Lab</h1>
+      <p class="lede">Estimate the mean of a distribution g without one sample from g. Take samples from a different distribution f, and give each sample a weight. Then see how the choice of f changes how fast the estimate settles.</p>
+    </div>
+    <button type="button" class="btn small" id="btnTour">Take the tour</button>
+  </header>
+
+  <section class="card controls" aria-label="Setup">
+    <div class="ctl-row">
+      <div class="ctl">
+        <span class="field-label" id="lbl-g">Target g</span>
+        <div class="seg" role="group" aria-labelledby="lbl-g" id="gSeg">
+          <button type="button" data-g="gamma" aria-pressed="true">One peak</button>
+          <button type="button" data-g="two" aria-pressed="false">Two peaks</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <span class="field-label" id="lbl-target">What we know about g</span>
+        <div class="seg" role="group" aria-labelledby="lbl-target" id="targetSeg">
+          <button type="button" data-t="known" aria-pressed="true">g exactly</button>
+          <button type="button" data-t="unnorm" aria-pressed="false">Only H = Z·g</button>
+        </div>
+      </div>
+      <div class="ctl" id="seedCtl">
+        <label class="field-label" for="seed">Random seed</label>
+        <div class="slider-row">
+          <input type="number" id="seed" inputmode="numeric" step="1">
+          <button type="button" class="btn small" id="newSeed">New seed</button>
+        </div>
+      </div>
+    </div>
+    <p class="goal" id="goalLine"></p>
+
+    <div class="ctl-row">
+      <div class="ctl" id="propCtl">
+        <span class="field-label" id="lbl-prop">Importance distribution f (we sample from f)</span>
+        <div class="seg" role="group" aria-labelledby="lbl-prop" id="propSeg"></div>
+        <p class="propdesc" id="propDesc"></p>
+      </div>
+      <div class="ctl" id="customCtl">
+        <span class="field-label">Your own f (normal distribution)</span>
+        <div class="slider-row"><label for="cm">Centre</label><input type="range" id="cm" min="0.5" max="11.5" step="0.1"><output id="cmOut" for="cm"></output></div>
+        <div class="slider-row"><label for="cs">Width</label><input type="range" id="cs" min="0.3" max="4" step="0.05"><output id="csOut" for="cs"></output></div>
+      </div>
+    </div>
+
+    <p class="restart-note">A change to g, to f, to what we know about g, or to the seed starts a new run.</p>
+  </section>
+
+  <main class="lab">
+    <section class="card figure" aria-label="Simulation">
+      <div class="runbar" id="runBar" role="group" aria-label="Run the simulation">
+        <div class="ctl">
+          <span class="field-label" id="lbl-mode">Mode</span>
+          <div class="seg" role="group" aria-labelledby="lbl-mode" id="modeSeg">
+            <button type="button" data-mode="step" aria-pressed="true">Single step</button>
+            <button type="button" data-mode="point" aria-pressed="false">Single point</button>
+            <button type="button" data-mode="run" aria-pressed="false">Automatic</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <span class="field-label">Action</span>
+          <div class="actions" id="actions">
+            <button class="btn primary" id="btnStep" type="button">Next step</button>
+            <button class="btn primary" id="btnPoint" type="button" hidden>Next point</button>
+            <button class="btn primary" id="btnPlay" type="button" hidden>Play</button>
+            <button class="btn" id="btnReset" type="button">Reset</button>
+          </div>
+          <span class="hint" id="modeHint"></span>
+        </div>
+        <div class="ctl" id="rateCtl" hidden>
+          <label class="field-label" for="rate">Speed</label>
+          <div class="slider-row">
+            <input type="range" id="rate" min="0" max="1000" step="1">
+            <output id="rateOut" for="rate"></output>
+          </div>
+          <span class="hint" id="rateHint"></span>
+        </div>
+      </div>
+      <p class="narration" id="narration" aria-live="polite"></p>
+      <div class="legend" aria-hidden="true">
+        <span><svg width="22" height="12" viewBox="0 0 22 12"><path d="M1 10 C6 10 8 2 11 2 S16 10 21 10" style="stroke: var(--target); stroke-width: 2.2; fill: none"/></svg><span id="legT">Target g</span></span>
+        <span><svg width="22" height="12" viewBox="0 0 22 12"><path d="M1 8 H21" style="stroke: var(--prop); stroke-width: 2.2; stroke-dasharray: 4 3; fill: none"/></svg>Importance distribution f</span>
+        <span><svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4" style="fill: var(--weight)"/></svg>Weight and contribution w·x</span>
+        <span><svg width="22" height="12" viewBox="0 0 22 12"><path d="M1 8 L8 4 L14 7 L21 5" style="stroke: var(--ink); stroke-width: 2.2; fill: none"/></svg>Estimate μ̂</span>
+        <span><svg width="22" height="12" viewBox="0 0 22 12"><path d="M1 6 H21" style="stroke: var(--truth); stroke-width: 2; stroke-dasharray: 5 3; fill: none"/></svg>True mean μ</span>
+      </div>
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="plot" role="img" aria-label="Three panels. Top: the target g and the importance distribution f. Middle: the weight g divided by f. Bottom: the running estimate of the mean of g, with the contributions and the true mean."></canvas>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="card" id="procCard" aria-labelledby="h-proc">
+        <h2 id="h-proc">Procedure</h2>
+        <ol class="proc" id="proc"></ol>
+      </section>
+
+      <section class="card" id="resultsCard" aria-labelledby="h-res">
+        <h2 id="h-res">Results</h2>
+        <dl class="rlist">
+          <div class="big"><dt>Samples N</dt><dd id="rN">0</dd></div>
+          <div class="big"><dt>Estimate μ̂</dt><dd id="rEst">—</dd></div>
+          <div><dt>True mean μ</dt><dd id="rTrue"></dd></div>
+          <div><dt>Error μ̂ − μ</dt><dd id="rErr">—</dd></div>
+          <div class="sep" id="rowStd"><dt>Standard: Σ w·x ÷ N</dt><dd id="rStd">—</dd></div>
+          <div id="rowSn"><dt>Self-normalized: Σ w·x ÷ Σ w</dt><dd id="rSn">—</dd></div>
+          <div><dt id="rMeanWLabel">Mean weight</dt><dd id="rMeanW">—</dd></div>
+          <div class="sep"><dt>Spread of contributions (SD)</dt><dd id="rSd">—</dd></div>
+          <div><dt>Largest weight share</dt><dd id="rMax">—</dd></div>
+          <div><dt>Effective sample size</dt><dd id="rEss">—</dd></div>
+        </dl>
+        <div class="meter-block">
+          <div class="meter" aria-hidden="true"><div class="meter-fill" id="mEss"></div></div>
+          <p class="meter-cap">Effective sample size = (Σ w)² ÷ Σ w². It is near N when all the weights are similar. It is small when a few large weights control the estimate.</p>
+        </div>
+      </section>
+
+      <section class="card" id="recentCard" aria-labelledby="h-recent">
+        <h2 id="h-recent">Recent samples</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">i</th><th scope="col">x</th><th scope="col" id="thT">g(x)</th><th scope="col">f(x)</th><th scope="col">w</th><th scope="col">w·x</th></tr></thead>
+            <tbody id="recent"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" id="expCard" aria-labelledby="h-exp">
+        <h2 id="h-exp">Experiments</h2>
+        <ol class="exp">
+          <li><strong>Uniform or curved?</strong> With One peak, make 2,000 samples with Uniform, then 2,000 with Curved. Which estimate gets near the true mean faster? Then look at the comparison card.</li>
+          <li><strong>Too narrow.</strong> With One peak, choose Narrow. Make 20,000 samples. Why is the estimate too low most of the time? What happens when a sample lands far from 3?</li>
+          <li><strong>Zero variance.</strong> Choose Ideal ∝ x·g(x). Look at the orange contributions. Why do they all have the same value?</li>
+          <li><strong>Unknown constant.</strong> Choose “Only H = Z·g”. Compare the standard estimate with the self-normalized estimate. What is the mean weight close to?</li>
+          <li><strong>In the wrong place.</strong> With One peak, choose Shifted. Where does f put most of its samples? Look at the weights on the left side of the middle panel. What happens to the estimate when a sample lands there?</li>
+          <li><strong>Beat Curved.</strong> With One peak, use the two sliders to make your own f. Look at the comparison card with N = 100. Can you get a smaller SD than Curved? How close can you get to the Ideal row?</li>
+          <li><strong>A missing peak.</strong> Choose Two peaks and Left only. Make 5,000 samples. The estimate settles, but far from the true mean. Which numbers in the Results card warn you? Now also choose “Only H = Z·g”. Is there still a warning?</li>
+          <li><strong>Cover both peaks.</strong> With Two peaks, compare Uniform, Wide and Mixture in the comparison card. Which f is best? Why can one normal f never be as good as Mixture here?</li>
+        </ol>
+      </section>
+    </aside>
+  </main>
+
+  <section class="card" id="cmpCard" aria-labelledby="h-cmp">
+    <div class="cmp-head">
+      <h2 id="h-cmp">Compare importance distributions</h2>
+      <div class="cmp-ctl">
+        <span class="field-label" id="lbl-cmpn">Samples in each run (N)</span>
+        <div class="seg" role="group" aria-labelledby="lbl-cmpn" id="cmpSeg">
+          <button type="button" data-n="10" aria-pressed="false">10</button>
+          <button type="button" data-n="100" aria-pressed="true">100</button>
+          <button type="button" data-n="1000" aria-pressed="false">1,000</button>
+        </div>
+        <button type="button" class="btn small" id="cmpAgain">New runs</button>
+      </div>
+    </div>
+    <p class="cmp-intro">Each row does the whole estimate 300 times, with N samples each time. Each dot is one estimate. The green line is the true mean. A narrow cloud means that the estimate changes little from run to run, so that f is efficient. SD is the spread of the 300 estimates. Bias is their average minus the true mean. A good f has a small SD and a bias near 0. A small SD alone is not enough: an f can give the same wrong answer every time.</p>
+    <div class="cmp-rows" id="cmpRows"></div>
+    <p class="cmp-status" id="cmpStatus"></p>
+  </section>
+</div>
+
+<div class="tour" id="tour" hidden>
+  <svg class="tour-shade" aria-hidden="true"><path id="tourPath" fill-rule="evenodd"></path><g id="tourRings"></g></svg>
+  <div class="tour-bubble" id="tourBubble" role="dialog" aria-labelledby="tourTitle" aria-describedby="tourBody">
+    <div class="tour-progress"><div id="tourBar"></div></div>
+    <div class="tour-head"><span id="tourCount"></span><button type="button" class="tour-skip" id="tourSkip">Skip the tour</button></div>
+    <h3 id="tourTitle"></h3>
+    <div id="tourArt"></div>
+    <p class="tour-body" id="tourBody" aria-live="polite"></p>
+    <p class="tour-task" id="tourTask" hidden></p>
+    <div class="tour-btns">
+      <button type="button" class="btn" id="tourBack">Back</button>
+      <button type="button" class="btn primary" id="tourNext">Next</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const PI = Math.PI;
+  const SUBS = "₀₁₂₃₄₅₆₇₈₉";
+  const sub = (n) => String(n).replace(/\d/g, (d) => SUBS[+d]);
+  const minus = (s) => String(s).replace(/-/g, "−");
+  const f3 = (v) => minus((Math.abs(v) < 5e-4 ? 0 : v).toFixed(3));
+  const grp = (n) => Math.round(n).toLocaleString("en-GB");
+  function fw(v) {
+    if (!isFinite(v)) return "—";
+    const a = Math.abs(v);
+    if (a >= 1e5) return minus(v.toExponential(2));
+    if (a >= 100) return minus(v.toFixed(1));
+    return f3(v);
+  }
+  const FONT_BODY = '"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif';
+  const FONT_MONO = '"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace';
+  const MAX_N = 100000;      // a run stops here
+  const SLOW = 2;            // at or below this many samples per second, Automatic mode shows each step
+  const GUIDE_MAX = 30;      // at or below this rate, the latest sample keeps its guide lines
+  const ZC = 4;              // the constant Z when only H = Z·g is known
+  const CMP_REPS = 300;
+  const PHASES = 6;
+  const reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  // ---------- maths helpers ----------
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function simpson(fn, a, b, N) {
+    N = N || 4000;
+    const h = (b - a) / N;
+    let s = fn(a) + fn(b);
+    for (let i = 1; i < N; i++) s += fn(a + i * h) * (i % 2 ? 4 : 2);
+    return (s * h) / 3;
+  }
+  function niceUp(v) {
+    const p = Math.pow(10, Math.floor(Math.log10(v)));
+    const m = v / p;
+    return (m <= 1.0001 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+  }
+  function decimalsFor(step) {
+    for (let d = 0; d < 8; d++) {
+      const m = step * Math.pow(10, d);
+      if (Math.abs(m - Math.round(m)) < 1e-6) return d;
+    }
+    return 6;
+  }
+  function ticks(lo, hi, target) {
+    const step = niceUp((hi - lo) / target);
+    const start = Math.ceil(lo / step - 1e-9) * step;
+    const vals = [];
+    for (let i = 0; i < 60; i++) {
+      const v = start + i * step;
+      if (v > hi + step * 1e-6) break;
+      vals.push(+v.toFixed(10));
+    }
+    return { vals, dec: decimalsFor(step) };
+  }
+
+  // ---------- the target g and the importance distributions f ----------
+  const CA = 0, CB = 12;
+  const phiN = (x, m, s) => Math.exp(-0.5 * ((x - m) / s) * ((x - m) / s)) / (s * Math.sqrt(2 * PI));
+  function makeTarget(id, raw, opts) {
+    const Zr = simpson(raw, CA, CB, 4000);
+    const g = (x) => (x < CA || x > CB ? 0 : raw(x) / Zr);
+    const mu = simpson((x) => x * g(x), CA, CB, 4000);
+    return Object.assign({ id, g, mu, vmin: CA - 0.3, vmax: CB + 0.3 }, opts);
+  }
+  function normalProp(id, name, note, m, s) {
+    const c = simpson((x) => phiN(x, m, s), CA, CB, 4000);
+    return {
+      id, name, note, m, s, normal: true,
+      pdf: (x) => (x < CA || x > CB ? 0 : phiN(x, m, s) / c),
+      sample: (r) => {
+        for (let t = 0; t < 10000; t++) {
+          let u1 = r();
+          if (u1 < 1e-300) u1 = 1e-300;
+          const x = m + s * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * PI * r());
+          if (x >= CA && x <= CB) return x;
+        }
+        return Math.min(CB, Math.max(CA, m));
+      }
+    };
+  }
+  // A mix of normal bumps, cut to [CA, CB]. The weights of the bumps add to 1.
+  function mixtureProp(id, name, note, comps) {
+    const raw = (x) => comps.reduce((a, k) => a + k.w * phiN(x, k.m, k.s), 0);
+    const c = simpson(raw, CA, CB, 4000);
+    return {
+      id, name, note, comps,
+      pdf: (x) => (x < CA || x > CB ? 0 : raw(x) / c),
+      sample: (r) => {
+        for (let t = 0; t < 10000; t++) {
+          let u = r(), k = 0;
+          while (k < comps.length - 1 && u >= comps[k].w) { u -= comps[k].w; k++; }
+          let u1 = r();
+          if (u1 < 1e-300) u1 = 1e-300;
+          const x = comps[k].m + comps[k].s * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * PI * r());
+          if (x >= CA && x <= CB) return x;
+        }
+        return comps[0].m;
+      }
+    };
+  }
+  const uniformProp = {
+    id: "uniform", name: "Uniform", note: "the video’s f",
+    pdf: (x) => (x < CA || x > CB ? 0 : 1 / (CB - CA)),
+    sample: (r) => CA + (CB - CA) * r()
+  };
+  // The zero-variance f from video 2: f(x) = x·g(x) ÷ μ. Samples come from rejection sampling with a flat box.
+  function idealProp(target) {
+    const pdf = (x) => (x < CA || x > CB ? 0 : x * target.g(x) / target.mu);
+    let mx = 0;
+    for (let i = 0; i <= 4000; i++) mx = Math.max(mx, pdf(CA + (CB - CA) * i / 4000));
+    const top = mx * 1.02;
+    return {
+      id: "ideal", name: "Ideal ∝ x·g(x)", note: "zero variance", pdf,
+      sample: (r) => {
+        for (let t = 0; t < 100000; t++) {
+          const x = CA + (CB - CA) * r();
+          if (r() * top < pdf(x)) return x;
+        }
+        return target.mu;
+      }
+    };
+  }
+  const GAMMA = makeTarget("gamma", (x) => x * x * Math.exp(-x) / 2, {
+    name: "One peak", ymaxC: 9, defaultProp: "uniform",
+    goal: '<span class="math">g(x) = x² e<sup>−x</sup> / 2</span> for x from 0 to 12 (a gamma distribution, shape 3).'
+  });
+  GAMMA.props = [
+    uniformProp,
+    normalProp("curved", "Curved", "like the video’s h", 4, 2.3),
+    normalProp("narrow", "Narrow", "too narrow", 3, 0.6),
+    normalProp("shifted", "Shifted", "in the wrong place", 7, 1.2),
+    idealProp(GAMMA)
+  ];
+  const TWO = makeTarget("two", (x) => 0.6 * phiN(x, 3, 0.8) + 0.4 * phiN(x, 8.5, 0.7), {
+    name: "Two peaks", ymaxC: 12, defaultProp: "uniform",
+    goal: '<span class="math">g(x) = 0.6·N(3, 0.8) + 0.4·N(8.5, 0.7)</span> for x from 0 to 12. This is a mix of two normal distributions N(centre, width), with peaks at 3 and 8.5.'
+  });
+  TWO.props = [
+    uniformProp,
+    normalProp("left", "Left only", "misses the right peak", 3, 0.7),
+    normalProp("wide", "Wide", "covers both peaks", 5.5, 3),
+    mixtureProp("mixture", "Mixture", "two bumps, like g", [{ w: 0.5, m: 3, s: 1.1 }, { w: 0.5, m: 8.5, s: 1 }]),
+    idealProp(TWO)
+  ];
+  const TARGETS = [GAMMA, TWO];
+
+  // ---------- state ----------
+  let scene = GAMMA;
+  let prop = GAMMA.props[0];
+  let unnorm = false;
+  let customM = 4, customS = 2.3;
+  let seed = 2026;
+  let rng = mulberry32(seed);
+  let mode = "step";
+  let running = false;
+  let rate = 0.5;
+  const DEFAULT_RATE_V = Math.round(1000 * Math.log(0.5 / 0.2) / Math.log(25000));
+  let rateV = DEFAULT_RATE_V;
+  let n = 0;
+  let cap = 4096;
+  let ax = new Float64Array(cap), aw = new Float64Array(cap), ac = new Float64Array(cap), aest = new Float64Array(cap);
+  let Sw = 0, Swx = 0, Sw2 = 0, Sc2 = 0, maxW = 0;
+  let cur = null;      // sample in progress: {i, x, gx, fx, w, c, est, phase}
+  let lastIt = null;
+  let recent = [];
+  let dirty = true, domDirty = true;
+  let curves = null;
+  const Zf = () => (unnorm ? ZC : 1);
+  const T = (x) => scene.g(x) * Zf();
+  const Tn = () => (unnorm ? "H" : "g");
+  const fxv = (x) => f3(x);
+
+  // ---------- canvas ----------
+  const cv = $("plot");
+  const ctx = cv.getContext("2d");
+  const layerAB = document.createElement("canvas");
+  const abctx = layerAB.getContext("2d");
+  const layerC = document.createElement("canvas");
+  const cctx = layerC.getContext("2d");
+  let W = 600, H = 640, dpr = 1, G = null;
+  let colors = {};
+  let sprRug = null, sprW = null, sprC = null;
+
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    const g = (name) => cs.getPropertyValue(name).trim();
+    colors = {
+      bg: g("--surface"), ink: g("--ink"), muted: g("--muted"), grid: g("--grid"), line: g("--line"),
+      target: g("--target"), prop: g("--prop"), weight: g("--weight"), truth: g("--truth"), warn: g("--warn")
+    };
+  }
+  function rgba(hex, a) {
+    let h = (hex || "#000000").replace("#", "");
+    if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+    const v = parseInt(h, 16);
+    return "rgba(" + ((v >> 16) & 255) + "," + ((v >> 8) & 255) + "," + (v & 255) + "," + a + ")";
+  }
+  function dotSprite(color, alpha, r) {
+    const rr = r * dpr, s = Math.ceil(rr * 2 + 2);
+    const c = document.createElement("canvas");
+    c.width = c.height = s;
+    const x = c.getContext("2d");
+    x.fillStyle = rgba(color, alpha);
+    x.beginPath(); x.arc(s / 2, s / 2, rr, 0, 2 * PI); x.fill();
+    return c;
+  }
+  function makeSprites() {
+    sprW = dotSprite(colors.weight, 0.5, 2.4);
+    sprC = dotSprite(colors.weight, 0.42, 2);
+    sprRug = document.createElement("canvas");
+    sprRug.width = Math.max(1, Math.round(1.4 * dpr));
+    sprRug.height = Math.round(8 * dpr);
+    const x = sprRug.getContext("2d");
+    x.fillStyle = rgba(colors.prop, 0.4);
+    x.fillRect(0, 0, sprRug.width, sprRug.height);
+  }
+  const XMAX_STEPS = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
+  const xmaxFor = (k) => XMAX_STEPS.find((v) => v >= k) || MAX_N;
+
+  function prepCurves() {
+    const N = 600, xs = [], tv = [], fv = [], wv = [];
+    let tmax = 0, fmax = 0;
+    for (let i = 0; i <= N; i++) {
+      const x = CA + (CB - CA) * i / N;
+      const t = T(x), f = prop.pdf(x);
+      xs.push(x); tv.push(t); fv.push(f);
+      wv.push(f > 1e-300 ? t / f : NaN);
+      if (t > tmax) tmax = t;
+      if (f > fmax) fmax = f;
+    }
+    // Scale the weight panel to the weights that f can really produce.
+    let wPl = 0;
+    for (let i = 0; i <= N; i++) if (fv[i] >= 1e-2 * fmax && isFinite(wv[i])) wPl = Math.max(wPl, wv[i]);
+    curves = {
+      xs, tv, fv, wv,
+      ymaxA: 1.15 * Math.max(tmax, fmax),
+      ymaxB: Math.min(40 * Zf(), Math.max(1.5 * Zf(), 1.2 * wPl))
+    };
+  }
+
+  function computeGeo() {
+    const L = W < 440 ? 46 : 54, R = 16, top = 28, gapAB = 50, gapBC = 58, bottom = 40;
+    const avail = Math.max(300, H - top - gapAB - gapBC - bottom);
+    const hA = Math.round(avail * 0.3), hB = Math.round(avail * 0.24), hC = avail - hA - hB;
+    const pA = { y0: top, y1: top + hA };
+    const pB = { y0: pA.y1 + gapAB, y1: pA.y1 + gapAB + hB };
+    const pC = { y0: pB.y1 + gapBC, y1: pB.y1 + gapBC + hC };
+    G = {
+      x0: L, x1: W - R, pA, pB, pC,
+      vmin: scene.vmin, vmax: scene.vmax,
+      ymaxA: curves ? curves.ymaxA : 1, ymaxB: curves ? curves.ymaxB : 1, ymaxC: scene.ymaxC,
+      xmaxC: xmaxFor(Math.max(n, cur ? cur.i : 0))
+    };
+  }
+  const sxV = (x) => G.x0 + (x - G.vmin) / (G.vmax - G.vmin) * (G.x1 - G.x0);
+  const syA = (y) => G.pA.y1 - y / G.ymaxA * (G.pA.y1 - G.pA.y0);
+  const syB = (y) => G.pB.y1 - y / G.ymaxB * (G.pB.y1 - G.pB.y0);
+  const sxC = (i) => G.x0 + i / G.xmaxC * (G.x1 - G.x0);
+  const syC = (y) => G.pC.y1 - y / G.ymaxC * (G.pC.y1 - G.pC.y0);
+
+  function layout() {
+    const w = Math.floor($("canvasWrap").clientWidth);
+    if (!w) return;
+    const newDpr = Math.min(3, window.devicePixelRatio || 1);
+    const newH = Math.round(Math.max(600, Math.min(820, w * 1.12)));
+    if (w === W && newH === H && newDpr === dpr && G && sprW) return;
+    W = w; H = newH; dpr = newDpr;
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    cv.style.height = H + "px";
+    layerAB.width = layerC.width = cv.width;
+    layerAB.height = layerC.height = cv.height;
+    computeGeo();
+    makeSprites();
+    redrawLayers();
+    dirty = true;
+  }
+  function drawABPoint(x, w) {
+    if (!G || !sprW) return;
+    const px = sxV(x) * dpr;
+    abctx.drawImage(sprRug, Math.round(px - sprRug.width / 2), Math.round(G.pA.y1 * dpr - sprRug.height));
+    const py = syB(Math.min(w, G.ymaxB)) * dpr;
+    abctx.drawImage(sprW, Math.round(px - sprW.width / 2), Math.round(py - sprW.height / 2));
+  }
+  function drawCPoint(i, c) {
+    if (!G || !sprC) return;
+    const px = sxC(i) * dpr, py = syC(Math.max(0, Math.min(c, G.ymaxC))) * dpr;
+    cctx.drawImage(sprC, Math.round(px - sprC.width / 2), Math.round(py - sprC.height / 2));
+  }
+  function redrawAB() {
+    abctx.setTransform(1, 0, 0, 1, 0, 0);
+    abctx.clearRect(0, 0, layerAB.width, layerAB.height);
+    for (let i = 0; i < n; i++) drawABPoint(ax[i], aw[i]);
+  }
+  function redrawC() {
+    cctx.setTransform(1, 0, 0, 1, 0, 0);
+    cctx.clearRect(0, 0, layerC.width, layerC.height);
+    for (let i = 0; i < n; i++) drawCPoint(i + 1, ac[i]);
+  }
+  function redrawLayers() { redrawAB(); redrawC(); }
+  function ensureXmax(k) {
+    if (!G) return;
+    const xm = xmaxFor(k);
+    if (xm !== G.xmaxC) { G.xmaxC = xm; redrawC(); }
+  }
+
+  // ---------- drawing ----------
+  function valueTicks() {
+    return [0, 2, 4, 6, 8, 10, 12].map((v) => ({ v, t: String(v) }));
+  }
+  function yTicks(max, target) {
+    const T_ = ticks(0, max, target);
+    return T_.vals.map((v) => ({ v, t: v.toFixed(T_.dec) }));
+  }
+  function gridLines(c, xt, sxFn, yt, syFn, p) {
+    c.strokeStyle = colors.grid;
+    c.lineWidth = 1;
+    c.beginPath();
+    for (const t of xt) { const X = Math.round(sxFn(t.v)) + 0.5; c.moveTo(X, p.y0); c.lineTo(X, p.y1); }
+    for (const t of yt) { const Y = Math.round(syFn(t.v)) + 0.5; c.moveTo(G.x0, Y); c.lineTo(G.x1, Y); }
+    c.stroke();
+  }
+  function axes(c, p) {
+    c.strokeStyle = rgba(colors.ink, 0.55);
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(G.x0, Math.round(p.y1) + 0.5); c.lineTo(G.x1, Math.round(p.y1) + 0.5);
+    c.moveTo(G.x0 + 0.5, p.y0); c.lineTo(G.x0 + 0.5, p.y1);
+    c.stroke();
+  }
+  function xLabels(c, xt, sxFn, yBase) {
+    c.font = "11.5px " + FONT_MONO;
+    c.fillStyle = colors.muted;
+    c.textAlign = "center";
+    c.textBaseline = "top";
+    for (const t of xt) c.fillText(t.t, sxFn(t.v), yBase + 6);
+  }
+  function yLabels(c, yt, syFn) {
+    c.font = "11.5px " + FONT_MONO;
+    c.fillStyle = colors.muted;
+    c.textAlign = "right";
+    c.textBaseline = "middle";
+    for (const t of yt) c.fillText(t.t, G.x0 - 6, syFn(t.v));
+  }
+  function panelTitle(c, text, y) {
+    c.font = "700 12.5px " + FONT_BODY;
+    c.fillStyle = colors.ink;
+    c.textAlign = "left";
+    c.textBaseline = "alphabetic";
+    c.fillText(text, G.x0, y);
+  }
+  function clipPanel(c, p) {
+    c.save();
+    c.beginPath();
+    c.rect(G.x0, p.y0, G.x1 - G.x0, p.y1 - p.y0 + 1);
+    c.clip();
+  }
+  function curvePath(c, xs, ys, sxFn, syFn) {
+    c.beginPath();
+    let pen = false;
+    for (let i = 0; i < xs.length; i++) {
+      const v = ys[i];
+      if (!isFinite(v)) { pen = false; continue; }
+      const X = sxFn(xs[i]), Y = syFn(v);
+      if (pen) c.lineTo(X, Y); else { c.moveTo(X, Y); pen = true; }
+    }
+  }
+  function tag(c, text, x, y, align, base, color, opts) {
+    opts = opts || {};
+    const size = opts.size || 12;
+    c.font = (opts.bold ? "700 " : "600 ") + size + "px " + (opts.body ? FONT_BODY : FONT_MONO);
+    const w = c.measureText(text).width, h = size + 6;
+    let x0 = align === "center" ? x - w / 2 : align === "right" ? x - w : x;
+    x0 = Math.max(4, Math.min(W - w - 4, x0));
+    const y0 = base === "bottom" ? y - h : base === "middle" ? y - h / 2 : y;
+    c.fillStyle = rgba(colors.bg, 0.9);
+    c.beginPath();
+    if (c.roundRect) c.roundRect(x0 - 4, y0, w + 8, h, 4); else c.rect(x0 - 4, y0, w + 8, h);
+    c.fill();
+    c.fillStyle = color;
+    c.textAlign = "left";
+    c.textBaseline = "middle";
+    c.fillText(text, x0, y0 + h / 2 + 0.5);
+  }
+  function dot(c, x, y, r, fill, ring) {
+    c.beginPath(); c.arc(x, y, r, 0, 2 * PI);
+    c.fillStyle = fill; c.fill();
+    if (ring) { c.lineWidth = 2; c.strokeStyle = ring; c.stroke(); }
+  }
+
+  function render() {
+    if (!G || !curves) return;
+    const c = ctx;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.fillStyle = colors.bg;
+    c.fillRect(0, 0, W, H);
+    const vt = valueTicks();
+    const showCur = cur && cur.phase >= 1 && cur.phase <= 5 && !(mode === "run" && running && rate > GUIDE_MAX);
+
+    // ----- panel A: g and f -----
+    const pA = G.pA, baseA = syA(0);
+    const ytA = yTicks(G.ymaxA, 3);
+    gridLines(c, vt, sxV, ytA, syA, pA);
+    clipPanel(c, pA);
+    curvePath(c, curves.xs, curves.fv, sxV, syA);
+    c.lineTo(sxV(CB), baseA); c.lineTo(sxV(CA), baseA); c.closePath();
+    c.fillStyle = rgba(colors.prop, 0.08); c.fill();
+    curvePath(c, curves.xs, curves.tv, sxV, syA);
+    c.lineTo(sxV(CB), baseA); c.lineTo(sxV(CA), baseA); c.closePath();
+    c.fillStyle = rgba(colors.target, 0.12); c.fill();
+    curvePath(c, curves.xs, curves.tv, sxV, syA);
+    c.strokeStyle = colors.target; c.lineWidth = 2.2; c.lineJoin = "round"; c.stroke();
+    curvePath(c, curves.xs, curves.fv, sxV, syA);
+    c.setLineDash([6, 4]); c.strokeStyle = colors.prop; c.lineWidth = 2.2; c.stroke(); c.setLineDash([]);
+    c.restore();
+    axes(c, pA);
+    xLabels(c, vt, sxV, baseA);
+    yLabels(c, ytA, syA);
+    panelTitle(c, Tn() + " (pink) and f (blue)", pA.y0 - 10);
+
+    // ----- panel B: the weights -----
+    const pB = G.pB, baseB = syB(0);
+    const ytB = yTicks(G.ymaxB, 3);
+    gridLines(c, vt, sxV, ytB, syB, pB);
+    if (!unnorm) {
+      const y1 = syB(1);
+      c.setLineDash([4, 4]); c.strokeStyle = rgba(colors.ink, 0.45); c.lineWidth = 1;
+      c.beginPath(); c.moveTo(G.x0, y1); c.lineTo(G.x1, y1); c.stroke(); c.setLineDash([]);
+      c.font = "11px " + FONT_BODY; c.fillStyle = colors.muted; c.textAlign = "right"; c.textBaseline = "bottom";
+      c.fillText("w = 1", G.x1 - 4, y1 - 2);
+    }
+    clipPanel(c, pB);
+    curvePath(c, curves.xs, curves.wv, sxV, syB);
+    c.strokeStyle = rgba(colors.weight, 0.9); c.lineWidth = 2; c.stroke();
+    c.restore();
+    // sample marks in A and weight dots in B
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.drawImage(layerAB, 0, 0);
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    axes(c, pB);
+    xLabels(c, vt, sxV, baseB);
+    yLabels(c, ytB, syB);
+    panelTitle(c, "Weight w = " + Tn() + "(x) ÷ f(x)", pB.y0 - 10);
+
+    // ----- panel C: the running estimate -----
+    const pC = G.pC, baseC = syC(0);
+    const ytC = yTicks(G.ymaxC, 4);
+    const xtC = ticks(0, G.xmaxC, W < 480 ? 4 : 6).vals.map((v) => ({ v, t: grp(v) }));
+    gridLines(c, xtC, sxC, ytC, syC, pC);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.drawImage(layerC, 0, 0);
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const yMu = syC(scene.mu);
+    c.setLineDash([7, 5]); c.strokeStyle = colors.truth; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(G.x0, yMu); c.lineTo(G.x1, yMu); c.stroke(); c.setLineDash([]);
+    if (n > 0) {
+      clipPanel(c, pC);
+      const stride = Math.max(1, Math.floor(n / ((G.x1 - G.x0) * 1.5)));
+      const line = (arr, color, width) => {
+        c.beginPath();
+        for (let i = 0; i < n; i += stride) {
+          const X = sxC(i + 1), Y = syC(Math.max(-0.05 * G.ymaxC, Math.min(arr[i], G.ymaxC * 1.05)));
+          if (i === 0) c.moveTo(X, Y); else c.lineTo(X, Y);
+        }
+        c.lineTo(sxC(n), syC(Math.max(-0.05 * G.ymaxC, Math.min(arr[n - 1], G.ymaxC * 1.05))));
+        c.strokeStyle = color; c.lineWidth = width; c.lineJoin = "round"; c.stroke();
+      };
+      line(aest, colors.ink, 2.4);
+      c.restore();
+    }
+    tag(c, "true mean μ = " + f3(scene.mu), G.x1 - 4, yMu - 3, "right", "bottom", colors.truth, { size: 11 });
+    axes(c, pC);
+    xLabels(c, xtC, sxC, baseC);
+    yLabels(c, ytC, syC);
+    panelTitle(c, "Running estimate μ̂ after i samples", pC.y0 - 10);
+    c.font = "11px " + FONT_BODY; c.fillStyle = colors.muted; c.textAlign = "right"; c.textBaseline = "top";
+    c.fillText("sample number i", G.x1, baseC + 22);
+
+    if (showCur) drawCurrent(c);
+  }
+
+  function drawCurrent(c) {
+    const s = sub(cur.i), p = cur.phase;
+    const pA = G.pA, pB = G.pB;
+    const px = sxV(cur.x);
+    c.save();
+    // Step 1: the value of x
+    c.setLineDash([4, 4]); c.strokeStyle = rgba(colors.ink, 0.6); c.lineWidth = 1.3;
+    c.beginPath(); c.moveTo(px, pA.y0); c.lineTo(px, pB.y1); c.stroke(); c.setLineDash([]);
+    const baseB = syB(0);
+    c.fillStyle = colors.ink;
+    c.beginPath(); c.moveTo(px, baseB + 1); c.lineTo(px - 5, baseB + 9); c.lineTo(px + 5, baseB + 9); c.closePath(); c.fill();
+    tag(c, "x" + s + " = " + fxv(cur.x), px, baseB + 9, "center", "top", colors.ink);
+    // Step 2: g(x) and f(x)
+    if (p >= 2) {
+      const xg = px, xf = px;
+      let yg = syA(cur.gx), yf = syA(cur.fx);
+      dot(c, xg, yg, 5, colors.target, colors.bg);
+      dot(c, xf, yf, 5, colors.prop, colors.bg);
+      const right = px < (G.x0 + G.x1) / 2;
+      let lg = yg, lf = yf;
+      if (Math.abs(lg - lf) < 20) { if (lg <= lf) { lg -= 10; lf += 10; } else { lg += 10; lf -= 10; } }
+      lg = Math.max(pA.y0 + 4, lg); lf = Math.max(pA.y0 + 4, lf);
+      tag(c, Tn() + "(x" + s + ") = " + f3(cur.gx), right ? Math.max(xg, xf) + 12 : Math.min(xg, xf) - 12, lg, right ? "left" : "right", "middle", colors.target);
+      tag(c, "f(x" + s + ") = " + f3(cur.fx), right ? Math.max(xg, xf) + 12 : Math.min(xg, xf) - 12, lf, right ? "left" : "right", "middle", colors.prop);
+    }
+    // Step 3: the weight
+    if (p >= 3) {
+      const yw = syB(Math.min(cur.w, G.ymaxB));
+      dot(c, px, yw, 6, colors.weight, colors.bg);
+      const right = px < (G.x0 + G.x1) / 2;
+      tag(c, "w" + s + " = " + fw(cur.w) + (cur.w > G.ymaxB ? " (off the top)" : ""), right ? px + 12 : px - 12, Math.max(pB.y0 + 8, yw), right ? "left" : "right", "middle", colors.weight);
+    }
+    // Step 4: the contribution
+    if (p >= 4) {
+      const cx = sxC(cur.i), cy = syC(Math.max(0, Math.min(cur.c, G.ymaxC)));
+      dot(c, cx, cy, 6, colors.weight, colors.bg);
+      const right = cx < (G.x0 + G.x1) / 2;
+      tag(c, "w" + s + "·x" + s + " = " + fw(cur.c) + (cur.c > G.ymaxC ? " (off the top)" : ""), right ? cx + 12 : cx - 12, Math.max(G.pC.y0 + 8, cy), right ? "left" : "right", "middle", colors.weight);
+    }
+    // Step 5: the new estimate
+    if (p >= 5) {
+      const ex = sxC(cur.i), ey = syC(Math.max(0, Math.min(cur.est, G.ymaxC)));
+      dot(c, ex, ey, 5.5, colors.ink, colors.bg);
+      const right = ex < (G.x0 + G.x1) / 2;
+      tag(c, "μ̂ = " + f3(cur.est), right ? ex + 12 : ex - 12, Math.min(G.pC.y1 - 10, ey + 16), right ? "left" : "right", "middle", colors.ink, { bold: true });
+    }
+    c.restore();
+  }
+
+  // ---------- algorithm ----------
+  function grow() {
+    cap *= 2;
+    const g2 = (a) => { const b = new Float64Array(cap); b.set(a); return b; };
+    ax = g2(ax); aw = g2(aw); ac = g2(ac); aest = g2(aest);
+  }
+  function record(it) {
+    if (n === cap) grow();
+    n++;
+    Sw += it.w; Swx += it.c; Sw2 += it.w * it.w; Sc2 += it.c * it.c;
+    if (it.w > maxW) maxW = it.w;
+    it.est = unnorm ? (Sw > 0 ? Swx / Sw : 0) : Swx / n;
+    const k = n - 1;
+    ax[k] = it.x; aw[k] = it.w; ac[k] = it.c; aest[k] = it.est;
+    ensureXmax(n);
+    drawABPoint(it.x, it.w);
+    drawCPoint(n, it.c);
+    recent.unshift({ i: n, x: it.x, gx: it.gx, fx: it.fx, w: it.w, c: it.c });
+    if (recent.length > 7) recent.length = 7;
+    lastIt = it;
+    dirty = domDirty = true;
+  }
+  // One step of the procedure. Phases: 1 get x, 2 find g and f, 3 weight, 4 contribution, 5 update estimate, 6 repeat.
+  function nextStep() {
+    if (!cur || cur.phase >= PHASES) {
+      if (n >= MAX_N) { stopRun(); return; }
+      cur = { i: n + 1, x: prop.sample(rng), phase: 1 };
+      ensureXmax(cur.i);
+    } else if (cur.phase === 1) {
+      cur.gx = T(cur.x); cur.fx = prop.pdf(cur.x); cur.phase = 2;
+    } else if (cur.phase === 2) {
+      cur.w = cur.fx > 0 ? cur.gx / cur.fx : 0; cur.phase = 3;
+    } else if (cur.phase === 3) {
+      cur.c = cur.w * cur.x; cur.phase = 4;
+    } else if (cur.phase === 4) {
+      cur.phase = 5; record(cur);
+    } else if (cur.phase === 5) {
+      cur.phase = 6;
+    }
+    dirty = domDirty = true;
+  }
+  function nextPoint() {
+    if (!cur || cur.phase >= 5) {
+      cur = null;
+      nextStep();
+      if (!cur) return;
+    }
+    while (cur.phase < 5) nextStep();
+  }
+  function fastOne() {
+    const x = prop.sample(rng);
+    const gx = T(x), fx = prop.pdf(x);
+    const w = fx > 0 ? gx / fx : 0;
+    const it = { i: n + 1, x, gx, fx, w, c: w * x, phase: 5 };
+    record(it);
+    return it;
+  }
+  function stopRun() {
+    running = false;
+    if (!cur && lastIt) cur = lastIt;
+    dirty = domDirty = true;
+  }
+  function togglePlay() {
+    if (running) { stopRun(); return; }
+    if (n >= MAX_N) return;
+    running = true;
+    phaseAcc = 1 / (rate * PHASES);
+    budget = 0;
+    dirty = domDirty = true;
+  }
+  function reset() {
+    running = false;
+    rng = mulberry32(seed);
+    n = 0;
+    Sw = Swx = Sw2 = Sc2 = maxW = 0;
+    cur = null; lastIt = null;
+    recent = [];
+    prepCurves();
+    computeGeo();
+    redrawLayers();
+    dirty = domDirty = true;
+  }
+
+  // ---------- DOM ----------
+  const STEPS = [
+    () => "Get a value x<sub>i</sub> from f.",
+    () => "Find " + Tn() + "(x<sub>i</sub>) and f(x<sub>i</sub>).",
+    () => "Calculate the weight w<sub>i</sub> = " + Tn() + "(x<sub>i</sub>) ÷ f(x<sub>i</sub>).",
+    () => "Calculate the contribution w<sub>i</sub> × x<sub>i</sub>.",
+    () => (unnorm
+      ? "Add w<sub>i</sub> × x<sub>i</sub> to the top sum. Add w<sub>i</sub> to the bottom sum. The estimate μ̂ is the top sum ÷ the bottom sum."
+      : "Add the contribution to the sum. The estimate μ̂ is the sum ÷ i."),
+    () => "Do steps 1 to 5 again many times."
+  ];
+  let procEls = [];
+  function buildProc() {
+    const ol = $("proc");
+    ol.innerHTML = STEPS.map((fn, j) =>
+      '<li><span class="num">' + (j + 1) + '</span><span class="txt">' + fn() + '</span><span class="val"></span></li>'
+    ).join("");
+    procEls = Array.from(ol.children).map((li) => ({ li, val: li.querySelector(".val") }));
+  }
+  function rateText(r) {
+    return r < 1 ? r.toFixed(2) : r < 10 ? r.toFixed(1) : grp(r);
+  }
+  function isFast() { return mode === "run" && running && rate > SLOW; }
+
+  function procStates() {
+    const st = Array.from({ length: PHASES }, () => ({ cls: "", val: "" }));
+    st[5].val = "Samples so far: " + grp(n);
+    if (isFast()) {
+      for (let j = 0; j < 5; j++) st[j].cls = "loop";
+      st[5].cls = "loop current";
+      st[5].val = "Repeating: " + rateText(rate) + " samples/s";
+      return st;
+    }
+    if (!cur) { if (n < MAX_N) st[0].cls = "next"; return st; }
+    const s = sub(cur.i), p = cur.phase;
+    if (p >= 1) st[0].val = "x" + s + " = " + fxv(cur.x);
+    if (p >= 2) st[1].val = Tn() + "(x" + s + ") = " + f3(cur.gx) + ", f(x" + s + ") = " + f3(cur.fx);
+    if (p >= 3) st[2].val = "w" + s + " = " + fw(cur.w);
+    if (p >= 4) st[3].val = "w" + s + " × x" + s + " = " + fw(cur.c);
+    if (p >= 5) st[4].val = "μ̂ = " + f3(cur.est);
+    for (let j = 0; j < 5; j++) st[j].cls = j + 1 < p ? "done" : j + 1 === p ? "current" : "";
+    if (p === 6) { st[5].cls = "current"; st[5].val = "Next: sample " + grp(cur.i + 1); }
+    return st;
+  }
+
+  function wSentence(w) {
+    if (unnorm) return "";
+    if (w > 1.0005) return " " + Tn() + "(x) is larger than f(x), so the weight is more than 1.";
+    if (w < 0.9995) return " f(x) is larger than " + Tn() + "(x), so the weight is less than 1.";
+    return " " + Tn() + "(x) and f(x) are equal, so the weight is 1.";
+  }
+  function narrationText() {
+    const mu = f3(scene.mu);
+    if (isFast()) return "Automatic: about " + rateText(rate) + " samples each second. This is too fast to see each step. Move the speed slider to the left to see the steps again.";
+    if (n >= MAX_N && !(cur && cur.phase < 5)) return "The run stopped at " + grp(MAX_N) + " samples. Press Reset to start again.";
+    if (!cur) {
+      if (n === 0) {
+        if (mode === "step") return "Press the Space bar (or Next step) to start. Each press does one step of the procedure. The plot shows what the step does.";
+        if (mode === "point") return "Press the Space bar (or Next point). One press does steps 1 to 5 for one new sample.";
+        return "Press the Space bar (or Play). The computer does the steps again and again. Use the speed slider to make it slower or faster.";
+      }
+      if (mode === "run") return "Paused after " + grp(n) + " samples. Press the Space bar to continue.";
+      return grp(n) + " samples so far. Press the Space bar to make a new sample.";
+    }
+    const s = sub(cur.i), X = fxv(cur.x);
+    const pre = mode === "run" && !running ? "Paused. " : "";
+    if (mode === "point" && cur.phase === 5) {
+      return "Steps 1 to 5 for sample " + grp(cur.i) + ": x = " + X + ", w = " + fw(cur.w) + ", w·x = " + fw(cur.c) + ". The estimate is now μ̂ = " + f3(cur.est) + ". The true mean is " + mu + ".";
+    }
+    switch (cur.phase) {
+      case 1: return pre + "Step 1. The computer gets x" + s + " = " + X + " from f. The dashed line shows this x.";
+      case 2: return pre + "Step 2. At x" + s + ", " + Tn() + "(x" + s + ") = " + f3(cur.gx) + " (pink) and f(x" + s + ") = " + f3(cur.fx) + " (blue).";
+      case 3: return pre + "Step 3. The weight is w" + s + " = " + f3(cur.gx) + " ÷ " + f3(cur.fx) + " = " + fw(cur.w) + "." + wSentence(cur.w);
+      case 4: return pre + "Step 4. The contribution is w" + s + " × x" + s + " = " + fw(cur.w) + " × " + X + " = " + fw(cur.c) + ". It is the large orange dot in the bottom panel.";
+      case 5: return pre + (unnorm
+        ? "Step 5. The top sum Σ w·x is " + fw(Swx) + ". The bottom sum Σ w is " + fw(Sw) + ". The estimate is μ̂ = " + fw(Swx) + " ÷ " + fw(Sw) + " = " + f3(cur.est) + ". The true mean is " + mu + "."
+        : "Step 5. The sum of the contributions is " + fw(Swx) + ". The estimate is μ̂ = " + fw(Swx) + " ÷ " + grp(cur.i) + " = " + f3(cur.est) + ". The true mean is " + mu + ".");
+      case 6: return pre + "Step 6. Go back to step 1 and get a new x.";
+    }
+    return "";
+  }
+
+  function recentHTML() {
+    let h = "";
+    if (cur && cur.phase < 5 && !isFast()) {
+      const p = cur.phase, dots = "…";
+      h += '<tr class="inprog"><td>' + grp(cur.i) + "</td><td>" + fxv(cur.x) + "</td><td>" + (p >= 2 ? f3(cur.gx) : dots) + "</td><td>" +
+        (p >= 2 ? f3(cur.fx) : dots) + '</td><td class="wcol">' + (p >= 3 ? fw(cur.w) : dots) + "</td><td>" + (p >= 4 ? fw(cur.c) : dots) + "</td></tr>";
+    }
+    for (const r of recent) {
+      h += "<tr><td>" + grp(r.i) + "</td><td>" + fxv(r.x) + "</td><td>" + f3(r.gx) + "</td><td>" + f3(r.fx) +
+        '</td><td class="wcol">' + fw(r.w) + "</td><td>" + fw(r.c) + "</td></tr>";
+    }
+    if (!h) h = '<tr><td colspan="6" class="empty">No samples yet.</td></tr>';
+    return h;
+  }
+
+  let lastNarr = "", lastRecent = "";
+  function updateDOM() {
+    const mu = scene.mu;
+    $("rN").textContent = grp(n);
+    const est = n ? (unnorm ? Swx / Sw : Swx / n) : NaN;
+    $("rEst").textContent = n ? f3(est) : "—";
+    $("rTrue").textContent = f3(mu);
+    $("rErr").textContent = n ? (est - mu >= 0 ? "+" : "") + f3(est - mu) : "—";
+    $("rStd").textContent = n ? fw(Swx / n) : "—";
+    $("rSn").textContent = n && Sw > 0 ? f3(Swx / Sw) : "—";
+    $("rowStd").classList.toggle("active", !unnorm);
+    $("rowSn").classList.toggle("active", unnorm);
+    $("rMeanWLabel").textContent = unnorm ? "Mean weight (estimates Z = " + ZC + ")" : "Mean weight (should be near 1)";
+    $("rMeanW").textContent = n ? f3(Sw / n) : "—";
+    const meanC = n ? Swx / n : 0;
+    $("rSd").textContent = n > 1 ? fw(Math.sqrt(Math.max(0, Sc2 / n - meanC * meanC))) : "—";
+    $("rMax").textContent = n && Sw > 0 ? (100 * maxW / Sw).toFixed(1) + "%" : "—";
+    const ess = Sw2 > 0 ? Sw * Sw / Sw2 : 0;
+    $("rEss").textContent = n ? grp(ess) + " of " + grp(n) + " (" + (100 * ess / n).toFixed(0) + "%)" : "—";
+    $("mEss").style.width = n ? Math.min(100, 100 * ess / n) + "%" : "0%";
+
+    const txt = narrationText();
+    if (txt !== lastNarr) { $("narration").textContent = txt; lastNarr = txt; }
+    const st = procStates();
+    for (let j = 0; j < PHASES; j++) {
+      const e = procEls[j];
+      if (!e) continue;
+      if (e.li.className !== st[j].cls) e.li.className = st[j].cls;
+      if (e.val.textContent !== st[j].val) e.val.textContent = st[j].val;
+    }
+    const rh = recentHTML();
+    if (rh !== lastRecent) { $("recent").innerHTML = rh; lastRecent = rh; }
+    $("btnPlay").textContent = running ? "Pause" : "Play";
+    const full = n >= MAX_N && !(cur && cur.phase < 5);
+    $("btnStep").disabled = full && !(cur && cur.phase === 5);
+    $("btnPoint").disabled = full;
+    $("btnPlay").disabled = full && !running;
+  }
+
+  function goalHTML() {
+    let h = scene.goal + " <strong>Goal:</strong> the mean of g. True value μ = " + f3(scene.mu) +
+      ". We act as if we cannot take samples from g, so we take samples from f.";
+    if (unnorm) h += " We know only H(x) = Z·g(x). This page uses Z = " + ZC + ", but the estimator does not use Z.";
+    return h;
+  }
+  function propDescText() {
+    if (prop.id === "uniform") return "f(x) = 1/12 for x from 0 to 12";
+    if (prop.id === "ideal") return "f(x) = x·g(x) ÷ μ";
+    if (prop.comps) return "f = " + prop.comps.map((k) => k.w + "·N(" + k.m + ", " + k.s + ")").join(" + ") + ", cut to 0 to 12";
+    return "f = normal distribution, centre " + prop.m + ", width " + prop.s + ", cut to 0 to 12";
+  }
+  function buildPropSeg() {
+    const list = scene.props.map((p) => ({ id: p.id, name: p.name }));
+    list.push({ id: "custom", name: "Your own" });
+    $("propSeg").innerHTML = list.map((p) =>
+      '<button type="button" data-prop="' + p.id + '" aria-pressed="' + (p.id === prop.id) + '">' + p.name + "</button>"
+    ).join("");
+  }
+  function refreshLabels() {
+    $("goalLine").innerHTML = goalHTML();
+    $("propDesc").textContent = propDescText();
+    for (const b of $("propSeg").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.prop === prop.id));
+    for (const b of $("gSeg").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.g === scene.id));
+    for (const b of $("targetSeg").querySelectorAll("button")) b.setAttribute("aria-pressed", String((b.dataset.t === "unnorm") === unnorm));
+    $("thT").textContent = Tn() + "(x)";
+    $("legT").textContent = unnorm ? "Target H = Z·g" : "Target g";
+    buildProc();
+  }
+  function syncCustomSliders() {
+    $("cm").value = String(customM);
+    $("cs").value = String(customS);
+    $("cmOut").textContent = customM.toFixed(1);
+    $("csOut").textContent = customS.toFixed(2);
+  }
+
+  function restoreDefaults() {
+    if (running) stopRun();
+    prop = scene.props.find((p) => p.id === scene.defaultProp);
+    buildPropSeg();
+    refreshLabels();
+    reset();
+    scheduleCompare();
+  }
+  function setProp(id) {
+    if (running) stopRun();
+    if (id === "custom") {
+      prop = normalProp("custom", "Your own", "centre " + customM.toFixed(1) + ", width " + customS.toFixed(2), customM, customS);
+    } else {
+      prop = scene.props.find((p) => p.id === id) || prop;
+      if (prop.normal) { customM = prop.m; customS = prop.s; syncCustomSliders(); }
+    }
+    refreshLabels();
+    reset();
+    if (id === "custom" || (cmpRes && cmpRes.hasCustom)) scheduleCompare(id === "custom" ? 400 : 30);
+    else drawCmpRowsState();
+  }
+  function setTarget(u) {
+    if (running) stopRun();
+    unnorm = u;
+    refreshLabels();
+    reset();
+    scheduleCompare();
+  }
+  function setMode(m) {
+    if (running) stopRun();
+    mode = m;
+    for (const b of $("modeSeg").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.mode === m));
+    $("btnStep").hidden = m !== "step";
+    $("btnPoint").hidden = m !== "point";
+    $("btnPlay").hidden = m !== "run";
+    $("rateCtl").hidden = m !== "run";
+    $("modeHint").innerHTML =
+      m === "step" ? "Slowest. One press does one step. Keys: <kbd>Space</kbd> or <kbd>→</kbd>" :
+      m === "point" ? "Faster. One press does steps 1 to 5. Keys: <kbd>Space</kbd> or <kbd>→</kbd>" :
+      "Fastest. The steps run by themselves. <kbd>Space</kbd> plays and pauses.";
+    dirty = domDirty = true;
+  }
+
+  // ---------- compare card ----------
+  let cmpN = 100, cmpSeed = 7, cmpRes = null, cmpTimer = null;
+  function scheduleCompare(delay) {
+    clearTimeout(cmpTimer);
+    $("cmpStatus").textContent = "Running the repeats…";
+    cmpTimer = setTimeout(runCompare, delay == null ? 40 : delay);
+  }
+  function runCompare() {
+    const list = scene.props.slice();
+    const hasCustom = prop.id === "custom";
+    if (hasCustom) list.push(prop);
+    const N = cmpN, rr = mulberry32(cmpSeed);
+    const rows = list.map((pp) => {
+      const est = new Float64Array(CMP_REPS);
+      let essSum = 0;
+      for (let r = 0; r < CMP_REPS; r++) {
+        let sw = 0, swx = 0, sw2 = 0;
+        for (let j = 0; j < N; j++) {
+          const x = pp.sample(rr), fx = pp.pdf(x);
+          const w = fx > 0 ? T(x) / fx : 0;
+          sw += w; swx += w * x; sw2 += w * w;
+        }
+        est[r] = unnorm ? (sw > 0 ? swx / sw : 0) : swx / N;
+        essSum += sw2 > 0 ? sw * sw / sw2 / N : 0;
+      }
+      let m = 0;
+      for (let r = 0; r < CMP_REPS; r++) m += est[r];
+      m /= CMP_REPS;
+      let v2 = 0;
+      for (let r = 0; r < CMP_REPS; r++) v2 += (est[r] - m) * (est[r] - m);
+      return { prop: pp, est, sd: Math.sqrt(v2 / (CMP_REPS - 1)), bias: m - scene.mu, ess: essSum / CMP_REPS };
+    });
+    cmpRes = { rows, R: Math.max(3 * rows[0].sd, 0.01 * scene.mu), N, hasCustom };
+    buildCmpRows();
+    $("cmpStatus").textContent = "";
+  }
+  function buildCmpRows() {
+    if (!cmpRes) return;
+    const rows = cmpRes.rows;
+    $("cmpRows").innerHTML = rows.map((r, i) =>
+      '<div class="cmp-row' + (i === rows.length - 1 ? " last" : "") + '" data-id="' + r.prop.id + '">' +
+      '<div class="cmp-name">' + r.prop.name + "<small>" + (r.prop.note || "") + "</small></div>" +
+      '<canvas class="cmp-strip" aria-label="' + CMP_REPS + " estimates for " + r.prop.name + '"></canvas>' +
+      '<div class="cmp-num"><span>SD</span>' + fw(r.sd) + "</div>" +
+      '<div class="cmp-num' + (Math.abs(r.bias) > 0.1 * scene.mu ? " bad" : "") + '"><span>Bias</span>' + (r.bias >= 0 ? "+" : "") + fw(r.bias) + "</div>" +
+      '<div class="cmp-num"><span>Mean ESS</span>' + (100 * r.ess).toFixed(0) + "%</div></div>"
+    ).join("");
+    drawCmpRowsState();
+    drawCmp();
+  }
+  function drawCmpRowsState() {
+    for (const el of $("cmpRows").querySelectorAll(".cmp-row")) el.classList.toggle("current", el.dataset.id === prop.id);
+  }
+  function drawCmp() {
+    if (!cmpRes) return;
+    const strips = $("cmpRows").querySelectorAll(".cmp-strip");
+    strips.forEach((cvs, i) => drawStrip(cvs, cmpRes.rows[i], i === strips.length - 1));
+  }
+  function drawStrip(cvs, row, last) {
+    const w = Math.max(80, cvs.clientWidth), h = cvs.clientHeight || (last ? 62 : 44);
+    const d = Math.min(3, window.devicePixelRatio || 1);
+    cvs.width = Math.round(w * d); cvs.height = Math.round(h * d);
+    const c = cvs.getContext("2d");
+    c.setTransform(d, 0, 0, d, 0, 0);
+    c.clearRect(0, 0, w, h);
+    const mu = scene.mu, R = cmpRes.R, lo = mu - R, hi = mu + R;
+    const X = (v) => 14 + (v - lo) / (hi - lo) * (w - 28);
+    const yTop = 4, yBot = 38;
+    c.strokeStyle = colors.line; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(14, yBot + 0.5); c.lineTo(w - 14, yBot + 0.5); c.stroke();
+    c.setLineDash([4, 3]); c.strokeStyle = colors.truth; c.lineWidth = 1.6;
+    c.beginPath(); c.moveTo(X(mu), yTop - 2); c.lineTo(X(mu), yBot); c.stroke(); c.setLineDash([]);
+    const jr = mulberry32(99);
+    let left = 0, right = 0;
+    c.fillStyle = rgba(colors.prop, 0.36);
+    for (let r = 0; r < row.est.length; r++) {
+      const v = row.est[r], jy = yTop + 3 + jr() * (yBot - yTop - 7);
+      if (v < lo) { left++; continue; }
+      if (v > hi) { right++; continue; }
+      c.beginPath(); c.arc(X(v), jy, 2.3, 0, 2 * PI); c.fill();
+    }
+    c.font = "600 10.5px " + FONT_MONO;
+    c.textBaseline = "middle";
+    if (left) {
+      c.fillStyle = colors.warn;
+      c.beginPath(); c.moveTo(2, 20); c.lineTo(9, 15); c.lineTo(9, 25); c.closePath(); c.fill();
+      c.textAlign = "left"; c.fillText(String(left), 12, 9);
+    }
+    if (right) {
+      c.fillStyle = colors.warn;
+      c.beginPath(); c.moveTo(w - 2, 20); c.lineTo(w - 9, 15); c.lineTo(w - 9, 25); c.closePath(); c.fill();
+      c.textAlign = "right"; c.fillText(String(right), w - 12, 9);
+    }
+    if (last) {
+      c.font = "11px " + FONT_MONO; c.fillStyle = colors.muted; c.textAlign = "center"; c.textBaseline = "top";
+      [lo, mu, hi].forEach((v) => {
+        c.beginPath(); c.moveTo(X(v), yBot); c.lineTo(X(v), yBot + 4); c.strokeStyle = colors.muted; c.stroke();
+        c.fillText(f3(v), X(v), yBot + 7);
+      });
+    }
+  }
+
+  // ---------- main loop ----------
+  let lastT = 0, budget = 0, phaseAcc = 0, lastDom = 0;
+  function frame(t) {
+    if (!lastT) lastT = t;
+    const dt = Math.min(0.1, (t - lastT) / 1000);
+    lastT = t;
+    if (running) {
+      if (rate <= SLOW) {
+        phaseAcc += dt;
+        const dur = 1 / (rate * PHASES);
+        let guard = 0;
+        while (running && phaseAcc >= dur && guard++ < 12) { phaseAcc -= dur; nextStep(); }
+      } else {
+        if (cur && cur.phase < 5) nextPoint();
+        budget += rate * dt;
+        const whole = Math.floor(budget);
+        budget -= whole;
+        let todo = Math.min(whole, 4000);
+        let last = null;
+        while (todo-- > 0) {
+          if (n >= MAX_N) { stopRun(); break; }
+          last = fastOne();
+        }
+        if (last) cur = rate <= GUIDE_MAX ? last : null;
+      }
+    }
+    if (dirty) { render(); dirty = false; }
+    if (domDirty && (!isFast() || t - lastDom > 90)) { updateDOM(); domDirty = false; lastDom = t; }
+    if (tour.active) tourTick();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- guided tour ----------
+  const TOUR_KEY = "importance-sampling-lab.tour-done";
+  const STEP_T = ["#btnStep", "#narration", "plot:A", "plot:B"];
+  const si = () => sub(cur ? cur.i : 1);
+  const TOUR = [
+    {
+      modal: true, art: true, next: "Start the tour",
+      title: "Welcome to the Importance Sampling Lab",
+      body: "In this lab, you estimate the mean of a distribution g, but you never take a sample from g. You take samples from a different distribution f, and you give each sample a weight. The tour shows you each part of the page. It takes about 4 minutes."
+    },
+    {
+      targets: ["#gSeg", "#goalLine"], title: "The target g",
+      body: "There are two targets. The tour uses One peak, a gamma distribution. We want its mean. We act as if we cannot take samples from g. The page shows the true mean, so that you can check the estimate. After the tour, try Two peaks."
+    },
+    {
+      targets: ["#propCtl", "#customCtl"], title: "The importance distribution f",
+      body: "f is the distribution that we take samples from. The tour uses a uniform f, as in video 2. Later, you can try the other buttons, or make your own f with the two sliders."
+    },
+    {
+      targets: ["plot:A"], title: "g and f",
+      body: "The pink curve is g. The dashed blue line is f, the uniform distribution from 0 to 12. Small blue marks at the bottom of this panel will show where the samples land."
+    },
+    {
+      targets: ["plot:B"], title: "The weights",
+      body: "A sample at x gets the weight w = g(x) ÷ f(x). Near x = 2, g is higher than f, so the weight is more than 1. Far to the right, g is almost 0, so the weight is almost 0."
+    },
+    {
+      targets: ["plot:C"], title: "The running estimate",
+      body: "The dark line is the estimate μ̂ after each sample. The green dashed line is the true mean of g. The orange dots are the contributions w × x."
+    },
+    {
+      targets: ["#procCard"], title: "The procedure",
+      body: "These are the steps from the videos. The step that happens now lights up. The numbers for the current sample show below each step."
+    },
+    {
+      targets: ["#modeSeg"], title: "Three speeds",
+      body: "Single step is the slowest. One press does one step. Single point does steps 1 to 5 with one press. Automatic does the steps by itself. We start with Single step."
+    },
+    {
+      targets: STEP_T, allow: ["#btnStep"], title: "Step 1: get x from f",
+      body: "Press Next step. The computer gets a random x from f. You can also press the Space bar. It does the same thing as a click on Next step.",
+      task: "Press Next step or the Space bar.", done: () => !!cur && cur.phase >= 1
+    },
+    {
+      targets: STEP_T, allow: ["#btnStep"], title: "Step 1 is done",
+      body: () => "The dashed line shows x" + si() + " = " + fxv(cur.x) + ". Now use the Space bar to find g(x" + si() + ") and f(x" + si() + ").",
+      task: "Press the Space bar.", done: () => !!cur && cur.phase >= 2
+    },
+    {
+      targets: STEP_T, allow: ["#btnStep"], title: "Step 2 is done",
+      body: () => "g(x" + si() + ") = " + f3(cur.gx) + " and f(x" + si() + ") = " + f3(cur.fx) + ". These are the heights of the pink curve and the blue line at x" + si() + ". Press the Space bar to calculate the weight.",
+      task: "Press the Space bar.", done: () => !!cur && cur.phase >= 3
+    },
+    {
+      targets: STEP_T, allow: ["#btnStep"], title: "Step 3 is done",
+      body: () => "The weight is w" + si() + " = " + f3(cur.gx) + " ÷ " + f3(cur.fx) + " = " + fw(cur.w) + "." + wSentence(cur.w) + " Press the Space bar to calculate the contribution.",
+      task: "Press the Space bar.", done: () => !!cur && cur.phase >= 4
+    },
+    {
+      targets: ["#btnStep", "#narration", "plot:C"], allow: ["#btnStep"], title: "Step 4 is done",
+      body: () => "The contribution is w" + si() + " × x" + si() + " = " + fw(cur.w) + " × " + fxv(cur.x) + " = " + fw(cur.c) + ". It is the large orange dot in the bottom panel. Press the Space bar to update the estimate.",
+      task: "Press the Space bar.", done: () => !!cur && cur.phase >= 5
+    },
+    {
+      targets: ["#btnStep", "#narration", "plot:C"], allow: ["#btnStep"], title: "Step 5 is done",
+      body: () => "After one sample, the estimate is μ̂ = " + f3(cur.est) + ". One sample is not enough for a good estimate. Press the Space bar to finish this sample (step 6).",
+      task: "Press the Space bar.", done: () => !!cur && cur.phase >= 6
+    },
+    {
+      targets: ["#resultsCard"], title: "Results",
+      body: "Here you see the estimate, the true mean and the error. The effective sample size (ESS) tells you how many direct samples from g your weighted samples are worth. When all the weights are similar, ESS is close to N."
+    },
+    {
+      targets: ["#modeSeg"], allow: ['#modeSeg [data-mode="point"]'], title: "Go faster",
+      body: "To do every step by hand is slow. Press Single point.",
+      task: "Press Single point.", done: () => mode === "point"
+    },
+    {
+      targets: ["#actions", "plot:C"], allow: ["#btnPoint"], title: "Make 5 samples",
+      body: "In this mode, one press of the Space bar (or Next point) does steps 1 to 5 for a new sample. Look at the bottom panel after each press.",
+      onEnter: () => { tour.base = n; },
+      task: () => "Samples made: " + Math.min(5, n - tour.base) + " of 5", done: () => n >= tour.base + 5
+    },
+    {
+      targets: ["#modeSeg", "#actions"], allow: ['#modeSeg [data-mode="run"]', "#btnPlay"], title: "Automatic",
+      body: "Press Automatic. Then press the Space bar (or Play) to start. In this mode, the Space bar plays and pauses. The speed starts slow, so you can still see each step.",
+      task: () => (mode !== "run" ? "Press Automatic." : "Press the Space bar."), done: () => mode === "run" && running
+    },
+    {
+      targets: ["#rateCtl", "#actions", "plot:C"], allow: ["#rate", "#btnPlay"], title: "Speed up",
+      body: "Move the speed slider to the right. The steps then go too fast to see, but the estimate gets more data quickly.",
+      task: () => "Samples so far: " + grp(Math.min(n, 2000)) + " of 2,000", done: () => n >= 2000
+    },
+    {
+      targets: ["plot:C"], title: "The weights correct the average",
+      body: () => "The dark line goes to " + f3(scene.mu) + ", the mean of g. You took samples only from the uniform f, and the mean of f is 6. The weights change the average of the samples into the mean of g. Look at how much the dark line still moves up and down."
+    },
+    {
+      targets: ["#propCtl", "plot:A", "plot:B"], allow: ['#propSeg [data-prop="curved"]'], title: "Try a better f",
+      body: "Now press Curved. This f is like the video’s h. It puts most of its samples where g is large, so the weights are more similar. A change to f starts a new run.",
+      task: "Press Curved.", done: () => prop.id === "curved"
+    },
+    {
+      targets: ["#actions", "#rateCtl", "plot:C"], allow: ["#btnPlay", "#rate"], title: "Run it again",
+      body: "Press the Space bar (or Play) to make 2,000 samples with Curved. Compare the dark line with the run for Uniform. It gets near the true mean faster, and it moves less.",
+      task: () => "Samples so far: " + grp(Math.min(n, 2000)) + " of 2,000", done: () => n >= 2000
+    },
+    {
+      targets: ["#cmpCard"], title: "Which f is best?",
+      body: "This card does the whole estimate 300 times for each f. A narrow cloud of dots means a small variance. Uniform gives a wide cloud. Curved gives a narrower cloud. Ideal ∝ x·g(x) gives no spread at all, as video 2 shows."
+    },
+    {
+      modal: true, next: "Start exploring", title: "You are ready",
+      body: "Now you can use the whole lab. The Space bar always does the next thing: one step, one sample, or play and pause. The Experiments card has more to try, which includes the Two peaks target. To see this tour again, press Take the tour at the top of the page."
+    }
+  ];
+  const tour = { active: false, i: 0, advancing: false, base: 0, pathKey: "", posKey: "" };
+  const ringPool = [];
+  const val = (v) => (typeof v === "function" ? v() : v);
+
+  function resolveRect(sel) {
+    if (sel.indexOf("plot:") === 0) {
+      if (!G) return null;
+      const r = cv.getBoundingClientRect();
+      const p = sel === "plot:A" ? G.pA : sel === "plot:B" ? G.pB : G.pC;
+      const below = sel === "plot:B" ? 36 : 40;
+      return { l: r.left, t: r.top + p.y0 - 24, r: r.right, b: r.top + p.y1 + below };
+    }
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) return null;
+    return { l: r.left, t: r.top, r: r.right, b: r.bottom };
+  }
+  const growR = (r, p) => ({ l: r.l - p, t: r.t - p, r: r.r + p, b: r.b + p });
+  const unionOf = (rs) => rs.reduce((a, r) => ({ l: Math.min(a.l, r.l), t: Math.min(a.t, r.t), r: Math.max(a.r, r.r), b: Math.max(a.b, r.b) }));
+  function mergeRects(list) {
+    const rs = list.map((r) => Object.assign({}, r));
+    let merged = true;
+    while (merged) {
+      merged = false;
+      for (let i = 0; i < rs.length && !merged; i++) {
+        for (let j = i + 1; j < rs.length; j++) {
+          const a = rs[i], b = rs[j];
+          if (a.l <= b.r && b.l <= a.r && a.t <= b.b && b.t <= a.b) {
+            rs[i] = unionOf([a, b]);
+            rs.splice(j, 1);
+            merged = true;
+            break;
+          }
+        }
+      }
+    }
+    return rs;
+  }
+  function rrPath(r, rad) {
+    const x = Math.round(r.l), y = Math.round(r.t), w = Math.round(r.r - r.l), h = Math.round(r.b - r.t);
+    const k = Math.max(0, Math.min(rad, w / 2, h / 2));
+    return "M" + (x + k) + "," + y + "H" + (x + w - k) + "A" + k + "," + k + " 0 0 1 " + (x + w) + "," + (y + k) +
+      "V" + (y + h - k) + "A" + k + "," + k + " 0 0 1 " + (x + w - k) + "," + (y + h) +
+      "H" + (x + k) + "A" + k + "," + k + " 0 0 1 " + x + "," + (y + h - k) +
+      "V" + (y + k) + "A" + k + "," + k + " 0 0 1 " + (x + k) + "," + y + "Z";
+  }
+  function setRings(list) {
+    const g = $("tourRings");
+    while (ringPool.length < list.length) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      el.setAttribute("rx", "10");
+      g.appendChild(el);
+      ringPool.push(el);
+    }
+    ringPool.forEach((el, i) => {
+      const it = list[i];
+      const key = it
+        ? [Math.round(it.r.l), Math.round(it.r.t), Math.round(it.r.r - it.r.l), Math.round(it.r.b - it.r.t), it.pulse ? 1 : 0].join(",")
+        : "none";
+      if (el._k === key) return;
+      el._k = key;
+      if (!it) { el.setAttribute("display", "none"); return; }
+      const p = key.split(",");
+      el.removeAttribute("display");
+      el.setAttribute("x", p[0]); el.setAttribute("y", p[1]);
+      el.setAttribute("width", p[2]); el.setAttribute("height", p[3]);
+      el.setAttribute("class", "tour-ring" + (it.pulse ? " pulse" : ""));
+    });
+  }
+  function placeBubble(holes, vw, vh, st) {
+    const b = $("tourBubble");
+    const w = b.offsetWidth, h = b.offsetHeight, m = 12;
+    let left, top;
+    if (st.modal || !holes.length) {
+      left = (vw - w) / 2;
+      top = Math.max(m, (vh - h) / 2);
+    } else {
+      const u = unionOf(holes);
+      const narrow = vw < 700;
+      if (!narrow && vh - u.b >= h + m + 8) { top = u.b + 10; left = u.l; }
+      else if (!narrow && u.t >= h + m + 8) { top = u.t - h - 10; left = u.l; }
+      else if (!narrow && vw - u.r >= w + m + 8) { left = u.r + 12; top = u.t; }
+      else if (!narrow && u.l >= w + m + 8) { left = u.l - w - 12; top = u.t; }
+      else { left = (vw - w) / 2; top = (u.t + u.b) / 2 > vh / 2 ? m : vh - h - m; }
+    }
+    left = Math.max(m, Math.min(vw - w - m, left));
+    top = Math.max(m, Math.min(vh - h - m, top));
+    const key = Math.round(left) + "," + Math.round(top);
+    if (key !== tour.posKey) {
+      b.style.left = Math.round(left) + "px";
+      b.style.top = Math.round(top) + "px";
+      tour.posKey = key;
+    }
+  }
+  function layoutTour() {
+    const st = TOUR[tour.i];
+    const vw = document.documentElement.clientWidth, vh = window.innerHeight;
+    const allowSel = st.allow || [];
+    const tSel = st.modal ? [] : (st.targets || []);
+    const targets = tSel.map(resolveRect).filter(Boolean).map((r) => growR(r, 6));
+    const ringTargets = tSel.filter((s) => allowSel.indexOf(s) < 0).map(resolveRect).filter(Boolean).map((r) => growR(r, 6));
+    const allows = st.modal ? [] : allowSel.map(resolveRect).filter(Boolean).map((r) => growR(r, 5));
+    const holes = mergeRects(targets.concat(allows));
+    let d = "M0,0H" + vw + "V" + vh + "H0Z";
+    for (const hole of holes) d += rrPath(hole, 10);
+    if (d !== tour.pathKey) { $("tourPath").setAttribute("d", d); tour.pathKey = d; }
+    setRings(ringTargets.map((r) => ({ r, pulse: false })).concat(allows.map((r) => ({ r, pulse: true }))));
+    placeBubble(holes, vw, vh, st);
+  }
+  function scrollToTargets(st) {
+    if (st.modal) return;
+    const rs = (st.targets || []).map(resolveRect).filter(Boolean);
+    if (!rs.length) return;
+    const u = unionOf(rs);
+    const vh = window.innerHeight, vw = document.documentElement.clientWidth, m = 16;
+    const reserve = vw < 700 ? $("tourBubble").offsetHeight + 24 : 0;
+    // When the run bar is sticky, it covers the top of the plot. Keep plot targets below it.
+    let topM = m;
+    const bar = $("runBar");
+    if (getComputedStyle(bar).position === "sticky") {
+      const fr = bar.parentElement.getBoundingClientRect();
+      const inBar = (st.targets || []).some((s) => { const el = document.querySelector(s); return !!el && bar.contains(el); });
+      if (!inBar && u.l < fr.right && u.r > fr.left) topM = m + bar.offsetHeight;
+    }
+    const avail = vh - reserve - topM - m;
+    let dy = 0;
+    if (u.b - u.t > avail || u.t < topM) dy = u.t - topM;
+    else if (u.b > topM + avail) dy = u.b - (topM + avail);
+    if (Math.abs(dy) > 2) window.scrollBy({ top: dy, behavior: reduceMotion ? "auto" : "smooth" });
+  }
+  function welcomeArt() {
+    // Samples from a uniform f under a bell-shaped g; dot size shows the weight.
+    const x0 = 16, x1 = 304, yb = 104;
+    const X = (x) => x0 + (x / 12) * (x1 - x0);
+    const Y = (y) => yb - y * 300;
+    let dg = "", df = "M" + x0 + " " + Y(1 / 12).toFixed(1) + " H" + x1;
+    for (let i = 0; i <= 96; i++) {
+      const x = 12 * i / 96;
+      dg += (i ? "L" : "M") + X(x).toFixed(1) + " " + Y(GAMMA.g(x)).toFixed(1);
+    }
+    const r = mulberry32(5);
+    let pts = "";
+    for (let i = 0; i < 26; i++) {
+      const x = 12 * r();
+      const w = GAMMA.g(x) * 12;
+      const rad = Math.max(1.4, Math.min(9, 3.2 * Math.sqrt(w)));
+      pts += '<circle cx="' + X(x).toFixed(1) + '" cy="' + (yb + 9).toFixed(1) + '" r="' + rad.toFixed(1) + '" style="fill: var(--weight); opacity: 0.75"/>';
+    }
+    return '<svg class="tour-art" viewBox="0 0 320 122" role="img" aria-label="A pink curve g and a flat blue line f. Orange dots below show samples from f. Large dots are where g is high.">' +
+      '<path d="M' + x0 + " " + yb + " H" + x1 + '" style="stroke: var(--muted); stroke-width: 1"/>' +
+      '<path d="' + df + '" style="fill: none; stroke: var(--prop); stroke-width: 2.4; stroke-dasharray: 6 4"/>' +
+      '<path d="' + dg + '" style="fill: none; stroke: var(--target); stroke-width: 2.6"/>' + pts + "</svg>";
+  }
+  function goTour(i) {
+    tour.i = i;
+    tour.advancing = false;
+    const st = TOUR[i];
+    if (st.onEnter) st.onEnter();
+    $("tourTitle").textContent = val(st.title);
+    $("tourBody").textContent = val(st.body);
+    $("tourArt").innerHTML = st.art ? welcomeArt() : "";
+    $("tourBubble").classList.toggle("modal", !!st.modal);
+    $("tourBubble").scrollTop = 0;
+    $("tourCount").textContent = st.modal ? "" : "Step " + i + " of " + (TOUR.length - 2);
+    $("tourBar").style.width = (100 * i / (TOUR.length - 1)) + "%";
+    const task = $("tourTask");
+    task.hidden = !st.task;
+    task.classList.remove("done");
+    if (st.task) task.textContent = val(st.task);
+    const next = $("tourNext");
+    next.hidden = !!st.done;
+    next.textContent = st.next || (i === TOUR.length - 2 ? "Finish" : "Next");
+    const prev = TOUR[i - 1];
+    $("tourBack").hidden = !(prev && !prev.done && !prev.modal);
+    $("tourSkip").hidden = i === TOUR.length - 1;
+    tour.pathKey = "";
+    tour.posKey = "";
+    layoutTour();
+    scrollToTargets(st);
+    if (!st.done) {
+      next.focus({ preventScroll: true });
+    } else {
+      const a = (st.allow || []).map((s) => document.querySelector(s)).find((el) => el && el.offsetParent !== null);
+      if (a && a.focus) a.focus({ preventScroll: true });
+    }
+  }
+  function tourTick() {
+    const st = TOUR[tour.i];
+    if (typeof st.task === "function") {
+      const t = st.task();
+      if ($("tourTask").textContent !== t) $("tourTask").textContent = t;
+    }
+    if (st.done && !tour.advancing && st.done()) {
+      tour.advancing = true;
+      $("tourTask").classList.add("done");
+      const i = tour.i;
+      setTimeout(() => { if (tour.active && tour.i === i) goTour(i + 1); }, 500);
+    }
+    layoutTour();
+  }
+  function startTour() {
+    if (running) stopRun();
+    $("rate").value = String(DEFAULT_RATE_V);
+    setRateFromSlider();
+    unnorm = false;
+    scene = GAMMA;
+    restoreDefaults();
+    setMode("step");
+    tour.active = true;
+    $("tour").hidden = false;
+    goTour(0);
+  }
+  function endTour() {
+    tour.active = false;
+    $("tour").hidden = true;
+    try { window.localStorage.setItem(TOUR_KEY, "1"); } catch (e) { /* storage not available */ }
+    dirty = domDirty = true;
+  }
+  function tourAllows(el) {
+    if (!tour.active) return true;
+    if (!el || !el.closest) return false;
+    if (el.closest("#tourBubble")) return true;
+    const st = TOUR[tour.i];
+    return (st.allow || []).some((sel) => {
+      const a = document.querySelector(sel);
+      return !!a && a.contains(el);
+    });
+  }
+  function syncInputs() {
+    $("seed").value = String(seed);
+    $("rate").value = String(rateV);
+    syncCustomSliders();
+  }
+
+  // ---------- wiring ----------
+  function primary() {
+    if (mode === "step") nextStep();
+    else if (mode === "point") nextPoint();
+    else togglePlay();
+  }
+  function setRateFromSlider() {
+    const v = +$("rate").value;
+    rateV = v;
+    rate = 0.2 * Math.pow(25000, v / 1000);
+    $("rateOut").textContent = rateText(rate) + " samples/s";
+    $("rateHint").textContent = rate <= SLOW ? "Slow enough to see each step." : "Too fast to see each step.";
+    phaseAcc = Math.min(phaseAcc, 1 / (rate * PHASES));
+    dirty = domDirty = true;
+  }
+
+  function init() {
+    readColors();
+    $("gSeg").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      const t = TARGETS.find((x) => x.id === b.dataset.g);
+      if (t && t !== scene) { scene = t; restoreDefaults(); }
+    });
+    $("targetSeg").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      const u = b.dataset.t === "unnorm";
+      if (u !== unnorm) setTarget(u);
+    });
+    $("propSeg").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (b && b.dataset.prop !== prop.id) setProp(b.dataset.prop);
+    });
+    const onCustom = () => {
+      customM = parseFloat($("cm").value);
+      customS = parseFloat($("cs").value);
+      $("cmOut").textContent = customM.toFixed(1);
+      $("csOut").textContent = customS.toFixed(2);
+      setProp("custom");
+    };
+    $("cm").addEventListener("input", onCustom);
+    $("cs").addEventListener("input", onCustom);
+    $("modeSeg").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (b) setMode(b.dataset.mode);
+    });
+    $("btnStep").addEventListener("click", nextStep);
+    $("btnPoint").addEventListener("click", nextPoint);
+    $("btnPlay").addEventListener("click", togglePlay);
+    $("btnReset").addEventListener("click", reset);
+    $("rate").value = String(DEFAULT_RATE_V);
+    $("rate").addEventListener("input", setRateFromSlider);
+    setRateFromSlider();
+    $("seed").value = String(seed);
+    $("seed").addEventListener("change", (e) => {
+      const v = parseInt(e.target.value, 10);
+      seed = Number.isFinite(v) ? Math.abs(v) : 0;
+      e.target.value = String(seed);
+      reset();
+    });
+    $("newSeed").addEventListener("click", () => {
+      seed = Math.floor(Math.random() * 1000000);
+      $("seed").value = String(seed);
+      reset();
+    });
+    $("cmpSeg").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      cmpN = parseInt(b.dataset.n, 10);
+      for (const x of $("cmpSeg").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b));
+      scheduleCompare();
+    });
+    $("cmpAgain").addEventListener("click", () => { cmpSeed = Math.floor(Math.random() * 1e9); scheduleCompare(); });
+
+    // The Space bar always presses the main button for the mode (Next step, Next point, Play/Pause),
+    // whatever has focus. Enter still presses the focused button. The right arrow also works in the two manual modes.
+    const isTextField = (t) => !!t && (t.tagName === "TEXTAREA" || t.isContentEditable || (t.tagName === "INPUT" && t.type !== "range"));
+    const isSpace = (e) => e.key === " " || e.code === "Space";
+    const primaryBtn = () => $(mode === "step" ? "btnStep" : mode === "point" ? "btnPoint" : "btnPlay");
+    const primaryReady = () => { const b = primaryBtn(); return !b.disabled && tourAllows(b); };
+    document.addEventListener("keydown", (e) => {
+      const t = e.target;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (tour.active && e.key === "Escape") { e.preventDefault(); endTour(); return; }
+      if (isTextField(t)) return;
+      if (isSpace(e)) {
+        e.preventDefault();
+        if (e.repeat && mode === "run") return;
+        if (primaryReady()) primary();
+      } else if (e.key === "ArrowRight" && mode !== "run" && !(t && t.tagName === "INPUT")) {
+        e.preventDefault();
+        if (primaryReady()) primary();
+      }
+    });
+    document.addEventListener("keyup", (e) => {
+      if (isSpace(e) && !isTextField(e.target)) e.preventDefault();
+    });
+
+    // During the tour, only the highlighted controls respond.
+    const INTERACTIVE = "button, input, select, textarea, a, label, summary";
+    ["pointerdown", "mousedown", "click", "dblclick"].forEach((type) => {
+      document.addEventListener(type, (e) => {
+        if (!tour.active) return;
+        const el = e.target && e.target.closest ? e.target.closest(INTERACTIVE) : null;
+        if (!el || tourAllows(el)) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }, true);
+    });
+    ["input", "change"].forEach((type) => {
+      document.addEventListener(type, (e) => {
+        if (!tour.active || tourAllows(e.target)) return;
+        e.stopPropagation();
+        syncInputs();
+      }, true);
+    });
+    $("btnTour").addEventListener("click", startTour);
+    $("tourNext").addEventListener("click", () => {
+      if (tour.i >= TOUR.length - 1) endTour();
+      else goTour(tour.i + 1);
+    });
+    $("tourBack").addEventListener("click", () => { if (tour.i > 0) goTour(tour.i - 1); });
+    $("tourSkip").addEventListener("click", endTour);
+
+    syncCustomSliders();
+    restoreDefaults();
+    setMode("step");
+    layout();
+    // Resize in the next frame, not inside the observer callback.
+    let layoutQueued = false;
+    const queueLayout = () => {
+      if (layoutQueued) return;
+      layoutQueued = true;
+      requestAnimationFrame(() => { layoutQueued = false; layout(); drawCmp(); });
+    };
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(queueLayout);
+      ro.observe($("canvasWrap"));
+      ro.observe($("cmpRows"));
+    }
+    window.addEventListener("resize", queueLayout);
+
+    const onTheme = () => { readColors(); makeSprites(); redrawLayers(); drawCmp(); dirty = true; };
+    if (window.matchMedia) {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      if (mq.addEventListener) mq.addEventListener("change", onTheme);
+    }
+    new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { dirty = true; drawCmp(); });
+
+    updateDOM();
+    let seen = false;
+    try { seen = window.localStorage.getItem(TOUR_KEY) === "1"; } catch (e) { seen = false; }
+    if (!seen) startTour();
+    requestAnimationFrame(frame);
+  }
+  init();
+})();
+</script>
+</body>
+</html>

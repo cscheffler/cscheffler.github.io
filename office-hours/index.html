@@ -32,6 +32,7 @@ import { firebaseConfig, OFFICE_TIMEZONE, OFFICE_LOCATION, LIVE_WEATHER, WEATHER
 //   &hour=21 &cloud=0.9 &rain=0.8         force time of day and weather
 //   &snow=1 &fog=1                        force snow instead of rain, or fog
 //   &cirrus=0.8 &wind=1                   force high cloud and wind speed
+//   &storm=1                              force a gale: trees bend, leaves fly
 //   &debug                                show the weather data and what is drawn from it
 //   &weather=noise                        synthetic weather instead of the live Open-Meteo data
 //   &month=1 or &doy=60                   force the season (1 = January; doy = day of year)
@@ -47,12 +48,13 @@ scene.setOverrides({
   fog: params.has('fog') ? num('fog') : null,
   cirrus: params.has('cirrus') ? num('cirrus') : null,
   wind: params.has('wind') ? num('wind') : null,
+  storm: params.has('storm') ? num('storm') : null,
   doy: params.has('doy') ? num('doy') : params.has('month') ? Math.round((num('month') - 1) * 30.4 + 15) : null
 });
 
 // Live weather, unless the weather is being forced or the synthetic one is asked for.
 function startLiveWeather() {
-  const weatherForced = ['cloud', 'rain', 'snow', 'fog', 'cirrus', 'wind'].some(k => params.has(k));
+  const weatherForced = ['cloud', 'rain', 'snow', 'fog', 'cirrus', 'wind', 'storm'].some(k => params.has(k));
   if (!LIVE_WEATHER || weatherForced || params.get('weather') === 'noise') return;
   const poll = async () => {
     try {
@@ -133,10 +135,10 @@ function debugText(v) {
     }
     lines.push('mean            ' + pc(wx.debug.total * 100) + '  ' + pc(wx.debug.low * 100) + '  ' + pc(wx.debug.mid * 100) + '  ' + pc(wx.debug.high * 100));
     lines.push('now      code ' + c.weather_code + ', ' + c.precipitation + ' mm/15 min, visibility ' + f(c.visibility / 1000, 1) + ' km, wind '
-      + c.wind_speed_10m + ' km/h from ' + c.wind_direction_10m + '°');
+      + c.wind_speed_10m + ' km/h from ' + c.wind_direction_10m + '°, gusts ' + c.wind_gusts_10m + ' km/h');
   }
   lines.push('drawn    cloud ' + f(wx.cloud) + '  cirrus ' + f(wx.cirrus) + '  rain ' + f(wx.rain) + (wx.snow > 0.5 ? ' (snow)' : '') + '  fog ' + f(wx.fog));
-  lines.push('         gloom ' + f(wx.gloom) + '  sun ' + f(wx.sunVis) + '  wind ' + f(wx.wind) + ' drift ' + f(wx.windX));
+  lines.push('         gloom ' + f(wx.gloom) + '  sun ' + f(wx.sunVis) + '  wind ' + f(wx.wind) + ' drift ' + f(wx.windX) + '  storm ' + f(wx.storm));
   lines.push('light    daylight ' + f(v.daylight) + '  after cloud ' + f(v.light) + '  sun ' + f(v.sun.elevation, 1) + '°');
   return lines.join('\n');
 }

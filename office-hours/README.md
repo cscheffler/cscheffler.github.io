@@ -96,7 +96,10 @@ page on your phone.
   and on a really dull day the desk lamp goes on. Rain and drizzle always fall
   from a full deck of cloud; showers can fall from a broken sky. Snow,
   thunderstorms, fog and mist (from the visibility) are shown too, and the
-  clouds drift with the wind's speed and direction. Every viewer fetches the
+  clouds drift with the wind's speed and direction. Rain slants and snow blows
+  sideways with the wind, falling straight down only when it is calm. In a strong wind (from
+  40 km/h, or gusts over 75) the trees lean and sway in the gusts, and in a
+  gale leaves and blossom are torn off and blow past. Every viewer fetches the
   same data, so they agree. If the fetch fails, or `LIVE_WEATHER` is off, a
   smooth random weather keyed on UTC time and a fixed seed takes over, which
   is also the same for everyone. Add `?debug` to the display page to see the
@@ -126,6 +129,7 @@ Open the display page with `?demo` to see a synthetic plant, and add any of:
 | `cloud`, `rain` | force the weather, 0 to 1 | `?demo&cloud=0.9&rain=0.8` |
 | `snow`, `fog` | force snow instead of rain, or fog | `?demo&snow=1&rain=0.6&cloud=0.9` |
 | `cirrus`, `wind` | force high cloud, or the wind speed, 0 to 1 | `?demo&cloud=0.3&cirrus=0.9&wind=1` |
+| `storm` | force a gale, 0 to 1: trees bend, leaves fly | `?demo&month=10&wind=1&storm=1` |
 | `debug` | show the weather data and what is drawn from it | `?debug` |
 | `weather=noise` | use the synthetic weather instead of Open-Meteo | `?demo&weather=noise` |
 | `month` | force the season, 1 to 12 | `?demo&month=1` for snow |

@@ -211,7 +211,7 @@ const GROUPS = [
   },
   {
     title: 'Weather',
-    note: 'The live page shows the real Stirling weather from Open-Meteo. Here "cloud" (low cloud), "rain", "cirrus" (high cloud), "fog" and "wind" are forced, 0 to 1. Snow follows the live data, or the season when forced. Live rain always comes from a full deck of cloud; only showers fall from a broken sky.',
+    note: 'The live page shows the real Stirling weather from Open-Meteo. Here "cloud" (low cloud), "rain", "cirrus" (high cloud), "fog", "wind" (cloud drift) and "storm" (gale: bending trees, flying leaves) are forced, 0 to 1. Snow follows the live data, or the season when forced. Live rain always comes from a full deck of cloud; only showers fall from a broken sky.',
     base: { ...MATURE, month: 7, hour: 13 },
     items: [
       { label: 'Clear', p: { cloud: 0, rain: 0 } },
@@ -227,7 +227,12 @@ const GROUPS = [
       { label: 'High cirrus on a clear day', p: { cloud: 0, cirrus: 0.9, rain: 0 } },
       { label: 'Cirrus above broken cloud', p: { cloud: 0.4, cirrus: 0.7, rain: 0 } },
       { label: 'Calm: clouds barely moving', note: 'Watch for a minute: the drift follows the wind speed.', p: { cloud: 0.5, rain: 0, wind: 0 } },
-      { label: 'Gale: clouds racing', note: 'Watch for a minute: a cloud crosses the window in about a minute.', p: { cloud: 0.6, rain: 0, wind: 1 } },
+      { label: 'Gale: clouds racing', note: 'Watch for a minute: a cloud crosses the window in about a minute. Trees stay still: "wind" is only the drift.', p: { cloud: 0.6, rain: 0, wind: 1 } },
+      { label: 'Summer gale: trees bending', note: '"storm" forces a gale. The trees lean downwind and gusts sweep across them; a few green leaves are torn off.', p: { cloud: 0.6, rain: 0, wind: 1, storm: 0.8 } },
+      { label: 'Autumn gale: leaves flying', p: { month: 10, cloud: 0.7, rain: 0, wind: 1, storm: 1 } },
+      { label: 'Spring gale: blossom flying', p: { month: 4, cloud: 0.5, rain: 0, wind: 1, storm: 1 } },
+      { label: 'Winter storm: bare trees thrashing', p: { month: 1, cloud: 1, rain: 0.6, wind: 1, storm: 1 } },
+      { label: 'Strong breeze, just bending', note: 'The bend starts at a strong breeze; leaves only fly in a proper gale.', p: { month: 10, cloud: 0.6, rain: 0, wind: 1, storm: 0.3 } },
       { label: 'Rainy night', p: { cloud: 0.95, rain: 0.8, hour: 23.5 } },
       { label: 'Overcast night in town', note: 'Cloud lit dull orange from below by the streetlights, no stars or moon.', p: { cloud: 1, rain: 0, hour: 23.5 } },
       { label: 'Broken cloud at night', p: { cloud: 0.5, rain: 0, hour: 23.5 } },

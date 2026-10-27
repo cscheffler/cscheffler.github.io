@@ -23,7 +23,7 @@ const LAMP = { glowX: 1085, glowY: 300 };
 
 const P = GROWTH;
 // Live weather values eased between fetches.
-const EASED = ['cloud', 'cirrus', 'rain', 'snow', 'fog', 'wind', 'windX', 'gloomData', 'sunData'];
+const EASED = ['cloud', 'cirrus', 'rain', 'snow', 'fog', 'wind', 'windX', 'storm', 'gloomData', 'sunData'];
 const rad = a => a * Math.PI / 180;
 
 // ---------------------------------------------------------------- static room
@@ -542,14 +542,72 @@ function cloudColors(sun, wx, d) {
   return { lit, shade, mid: lerpHex(lit, shade, 0.5) };
 }
 
-function makeDrops(seed, count) {
+// Rain and snow: two layers, near (big, fast) and far (small, slow), each a square tile
+// of drops repeated across the view. Moving a layer by its offset modulo the tile size
+// is seamless, so it can fall and blow sideways forever. Fall speeds in pixels a second.
+const PRECIP_LAYERS = [
+  { T: 230, count: 24, rainFall: 260, snowFall: 26, l: [12, 22], r: [1.6, 2.8], width: 1.3, op: 1 },
+  { T: 170, count: 16, rainFall: 190, snowFall: 17, l: [7, 13], r: [0.9, 1.6], width: 0.9, op: 0.6 }
+];
+// Snow is light and blows far more sideways than rain in the same wind.
+const SNOW_DRIFT = 2.5;
+
+function makePrecip(seed) {
   const rnd = mulberry32(seed + 99);
-  return Array.from({ length: count }, () => ({
-    x: VIEW.x - 20 + rnd() * (VIEW.w + 40),
-    y: VIEW.y - 60 + rnd() * (VIEW.h + 60),
-    l: 10 + rnd() * 10,
-    r: 1.2 + rnd() * 1.3
+  return PRECIP_LAYERS.map(layer => ({
+    ...layer,
+    drops: Array.from({ length: layer.count }, () => ({
+      x: rnd() * layer.T, y: rnd() * layer.T, rank: rnd(),
+      l: layer.l[0] + rnd() * (layer.l[1] - layer.l[0]),
+      r: layer.r[0] + rnd() * (layer.r[1] - layer.r[0])
+    }))
   }));
+}
+
+// How far rain moves sideways for each pixel it falls: nearly straight down when calm,
+// about 30° in a 30 km/h wind, and over 50° in a gale. Same direction as the clouds.
+function precipSlant(wx) {
+  return wx.windX * wx.wind + 0.5 * wx.storm * (wx.windX < 0 ? -1 : 1);
+}
+
+// `blown` is the slant integrated over time, so a change of wind never makes drops jump.
+function precipTransform(layer, k, snow, t, blown) {
+  const fall = snow ? layer.snowFall : layer.rainFall;
+  const sway = snow ? 10 * Math.sin(t * 0.5 + k) : 0;
+  const mod = v => ((v % layer.T) + layer.T) % layer.T;
+  return `translate(${n(mod(fall * blown * (snow ? SNOW_DRIFT : 1) + sway))} ${n(mod(fall * t))})`;
+}
+
+function precipSVG(precip, wx, d, t, blown) {
+  const { x, y, w, h } = VIEW;
+  const snow = wx.snow > 0.5;
+  const slant = precipSlant(wx);
+  let s = snow
+    ? `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#c8d2dc" opacity="${n(wx.rain * 0.25)}"/>`
+    : `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#3b4a5c" opacity="${n(wx.rain * 0.22)}"/>`;
+  const rainCol = lerpHex('#9fb3c8', '#e3eef8', d);
+  precip.forEach((layer, k) => {
+    // Light rain has fewer drops as well as fainter ones.
+    let tile = '';
+    for (const p of layer.drops) {
+      if (p.rank > 0.35 + 0.65 * wx.rain) continue;
+      if (snow) tile += `<circle cx="${n(p.x)}" cy="${n(p.y)}" r="${n(p.r)}"/>`;
+      else {
+        const dy = p.l / Math.hypot(1, slant);
+        tile += `<line x1="${n(p.x)}" y1="${n(p.y)}" x2="${n(p.x + slant * dy)}" y2="${n(p.y + dy)}"/>`;
+      }
+    }
+    const paint = snow ? `fill="#fff"` : `stroke="${rainCol}" stroke-width="${layer.width}" stroke-linecap="round"`;
+    s += `<defs><g id="precipTile${k}" ${paint}>${tile}</g></defs>`;
+    s += `<g id="precip${k}" opacity="${n((snow ? 0.85 : 0.55) * wx.rain * layer.op)}" transform="${precipTransform(layer, k, snow, t, blown)}">`;
+    for (let i = -1; i <= Math.ceil(w / layer.T) + 1; i++) {
+      for (let j = -1; j <= Math.ceil(h / layer.T) + 1; j++) {
+        s += `<use href="#precipTile${k}" x="${x + i * layer.T}" y="${y + j * layer.T}"/>`;
+      }
+    }
+    s += `</g>`;
+  });
+  return s;
 }
 
 // A row drawn at `drift` pixels: three copies of its period, shifted so they always span the view.
@@ -566,6 +624,65 @@ function repeatRow(shapes) {
 // day, a cloud across the window in about a minute in a gale. Gusts vary it by a fifth.
 function windSpeed(wx, t, seed) {
   return (0.4 + 6 * wx.wind) * wx.windX * (0.9 + 0.2 * smoothNoise(t / 3600, 0.1, seed + 5));
+}
+
+// How far a tree bends in a storm, in degrees: a steady lean downwind, gusts that
+// sweep across the view (reaching the upwind trees first), and a quick shiver on top.
+function treeBend(i, t, wx) {
+  if (wx.storm < 0.01) return 0;
+  const tx = TREES[i][0];
+  const lag = (wx.windX < 0 ? 1 - tx : tx) * 1.2;
+  const gust = smoothNoise(t - lag, 5, 31);
+  const shiver = Math.sin(2 * Math.PI * t / (1.3 + 0.17 * i) + i * 1.7);
+  return wx.storm * (10 + 14 * gust + (2 + 3 * gust) * shiver);
+}
+
+// The whole tree leans from the foot of its trunk, and the crown bends further from the
+// top of the trunk, where the branches join it, so they stay attached.
+function treeTransforms(i, t, wx) {
+  const b = treeBend(i, t, wx);
+  if (!b) return { tree: '', crown: '' };
+  const [tx, ty, ts] = TREES[i];
+  const px = VIEW.x + VIEW.w * tx, py = VIEW.y + VIEW.h * ty;
+  const foot = py + 22 * ts;
+  const dir = wx.windX < 0 ? -1 : 1;
+  return {
+    tree: `translate(${n(px)} ${n(foot)}) skewX(${n(-dir * b)}) translate(${n(-px)} ${n(-foot)})`,
+    crown: `translate(${n(px)} ${n(py)}) skewX(${n(-dir * b * 0.7)}) `
+      + `scale(${(1 + b / 150).toFixed(3)} ${(1 - b / 250).toFixed(3)}) translate(${n(-px)} ${n(-py)})`
+  };
+}
+
+// Leaves torn off in a storm. Each crosses the window downwind in a couple of seconds,
+// tumbling, then waits off-screen for its next pass.
+function makeLeaves(seed) {
+  const rnd = mulberry32(seed + 33);
+  return Array.from({ length: 18 }, () => ({
+    rank: rnd(), off: rnd() * 100, period: 3 + rnd() * 6, cross: 1.4 + rnd() * 1.4,
+    y: VIEW.y + VIEW.h * (0.3 + rnd() * 0.6), amp: 6 + rnd() * 18, wob: 1 + rnd() * 2, ph: rnd() * 6.3,
+    rise: rnd() * 60 - 35, spin: (rnd() < 0.5 ? -1 : 1) * (1.5 + rnd() * 3), size: 1 + rnd() * 0.8,
+    pick: rnd(), k: Math.floor(rnd() * 5)
+  }));
+}
+
+// How many leaves fly: none below a strong storm, most in autumn, none from bare trees.
+function leafAmount(wx, season) {
+  return smoothstep(0.35, 1, wx.storm) * (1 - season.winter) * (0.45 + 0.55 * season.autumn);
+}
+
+function leafColor(leaf, season) {
+  if (leaf.pick < season.autumn) return AUTUMN_CANOPY[leaf.k];
+  if (leaf.pick < season.autumn + season.spring) return leaf.k % 2 ? '#8fcf6a' : '#f6b8cc';
+  return leaf.k % 2 ? '#3f7a3a' : '#5c9a45';
+}
+
+function leafTransform(leaf, t, windX) {
+  const p = (((t + leaf.off) % leaf.period) + leaf.period) % leaf.period / leaf.cross;
+  const along = VIEW.x - 20 + p * (VIEW.w + 40);   // past the far edge once p > 1, and clipped
+  const x = windX < 0 ? 2 * VIEW.x + VIEW.w - along : along;
+  const y = leaf.y + leaf.amp * Math.sin(2 * Math.PI * leaf.wob * p + leaf.ph) - leaf.rise * p;
+  const flip = Math.cos(t * leaf.spin * 2.1 + leaf.ph);
+  return `translate(${n(x)} ${n(y)}) rotate(${n((leaf.spin * t * 120) % 360)}) scale(${n(leaf.size)} ${(leaf.size * flip).toFixed(2)})`;
 }
 
 function housesSVG(tint, lit, season) {
@@ -594,7 +711,7 @@ function housesSVG(tint, lit, season) {
 
 // The view through the window. `light` is the daylight after the clouds have taken
 // their share; `drift` is how far the wind has carried the clouds, in pixels.
-function viewSVG(sun, wx, light, season, clouds, cirrus, drops, drift) {
+function viewSVG(sun, wx, light, season, clouds, cirrus, leaves, precip, drift, blown, t) {
   const { x, y, w, h } = VIEW;
   const d = sun.daylight;
   const [top, bot] = skyColors(d, sun.twilight, wx, seasonHex(SEASON.skyTop, season), seasonHex(SEASON.skyBot, season));
@@ -671,8 +788,9 @@ function viewSVG(sun, wx, light, season, clouds, cirrus, drops, drift) {
   TREES.forEach(([tx, ty, ts], i) => {
     const px = x + w * tx, py = y + h * ty;
     const canopy = tint(mixHex([['#8fcf6a', season.spring], ['#3f7a3a', season.summer], [AUTUMN_CANOPY[i], season.autumn]]), '#12202a');
-    s += `<rect x="${n(px - 2.5 * ts)}" y="${n(py)}" width="${n(5 * ts)}" height="${n(22 * ts)}" fill="${trunk}"/>
-    <path d="M ${n(px)} ${n(py + 2 * ts)} L ${n(px - 11 * ts)} ${n(py - 10 * ts)} M ${n(px)} ${n(py)} L ${n(px + 10 * ts)} ${n(py - 12 * ts)} M ${n(px)} ${n(py - 2 * ts)} L ${n(px + 1 * ts)} ${n(py - 18 * ts)} M ${n(px)} ${n(py + 4 * ts)} L ${n(px - 6 * ts)} ${n(py - 2 * ts)} L ${n(px - 12 * ts)} ${n(py - 1 * ts)}" stroke="${trunk}" stroke-width="${n(2 * ts)}" fill="none" stroke-linecap="round"/>`;
+    const tf = treeTransforms(i, t, wx);
+    s += `<g id="tree${i}" transform="${tf.tree}"><rect x="${n(px - 2.5 * ts)}" y="${n(py)}" width="${n(5 * ts)}" height="${n(22 * ts)}" fill="${trunk}"/>
+    <g id="crown${i}" transform="${tf.crown}"><path d="M ${n(px)} ${n(py + 2 * ts)} L ${n(px - 11 * ts)} ${n(py - 10 * ts)} M ${n(px)} ${n(py)} L ${n(px + 10 * ts)} ${n(py - 12 * ts)} M ${n(px)} ${n(py - 2 * ts)} L ${n(px + 1 * ts)} ${n(py - 18 * ts)} M ${n(px)} ${n(py + 4 * ts)} L ${n(px - 6 * ts)} ${n(py - 2 * ts)} L ${n(px - 12 * ts)} ${n(py - 1 * ts)}" stroke="${trunk}" stroke-width="${n(2 * ts)}" fill="none" stroke-linecap="round"/>`;
     if (leafy > 0.02) {
       s += `<g opacity="${n(leafy)}"><circle cx="${n(px)}" cy="${n(py - 4 * ts)}" r="${n(16 * ts)}" fill="${canopy}"/>
       <circle cx="${n(px - 9 * ts)}" cy="${n(py + 2 * ts)}" r="${n(11 * ts)}" fill="${canopy}"/>
@@ -684,29 +802,27 @@ function viewSVG(sun, wx, light, season, clouds, cirrus, drops, drift) {
       }
       s += `</g>`;
     }
+    s += `</g></g>`;
     if (season.winter > 0.3) {
       s += `<ellipse cx="${n(px)}" cy="${n(py + 22 * ts)}" rx="${n(16 * ts)}" ry="${n(3 * ts)}" fill="${tint('#f4f7fa', '#1c2432')}" opacity="${n((season.winter - 0.3) / 0.7)}"/>`;
     }
   });
+
+  const flying = leafAmount(wx, season);
+  if (flying > 0.01) {
+    s += `<g id="leaves">`;
+    leaves.forEach((leaf, j) => {
+      if (leaf.rank < flying) s += `<path data-i="${j}" d="M -4 0 Q 0 -2.6 4 0 Q 0 2.6 -4 0 Z" fill="${tint(leafColor(leaf, season), '#12202a')}" transform="${leafTransform(leaf, t, wx.windX)}"/>`;
+    });
+    s += `</g>`;
+  }
 
   if (wx.fog > 0.02) {
     const fogCol = lerpHex('#1c2230', '#d8dde3', light);
     s += `<rect x="${x}" y="${y + h * 0.3}" width="${w}" height="${h * 0.7}" fill="${fogCol}" opacity="${n(wx.fog * 0.75)}"/>
     <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fogCol}" opacity="${n(wx.fog * 0.35)}"/>`;
   }
-  if (wx.rain > 0.02) {
-    if (wx.snow > 0.5) {
-      s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#c8d2dc" opacity="${n(wx.rain * 0.25)}"/>`;
-      s += `<g id="snow" opacity="${n(0.85 * wx.rain)}" fill="#fff">`;
-      for (const f of drops) s += `<circle cx="${n(f.x)}" cy="${n(f.y)}" r="${n(f.r)}"/>`;
-      s += `</g>`;
-    } else {
-      s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#3b4a5c" opacity="${n(wx.rain * 0.22)}"/>`;
-      s += `<g id="rain" opacity="${n(0.55 * wx.rain)}" stroke="${lerpHex('#9fb3c8', '#e3eef8', d)}" stroke-width="1.2" stroke-linecap="round">`;
-      for (const r of drops) s += `<line x1="${n(r.x)}" y1="${n(r.y)}" x2="${n(r.x - r.l * 0.25)}" y2="${n(r.y + r.l)}"/>`;
-      s += `</g>`;
-    }
-  }
+  if (wx.rain > 0.02) s += precipSVG(precip, wx, d, t, blown);
   s += `<polygon points="${x + 40},${y} ${x + 110},${y} ${x + 30},${y + h} ${x - 40},${y + h}" fill="#fff" opacity="0.06"/>
   <polygon points="${x + 130},${y} ${x + 160},${y} ${x + 80},${y + h} ${x + 50},${y + h}" fill="#fff" opacity="0.05"/>`;
   return s;
@@ -720,12 +836,13 @@ export function createScene(svg, { weatherSeed = 0, timeZone, location = { latit
   const byId = id => svg.querySelector('#' + id);
   const clouds = makeClouds(weatherSeed);
   const cirrus = makeCirrus(weatherSeed);
-  const drops = makeDrops(weatherSeed, 70);
+  const leaves = makeLeaves(weatherSeed);
+  const precip = makePrecip(weatherSeed);
   let overrides = {};
   let liveTarget = null;   // latest live conditions, or null to use the synthetic weather
   let eased = null;        // live conditions eased over a few renders so changes never pop
   let wxNow = null;        // the weather last drawn, which sets the wind for the drift
-  let drift = null, lastT = null;
+  let drift = null, blown = null, lastT = null;   // clouds' and rain's wind-carried distance
 
   function clockFor(now) {
     const clk = officeClock(now, timeZone);
@@ -745,9 +862,13 @@ export function createScene(svg, { weatherSeed = 0, timeZone, location = { latit
   // over time. It starts from time × speed, so viewers agree while the wind holds steady.
   function advanceDrift(t) {
     if (!wxNow) return;
-    const v = windSpeed(wxNow, t, weatherSeed);
-    if (drift == null) drift = t * v;
-    else drift += v * clamp(t - lastT, 0, 1);
+    const v = windSpeed(wxNow, t, weatherSeed), slant = precipSlant(wxNow);
+    if (drift == null) { drift = t * v; blown = t * slant; }
+    else {
+      const dt = clamp(t - lastT, 0, 1);
+      drift += v * dt;
+      blown += slant * dt;
+    }
     lastT = t;
   }
 
@@ -759,10 +880,19 @@ export function createScene(svg, { weatherSeed = 0, timeZone, location = { latit
     });
     const ci = byId('cirrus');
     if (ci) ci.setAttribute('transform', rowTransform(drift, 1.2));
-    const rn = byId('rain');
-    if (rn) rn.setAttribute('transform', `translate(0 ${n((t * 240) % 60)})`);
-    const sn = byId('snow');
-    if (sn) sn.setAttribute('transform', `translate(${n(10 * Math.sin(t * 0.5))} ${n((t * 22) % 60)})`);
+    if (wxNow && wxNow.storm >= 0.01) {
+      TREES.forEach((tree, i) => {
+        const tf = treeTransforms(i, t, wxNow);
+        byId('tree' + i).setAttribute('transform', tf.tree);
+        byId('crown' + i).setAttribute('transform', tf.crown);
+      });
+      const lv = byId('leaves');
+      if (lv) for (const el of lv.children) el.setAttribute('transform', leafTransform(leaves[el.dataset.i], t, wxNow.windX));
+    }
+    if (wxNow) precip.forEach((layer, k) => {
+      const el = byId('precip' + k);
+      if (el) el.setAttribute('transform', precipTransform(layer, k, wxNow.snow > 0.5, t, blown));
+    });
   }
 
   function renderView(now) {
@@ -788,6 +918,7 @@ export function createScene(svg, { weatherSeed = 0, timeZone, location = { latit
     if (overrides.fog != null) wx.fog = clamp(overrides.fog, 0, 1);
     if (overrides.cirrus != null) wx.cirrus = clamp(overrides.cirrus, 0, 1);
     if (overrides.wind != null) wx.wind = clamp(overrides.wind, 0, 1);
+    if (overrides.storm != null) wx.storm = clamp(overrides.storm, 0, 1);
     wx = finishWeather(wx);
     wxNow = wx;
     advanceDrift(Date.now() / 1000);
@@ -800,7 +931,7 @@ export function createScene(svg, { weatherSeed = 0, timeZone, location = { latit
     const lamp = Math.max(1 - light, smoothstep(0.2, 0.4, d - light));
     const dimFill = mixHex([[NIGHT_TINT, 1 - d], ['#3b3d42', d - light]]);
     const dim = clamp((1 - light) * 0.5, 0, 1);
-    byId('view').innerHTML = viewSVG(sun, wx, light, season, clouds, cirrus, drops, drift);
+    byId('view').innerHTML = viewSVG(sun, wx, light, season, clouds, cirrus, leaves, precip, drift, blown, Date.now() / 1000);
     byId('dim').setAttribute('fill', dimFill);
     byId('dim').setAttribute('opacity', n(dim));
     byId('lamp-glow').setAttribute('opacity', n(lamp));

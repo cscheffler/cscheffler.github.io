@@ -19,6 +19,8 @@ export const HOUR_MS = 3600e3;
 //   rain      precipitation intensity; snow (0 or 1) says whether it falls as snow
 //   fog       mist and fog
 //   wind      wind speed; windX is the drift across the window, -1 left .. 1 right
+//   storm     how far beyond an ordinary windy day it is: 0 up to a strong breeze,
+//             1 in a gale. Bends the trees and tears off leaves.
 //   gloomData how much less light gets through than on a clear day, from the modelled
 //             sunshine; null when unknown (night, synthetic weather)
 //   sunData   how much of that light is direct sunshine, i.e. how visible the sun is; null when unknown
@@ -49,7 +51,7 @@ export function weatherAt(tMs, seed = 0) {
   const cirrus = clamp(1.6 * smoothNoise(h, 6, seed + 6) - 0.6, 0, 1);
   const wind = 0.15 + 0.85 * smoothNoise(h, 2.5, seed + 5);
   const windX = -0.35 - 0.65 * smoothNoise(h, 9, seed + 7);
-  return { cloud, cirrus, wet, rain, snow: 0, fog: 0, wind, windX, gloomData: null, sunData: null, source: 'synthetic' };
+  return { cloud, cirrus, wet, rain, snow: 0, fog: 0, wind, windX, storm: 0, gloomData: null, sunData: null, source: 'synthetic' };
 }
 
 // Rain only falls from a mostly cloudy sky, and only when the air is wet.
@@ -73,7 +75,7 @@ const HOURLY = ['cloud_cover', 'cloud_cover_low', 'cloud_cover_mid', 'cloud_cove
 export async function fetchWeather(latitude, longitude, nowMs = Date.now()) {
   const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + latitude + '&longitude=' + longitude
     + '&models=' + WEATHER_MODELS.join(',')
-    + '&current=precipitation,snowfall,weather_code,visibility,wind_speed_10m,wind_direction_10m'
+    + '&current=precipitation,snowfall,weather_code,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m'
     + '&hourly=' + HOURLY.join(',')
     + '&past_hours=3&forecast_hours=4&timeformat=unixtime';
   const res = await fetch(url);
@@ -176,10 +178,14 @@ export function weatherFromOpenMeteo(data, nowMs = Date.now()) {
   const gloomData = kt == null ? null : clamp((0.7 - kt) / 0.5, 0, 1);
   const sunData = direct == null ? null : smoothstep(0.1, 0.5, direct);
 
-  const wind = clamp((Number(c.wind_speed_10m) || 0) / 45, 0, 1);
+  const speed = Number(c.wind_speed_10m) || 0, gusts = Number(c.wind_gusts_10m) || 0;
+  const wind = clamp(speed / 45, 0, 1);
   const windX = windAcross(Number(c.wind_direction_10m));
+  // A blustery Stirling day (35 km/h, gusts to 70) is not a storm. Trees start to bend
+  // from a strong breeze (40 km/h, or gusts over 75) and thrash in a gale (65, or gusts of 110).
+  const storm = Math.max(smoothstep(40, 65, speed), smoothstep(75, 110, gusts));
   return {
-    cloud, cirrus: high, rain, snow, fog, wind, windX, gloomData, sunData, code, time: c.time, source: 'open-meteo',
+    cloud, cirrus: high, rain, snow, fog, wind, windX, storm, gloomData, sunData, code, time: c.time, source: 'open-meteo',
     debug: { fetched: nowMs, models, total, low, mid, high, current: c }
   };
 }

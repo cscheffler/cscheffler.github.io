@@ -10,6 +10,9 @@
   #plant { transform-box: view-box; transform-origin: 560px 257px; animation: sway 7s ease-in-out infinite; }
   @keyframes sway { 0%, 100% { transform: rotate(-1.1deg); } 50% { transform: rotate(1.1deg); } }
   @media (prefers-reduced-motion: reduce) { #plant { animation: none; } }
+  #debug { position: fixed; top: 6px; left: 6px; margin: 0; padding: 6px 8px; max-width: calc(100% - 12px); overflow: hidden;
+           font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; color: #fff; background: rgba(0, 0, 0, 0.7);
+           border-radius: 4px; pointer-events: none; white-space: pre; }
 </style>
 </head>
 <body>
@@ -28,6 +31,8 @@ import { firebaseConfig, OFFICE_TIMEZONE, OFFICE_LOCATION, LIVE_WEATHER, WEATHER
 //   &empty                                no plant at all (pot with bare soil)
 //   &hour=21 &cloud=0.9 &rain=0.8         force time of day and weather
 //   &snow=1 &fog=1                        force snow instead of rain, or fog
+//   &cirrus=0.8 &wind=1                   force high cloud and wind speed
+//   &debug                                show the weather data and what is drawn from it
 //   &weather=noise                        synthetic weather instead of the live Open-Meteo data
 //   &month=1 or &doy=60                   force the season (1 = January; doy = day of year)
 const params = new URLSearchParams(location.search);
@@ -40,19 +45,22 @@ scene.setOverrides({
   rain: params.has('rain') ? num('rain') : null,
   snow: params.has('snow') ? num('snow') : null,
   fog: params.has('fog') ? num('fog') : null,
+  cirrus: params.has('cirrus') ? num('cirrus') : null,
+  wind: params.has('wind') ? num('wind') : null,
   doy: params.has('doy') ? num('doy') : params.has('month') ? Math.round((num('month') - 1) * 30.4 + 15) : null
 });
 
 // Live weather, unless the weather is being forced or the synthetic one is asked for.
 function startLiveWeather() {
-  const weatherForced = ['cloud', 'rain', 'snow', 'fog'].some(k => params.has(k));
+  const weatherForced = ['cloud', 'rain', 'snow', 'fog', 'cirrus', 'wind'].some(k => params.has(k));
   if (!LIVE_WEATHER || weatherForced || params.get('weather') === 'noise') return;
   const poll = async () => {
     try {
       scene.setWeather(await fetchWeather(OFFICE_LOCATION.latitude, OFFICE_LOCATION.longitude));
+      weatherError = '';
       lastView = 0; // show the new conditions on the next tick, not up to five seconds later
       tick();
-    } catch (e) { /* keep whatever we had, or the synthetic weather */ }
+    } catch (e) { weatherError = e.message; /* keep whatever we had, or the synthetic weather */ }
   };
   poll();
   setInterval(poll, 10 * 60 * 1000);
@@ -63,6 +71,9 @@ let offset = 0;                       // server clock minus local clock
 const now = () => Date.now() + offset;
 let log = null, mode = 'loading', problem = '';
 let dirty = true, lastPlant = 0, lastView = 0;
+let weatherError = '';
+const debugBox = params.has('debug') ? document.body.appendChild(document.createElement('pre')) : null;
+if (debugBox) debugBox.id = 'debug';
 
 async function connect() {
   if (params.has('demo') || !configured) {
@@ -105,12 +116,39 @@ function noteLines(state) {
   return lines;
 }
 
+// ?debug: the raw Open-Meteo numbers and what the scene draws from them, to tell
+// whether a sky that looks wrong is the data or the drawing.
+function debugText(v) {
+  const f = (x, d = 2) => x == null || !Number.isFinite(x) ? '–' : x.toFixed(d);
+  const pc = x => x == null ? '  –' : String(Math.round(x)).padStart(3);
+  const hm = ms => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const wx = v.wx, lines = [];
+  lines.push('source   ' + wx.source + (weatherError ? '  (fetch failed: ' + weatherError + ')' : ''));
+  if (wx.debug) {
+    const c = wx.debug.current;
+    lines.push('fetched  ' + hm(wx.debug.fetched) + ', ±2 h mean of each model');
+    lines.push('model           total  low  mid high    kt  direct');
+    for (const m of wx.debug.models) {
+      lines.push(m.model.padEnd(15) + ' ' + pc(m.total) + '  ' + pc(m.low) + '  ' + pc(m.mid) + '  ' + pc(m.high) + '  ' + f(m.kt).padStart(5) + '  ' + f(m.direct).padStart(5));
+    }
+    lines.push('mean            ' + pc(wx.debug.total * 100) + '  ' + pc(wx.debug.low * 100) + '  ' + pc(wx.debug.mid * 100) + '  ' + pc(wx.debug.high * 100));
+    lines.push('now      code ' + c.weather_code + ', ' + c.precipitation + ' mm/15 min, visibility ' + f(c.visibility / 1000, 1) + ' km, wind '
+      + c.wind_speed_10m + ' km/h from ' + c.wind_direction_10m + '°');
+  }
+  lines.push('drawn    cloud ' + f(wx.cloud) + '  cirrus ' + f(wx.cirrus) + '  rain ' + f(wx.rain) + (wx.snow > 0.5 ? ' (snow)' : '') + '  fog ' + f(wx.fog));
+  lines.push('         gloom ' + f(wx.gloom) + '  sun ' + f(wx.sunVis) + '  wind ' + f(wx.wind) + ' drift ' + f(wx.windX));
+  lines.push('light    daylight ' + f(v.daylight) + '  after cloud ' + f(v.light) + '  sun ' + f(v.sun.elevation, 1) + '°');
+  return lines.join('\n');
+}
+
 function tick() {
   const t = now();
   scene.renderClock(t);
   if (t - lastView > 5000) {
     lastView = t;
-    document.body.style.background = scene.renderView(t).background;
+    const v = scene.renderView(t);
+    document.body.style.background = v.background;
+    if (debugBox) debugBox.textContent = debugText(v);
   }
   if (dirty || t - lastPlant > 30000) {
     dirty = false; lastPlant = t;

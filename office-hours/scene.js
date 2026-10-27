@@ -1,10 +1,11 @@
 // scene.js — draws the office, the view through the window, the plant and the
 // bowl as SVG. Everything dynamic is a pure function of (state, time), so all
-// viewers see the same picture.
+// viewers see the same picture. The one exception is the cloud drift, which
+// integrates the wind; viewers agree on it while the wind holds steady.
 
 import { GROWTH } from './plant-model.js';
-import { clamp, lerpHex, shadeHex, mixHex, mulberry32, n } from './util.js';
-import { weatherAt, rainFrom, officeClock, utcOffsetHours, sunState, skyColors, seasonWeights, smoothNoise } from './weather.js';
+import { clamp, lerpHex, shadeHex, mixHex, desatHex, mulberry32, smoothstep, n } from './util.js';
+import { weatherAt, rainFrom, finishWeather, officeClock, utcOffsetHours, sunState, skyColors, seasonWeights, smoothNoise } from './weather.js';
 
 export const W = 1200, H = 560;
 export const WALL = '#e8dfcf';
@@ -21,6 +22,8 @@ const CLOCK = { cx: 1128, cy: 150, r: 36 };
 const LAMP = { glowX: 1085, glowY: 300 };
 
 const P = GROWTH;
+// Live weather values eased between fetches.
+const EASED = ['cloud', 'cirrus', 'rain', 'snow', 'fog', 'wind', 'windX', 'gloomData', 'sunData'];
 const rad = a => a * Math.PI / 180;
 
 // ---------------------------------------------------------------- static room
@@ -430,15 +433,113 @@ function seasonHex(pal, w) {
   return mixHex([[pal.winter, w.winter], [pal.spring, w.spring], [pal.summer, w.summer], [pal.autumn, w.autumn]]);
 }
 
+// The cloud field: rows of cloud from just above the hills (far: small and slow) to the
+// top of the window (near: big and fast). Along each row a smooth periodic noise decides
+// where the cloud is, with the threshold set so that the covered fraction of the row
+// equals the cloud cover. As the cover grows the clouds widen and merge into a deck.
+const CLOUD_PERIOD = 720;
+const CLOUD_ROWS = [
+  // base: fraction of the way down the view; bh: body height; speed: relative drift; freq: clouds per period
+  { base: 0.60, bh: 10, speed: 0.35, freq: 9 },
+  { base: 0.53, bh: 13, speed: 0.45, freq: 7 },
+  { base: 0.45, bh: 17, speed: 0.55, freq: 6 },
+  { base: 0.35, bh: 22, speed: 0.7, freq: 4 },
+  { base: 0.23, bh: 28, speed: 0.85, freq: 3 },
+  { base: 0.09, bh: 34, speed: 1, freq: 2 }
+];
+
 function makeClouds(seed) {
   const rnd = mulberry32(seed + 77);
-  return Array.from({ length: 7 }, () => ({
-    baseX: rnd() * (VIEW.w + 260),
-    y: VIEW.y + 16 + rnd() * VIEW.h * 0.42,
-    scale: 0.55 + rnd() * 0.75,
-    speed: 0.7 + rnd() * 0.6,
-    blobs: Array.from({ length: 5 }, () => ({ dx: rnd() * 64 - 32, dy: rnd() * 12 - 10, r: 12 + rnd() * 13 }))
+  const M = 360;
+  return CLOUD_ROWS.map(row => {
+    const waves = [1, 1.7, 2.9, 4.3].map((m, i) => ({ k: Math.max(1, Math.round(row.freq * m)), a: 1 / (1 + i), ph: rnd() * 2 * Math.PI }));
+    const f = x => waves.reduce((s, w) => s + w.a * Math.sin(2 * Math.PI * w.k * x / CLOUD_PERIOD + w.ph), 0);
+    const samples = Array.from({ length: M }, (_, i) => f(i * CLOUD_PERIOD / M));
+    // Start the row at its clearest spot, the last to cloud over, so no cloud straddles the wrap.
+    let start = 0;
+    samples.forEach((v, i) => { if (v > samples[start]) start = i; });
+    const nb = Math.round(CLOUD_PERIOD / (row.bh * 0.8));
+    return {
+      ...row, nb,
+      vals: [...samples.slice(start), ...samples.slice(0, start)],
+      sorted: [...samples].sort((a, b) => a - b),
+      shift: start * CLOUD_PERIOD / M,
+      bumps: Array.from({ length: nb }, () => 0.45 + 0.5 * rnd())
+    };
+  });
+}
+
+// One period of a cloud row at the given cover, in row coordinates (0..CLOUD_PERIOD).
+function cloudRowShapes(row, cover) {
+  const P = CLOUD_PERIOD, M = row.vals.length, dx = P / M;
+  const base = VIEW.y + VIEW.h * row.base;
+  const bump = (j, a, b, h) => {
+    const u = ((j * P / row.nb - row.shift) % P + P) % P;
+    const edge = Math.min(u - a, b - u);
+    if (edge <= 0) return '';
+    const r = Math.min(h * row.bumps[j] * clamp(edge / (h * 1.2), 0.3, 1), edge + h * 0.25);
+    return r < 2 ? '' : `<circle cx="${n(u)}" cy="${n(base - h * 0.55)}" r="${n(r)}"/>`;
+  };
+  if (cover >= 0.998) {
+    let s = `<rect x="${-row.bh}" y="${n(base - row.bh)}" width="${P + 2 * row.bh}" height="${row.bh}"/>`;
+    for (let j = 0; j < row.nb; j++) s += bump(j, -P, 2 * P, row.bh);
+    return s;
+  }
+  // The threshold is the cover-quantile of the row's noise, interpolated so the clouds grow smoothly.
+  const q = cover * (M - 1), i0 = Math.floor(q);
+  const thr = row.sorted[i0] + (row.sorted[Math.min(i0 + 1, M - 1)] - row.sorted[i0]) * (q - i0);
+  let s = '', a = null;
+  for (let i = 1; i <= M; i++) {
+    const p = row.vals[i - 1], v = row.vals[i % M];
+    const cross = (i - 1 + (p - thr) / (p - v)) * dx;
+    if (a == null && p > thr && v <= thr) a = cross;
+    else if (a != null && p <= thr && v > thr) {
+      const b = cross, len = b - a;
+      a = null;
+      if (len < 3) continue;
+      const h = Math.min(row.bh, len * 0.6);   // the smallest wisps are flatter
+      s += `<rect x="${n(b - len)}" y="${n(base - h)}" width="${n(len)}" height="${n(h)}" rx="${n(Math.min(h, len) / 2)}"/>`;
+      for (let j = 0; j < row.nb; j++) s += bump(j, b - len, b, h);
+    }
+  }
+  return s;
+}
+
+// High cirrus: thin streaks, more of them the higher the cover.
+function makeCirrus(seed) {
+  const rnd = mulberry32(seed + 55);
+  return Array.from({ length: 10 }, () => ({
+    u: rnd() * CLOUD_PERIOD, y: VIEW.y + 8 + rnd() * VIEW.h * 0.35,
+    len: 90 + rnd() * 130, th: 1.2 + rnd() * 2, tilt: -4 - rnd() * 8, rank: rnd() * 0.9
   }));
+}
+
+function cirrusShapes(cirrus, amount) {
+  let s = '';
+  for (const c of cirrus) {
+    const op = clamp((amount - c.rank) * 4, 0, 1) * 0.45;
+    if (op < 0.01) continue;
+    s += `<g opacity="${n(op)}" transform="rotate(${n(c.tilt)} ${n(c.u)} ${n(c.y)})">
+      <ellipse cx="${n(c.u)}" cy="${n(c.y)}" rx="${n(c.len / 2)}" ry="${n(c.th)}"/>
+      <ellipse cx="${n(c.u + c.len * 0.2)}" cy="${n(c.y + c.th * 2.2)}" rx="${n(c.len * 0.35)}" ry="${n(c.th * 0.6)}"/></g>`;
+  }
+  return s;
+}
+
+// Cloud colours: tops lit, bases in shade. Heavy, dull cloud is darker and flatter; at
+// night the bases are lit a dull orange by the town.
+function cloudColors(sun, wx, d) {
+  const heavy = smoothstep(0.4, 1, wx.cloud);
+  const dark = clamp(0.75 * wx.gloom + 0.3 * wx.rain, 0, 1);
+  let lit = lerpHex(lerpHex('#ffffff', '#c3c9cf', heavy), '#80878f', dark);
+  let shade = lerpHex(lerpHex('#c5ccd5', '#9aa1a9', heavy), '#5f666f', dark);
+  lit = lerpHex('#2b2b33', lit, d);
+  shade = lerpHex('#43393a', shade, d);
+  const glow = sun.twilight * 0.55 * (1 - wx.rain) * (1 - 0.6 * heavy);
+  lit = lerpHex(lit, '#f0a070', glow);
+  shade = lerpHex(shade, '#c88a78', glow * 0.6);
+  shade = lerpHex(shade, lit, 0.55 * smoothstep(0.85, 1, wx.cloud));
+  return { lit, shade, mid: lerpHex(lit, shade, 0.5) };
 }
 
 function makeDrops(seed, count) {
@@ -451,25 +552,25 @@ function makeDrops(seed, count) {
   }));
 }
 
-// Cloud drift is a continuous function of time: a steady speed plus a slowly
-// varying "gust" term, so wind changes never make clouds jump.
-function cloudTransform(c, t, seed) {
-  const span = VIEW.w + 260;
-  const px = c.baseX + c.speed * (t * 1.5 + 5000 * smoothNoise(t / 3600, 2.5, seed + 5));
-  const x = VIEW.x - 130 + ((px % span) + span) % span;
-  return `translate(${n(x)} ${n(c.y)}) scale(${n(c.scale)})`;
+// A row drawn at `drift` pixels: three copies of its period, shifted so they always span the view.
+function rowTransform(drift, speed) {
+  const phase = ((-drift * speed) % CLOUD_PERIOD + CLOUD_PERIOD) % CLOUD_PERIOD;
+  return `translate(${n(VIEW.x - phase)} 0)`;
 }
 
-function cloudShape(c, fill) {
-  let s = `<rect x="-40" y="-4" width="80" height="16" rx="8" fill="${fill}"/>`;
-  for (const b of c.blobs) s += `<circle cx="${n(b.dx)}" cy="${n(b.dy)}" r="${n(b.r)}" fill="${fill}"/>`;
-  return s;
+function repeatRow(shapes) {
+  return shapes + `<g transform="translate(${CLOUD_PERIOD} 0)">${shapes}</g><g transform="translate(${-CLOUD_PERIOD} 0)">${shapes}</g>`;
 }
 
-function housesSVG(d, grey, season) {
+// Cloud speed in pixels per second for the nearest row: a breath of drift on a calm
+// day, a cloud across the window in about a minute in a gale. Gusts vary it by a fifth.
+function windSpeed(wx, t, seed) {
+  return (0.4 + 6 * wx.wind) * wx.windX * (0.9 + 0.2 * smoothNoise(t / 3600, 0.1, seed + 5));
+}
+
+function housesSVG(tint, lit, season) {
   const { x, y, w, h } = VIEW;
   const baseY = y + h * 0.745;
-  const tint = (dayHex, nightHex) => lerpHex(lerpHex(nightHex, dayHex, d), '#8a8f94', grey);
   let s = '';
   HOUSES.forEach((hs, i) => {
     const hx = x + w * hs.fx - hs.w / 2, hy = baseY - hs.h;
@@ -483,28 +584,37 @@ function housesSVG(d, grey, season) {
     <polygon points="${n(hx - 3)},${n(hy)} ${n(hx + hs.w + 3)},${n(hy)} ${n(hx + hs.w / 2)},${n(peak)}" fill="${roof}"/>
     <rect x="${n(hx + hs.w / 2 - 3.5)}" y="${n(baseY - 10)}" width="7" height="10" fill="${tint('#5a3f32', '#0b1018')}"/>`;
     hs.win.forEach(([wx, wy], k) => {
-      const lit = k === hs.dark ? 0.15 : 1;
+      const on = k === hs.dark ? 0.15 : 1;
       s += `<rect x="${n(hx + wx)}" y="${n(hy + wy)}" width="6" height="7" fill="${tint('#7f9bb8', '#1b2333')}"/>
-      <rect x="${n(hx + wx)}" y="${n(hy + wy)}" width="6" height="7" fill="#ffe08a" opacity="${n((1 - d) * 0.95 * lit)}"/>`;
+      <rect x="${n(hx + wx)}" y="${n(hy + wy)}" width="6" height="7" fill="#ffe08a" opacity="${n(lit * 0.95 * on)}"/>`;
     });
   });
   return s;
 }
 
-function viewSVG(sun, wx, season, clouds, drops, t, seed) {
+// The view through the window. `light` is the daylight after the clouds have taken
+// their share; `drift` is how far the wind has carried the clouds, in pixels.
+function viewSVG(sun, wx, light, season, clouds, cirrus, drops, drift) {
   const { x, y, w, h } = VIEW;
   const d = sun.daylight;
   const [top, bot] = skyColors(d, sun.twilight, wx, seasonHex(SEASON.skyTop, season), seasonHex(SEASON.skyBot, season));
   const horizon = y + h * 0.6;
+  const cc = cloudColors(sun, wx, d);
   let s = `<defs>
     <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bot}"/></linearGradient>
-    <radialGradient id="glowGrad" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ff9a4a" stop-opacity="0.85"/><stop offset="0.5" stop-color="#ff9a4a" stop-opacity="0.3"/><stop offset="1" stop-color="#ff9a4a" stop-opacity="0"/></radialGradient>
-  </defs>
+    <radialGradient id="glowGrad" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ff9a4a" stop-opacity="0.85"/><stop offset="0.5" stop-color="#ff9a4a" stop-opacity="0.3"/><stop offset="1" stop-color="#ff9a4a" stop-opacity="0"/></radialGradient>`;
+  clouds.forEach((row, i) => {
+    const base = y + h * row.base;
+    s += `<linearGradient id="cloudGrad${i}" gradientUnits="userSpaceOnUse" x1="0" y1="${n(base - row.bh * 1.6)}" x2="0" y2="${n(base)}">
+      <stop offset="0" stop-color="${cc.lit}"/><stop offset="0.55" stop-color="${cc.lit}"/><stop offset="1" stop-color="${cc.shade}"/></linearGradient>`;
+  });
+  s += `</defs>
   <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#skyGrad)"/>`;
 
+  // Stars, sun and moon sit behind the clouds, so clouds hide them where they pass.
   if (sun.stars > 0.01) {
     const rnd = mulberry32(99);
-    const op = sun.stars * (1 - wx.cloud * 0.85) * (1 - wx.fog);
+    const op = sun.stars * (1 - 0.5 * wx.cloud) * (1 - wx.fog) * (1 - 0.6 * wx.cirrus);
     for (let i = 0; i < 50; i++) {
       const sx = x + rnd() * w, sy = y + rnd() * h * 0.7, r = 0.6 + rnd() * 1;
       const bright = rnd();
@@ -515,27 +625,45 @@ function viewSVG(sun, wx, season, clouds, drops, t, seed) {
   const sunX = x + sun.x * w;
   if (sun.twilight > 0.02) {
     const gx = clamp(sunX, x + w * 0.1, x + w * 0.9);
-    s += `<ellipse cx="${n(gx)}" cy="${n(horizon)}" rx="${n(w * 0.5)}" ry="${n(h * 0.34)}" fill="url(#glowGrad)" opacity="${n(sun.twilight * 0.8 * (1 - wx.cloud * 0.5) * (1 - wx.fog))}"/>`;
+    s += `<ellipse cx="${n(gx)}" cy="${n(horizon)}" rx="${n(w * 0.5)}" ry="${n(h * 0.34)}" fill="url(#glowGrad)" opacity="${n(sun.twilight * 0.8 * (1 - 0.85 * smoothstep(0.3, 1, wx.cloud)) * (1 - wx.fog))}"/>`;
   }
   if (sun.elevation > -1.5 && sun.x > -0.1 && sun.x < 1.1) {
     const sy = horizon - sun.elevation / 60 * h * 0.85;
     const col = lerpHex('#ffb347', '#fff6c8', clamp(sun.elevation / 20, 0, 1));
-    s += `<circle cx="${n(sunX)}" cy="${n(sy)}" r="40" fill="${col}" opacity="${n(0.22 * (1 - wx.cloud * 0.7) * (1 - wx.fog))}"/>
-    <circle cx="${n(sunX)}" cy="${n(sy)}" r="15" fill="${col}" opacity="${n((1 - wx.cloud * 0.85) * (1 - wx.fog * 0.7))}"/>`;
+    const vis = wx.sunVis * (1 - wx.fog * 0.7);
+    s += `<circle cx="${n(sunX)}" cy="${n(sy)}" r="40" fill="${col}" opacity="${n(0.22 * vis)}"/>
+    <circle cx="${n(sunX)}" cy="${n(sy)}" r="15" fill="${col}" opacity="${n(vis)}"/>`;
   }
   if (d < 0.6) {
     const f = clamp(sun.moonFrac, 0, 1);
     const mx = x + 30 + f * (w - 60), my = y + h * 0.8 - Math.sin(Math.PI * f) * h * 0.6;
-    const op = clamp(1 - d * 1.6, 0, 1) * (1 - wx.cloud * 0.8) * (1 - wx.fog);
+    const op = clamp(1 - d * 1.6, 0, 1) * (1 - smoothstep(0.85, 1, wx.cloud)) * (1 - 0.5 * wx.cirrus) * (1 - wx.fog);
     s += `<g opacity="${n(op)}"><circle cx="${n(mx)}" cy="${n(my)}" r="12" fill="#f4f1e0"/><circle cx="${n(mx + 5)}" cy="${n(my - 3)}" r="10" fill="${top}"/></g>`;
   }
 
-  const grey = wx.cloud * 0.4 * d;
-  const tint = (dayHex, nightHex) => lerpHex(lerpHex(nightHex, dayHex, d), '#8d9aa0', grey);
+  // Clouds: cirrus high up, then a flat deck that fills any slivers at full cover,
+  // then the rows from the horizon up. All behind the hills.
+  if (wx.cirrus > 0.01) {
+    s += `<g id="cirrus" fill="${lerpHex('#3a4058', '#ffffff', d)}" transform="${rowTransform(drift, 1.2)}">${repeatRow(cirrusShapes(cirrus, wx.cirrus))}</g>`;
+  }
+  const deck = smoothstep(0.85, 1, wx.cloud);
+  if (deck > 0.01) s += `<rect x="${x}" y="${y}" width="${w}" height="${n(h * 0.62)}" fill="${cc.mid}" opacity="${n(deck)}"/>`;
+  if (wx.cloud > 0.002) {
+    // Rows leave gaps between them, so each row must cover more than the target for
+    // the sky as a whole to match it. The curve was fitted to screenshots.
+    const rowCover = 1 - Math.pow(1 - wx.cloud, 1.6);
+    clouds.forEach((row, i) => {
+      s += `<g id="cloudrow${i}" fill="url(#cloudGrad${i})" transform="${rowTransform(drift, row.speed)}">${repeatRow(cloudRowShapes(row, rowCover))}</g>`;
+    });
+  }
+
+  // The land is darker and greyer on a dull day.
+  const dull = 0.55 * wx.gloom * d;
+  const tint = (dayHex, nightHex) => desatHex(lerpHex(nightHex, dayHex, light), dull);
   const far = tint(seasonHex(SEASON.far, season), '#1e2a44');
   const near = tint(seasonHex(SEASON.near, season), '#16202e');
   s += `<path d="M ${x} ${y + h * 0.62} Q ${x + w * 0.18} ${y + h * 0.44} ${x + w * 0.38} ${y + h * 0.58} T ${x + w * 0.72} ${y + h * 0.5} T ${x + w + 10} ${y + h * 0.6} V ${y + h} H ${x} Z" fill="${far}"/>`;
-  s += housesSVG(d, grey, season);
+  s += housesSVG(tint, 1 - light, season);
   s += `<path d="M ${x - 10} ${y + h * 0.74} Q ${x + w * 0.25} ${y + h * 0.62} ${x + w * 0.5} ${y + h * 0.72} T ${x + w + 10} ${y + h * 0.7} V ${y + h} H ${x - 10} Z" fill="${near}"/>`;
 
   const trunk = tint('#5a3f2a', '#0e1218');
@@ -561,17 +689,8 @@ function viewSVG(sun, wx, season, clouds, drops, t, seed) {
     }
   });
 
-  const dayFill = lerpHex('#ffffff', '#6b7480', 0.25 * wx.cloud + 0.5 * wx.rain);
-  const cloudFill = lerpHex(lerpHex('#232c45', dayFill, d), '#f0a070', sun.twilight * 0.55 * (1 - wx.rain));
-  s += `<g id="clouds">`;
-  clouds.forEach((c, i) => {
-    const op = clamp(wx.cloud * 8 - i, 0, 1) * 0.95;
-    s += `<g id="cloud${i}" opacity="${n(op)}" transform="${cloudTransform(c, t, seed)}">${cloudShape(c, cloudFill)}</g>`;
-  });
-  s += `</g>`;
-
   if (wx.fog > 0.02) {
-    const fogCol = lerpHex('#1c2230', '#d8dde3', d);
+    const fogCol = lerpHex('#1c2230', '#d8dde3', light);
     s += `<rect x="${x}" y="${y + h * 0.3}" width="${w}" height="${h * 0.7}" fill="${fogCol}" opacity="${n(wx.fog * 0.75)}"/>
     <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fogCol}" opacity="${n(wx.fog * 0.35)}"/>`;
   }
@@ -600,10 +719,13 @@ export function createScene(svg, { weatherSeed = 0, timeZone, location = { latit
   svg.innerHTML = staticScene(weatherSeed);
   const byId = id => svg.querySelector('#' + id);
   const clouds = makeClouds(weatherSeed);
+  const cirrus = makeCirrus(weatherSeed);
   const drops = makeDrops(weatherSeed, 70);
   let overrides = {};
   let liveTarget = null;   // latest live conditions, or null to use the synthetic weather
   let eased = null;        // live conditions eased over a few renders so changes never pop
+  let wxNow = null;        // the weather last drawn, which sets the wind for the drift
+  let drift = null, lastT = null;
 
   function clockFor(now) {
     const clk = officeClock(now, timeZone);
@@ -619,11 +741,24 @@ export function createScene(svg, { weatherSeed = 0, timeZone, location = { latit
     return clk;
   }
 
+  // The clouds move at the current wind speed, so their position is the wind integrated
+  // over time. It starts from time × speed, so viewers agree while the wind holds steady.
+  function advanceDrift(t) {
+    if (!wxNow) return;
+    const v = windSpeed(wxNow, t, weatherSeed);
+    if (drift == null) drift = t * v;
+    else drift += v * clamp(t - lastT, 0, 1);
+    lastT = t;
+  }
+
   function positionDynamic(t) {
-    clouds.forEach((c, i) => {
-      const el = byId('cloud' + i);
-      if (el) el.setAttribute('transform', cloudTransform(c, t, weatherSeed));
+    advanceDrift(t);
+    clouds.forEach((row, i) => {
+      const el = byId('cloudrow' + i);
+      if (el) el.setAttribute('transform', rowTransform(drift, row.speed));
     });
+    const ci = byId('cirrus');
+    if (ci) ci.setAttribute('transform', rowTransform(drift, 1.2));
     const rn = byId('rain');
     if (rn) rn.setAttribute('transform', `translate(0 ${n((t * 240) % 60)})`);
     const sn = byId('snow');
@@ -638,8 +773,11 @@ export function createScene(svg, { weatherSeed = 0, timeZone, location = { latit
     wx.snow = season.winter > 0.5 ? 1 : 0;
     if (liveTarget) {
       if (!eased) eased = { ...liveTarget };
-      else for (const k of ['cloud', 'rain', 'snow', 'fog', 'wind']) eased[k] += (liveTarget[k] - eased[k]) * 0.25;
-      wx = { ...wx, ...eased, source: liveTarget.source };
+      else for (const k of EASED) {
+        const a = eased[k], b = liveTarget[k];
+        eased[k] = a == null || b == null ? b : a + (b - a) * 0.25;
+      }
+      wx = { ...wx, ...eased, source: liveTarget.source, code: liveTarget.code, time: liveTarget.time, debug: liveTarget.debug };
     }
     if (overrides.cloud != null) {
       wx.cloud = clamp(overrides.cloud, 0, 1);
@@ -648,13 +786,27 @@ export function createScene(svg, { weatherSeed = 0, timeZone, location = { latit
     if (overrides.rain != null) wx.rain = clamp(overrides.rain, 0, 1);
     if (overrides.snow != null) wx.snow = overrides.snow ? 1 : 0;
     if (overrides.fog != null) wx.fog = clamp(overrides.fog, 0, 1);
-    byId('view').innerHTML = viewSVG(sun, wx, season, clouds, drops, Date.now() / 1000, weatherSeed);
+    if (overrides.cirrus != null) wx.cirrus = clamp(overrides.cirrus, 0, 1);
+    if (overrides.wind != null) wx.wind = clamp(overrides.wind, 0, 1);
+    wx = finishWeather(wx);
+    wxNow = wx;
+    advanceDrift(Date.now() / 1000);
+
+    // Daylight after the clouds: a dull day lets through a fraction of a clear day's
+    // light. The room dims towards grey for gloom and towards night blue for night.
+    // The lamp follows the light, and is switched on properly on a really dull day.
     const d = sun.daylight;
-    byId('dim').setAttribute('opacity', n(clamp((1 - d) * 0.5, 0, 1)));
-    byId('lamp-glow').setAttribute('opacity', n(1 - d));
-    byId('lamp-bulb').setAttribute('opacity', n(1 - d));
-    byId('sill-objects').style.filter = d > 0.98 ? '' : `brightness(${n(1 - (1 - d) * 0.45)})`;
-    return { daylight: d, wx, clk, season, background: lerpHex(WALL, NIGHT_TINT, (1 - d) * 0.5) };
+    const light = d * (1 - 0.4 * wx.gloom);
+    const lamp = Math.max(1 - light, smoothstep(0.2, 0.4, d - light));
+    const dimFill = mixHex([[NIGHT_TINT, 1 - d], ['#3b3d42', d - light]]);
+    const dim = clamp((1 - light) * 0.5, 0, 1);
+    byId('view').innerHTML = viewSVG(sun, wx, light, season, clouds, cirrus, drops, drift);
+    byId('dim').setAttribute('fill', dimFill);
+    byId('dim').setAttribute('opacity', n(dim));
+    byId('lamp-glow').setAttribute('opacity', n(lamp));
+    byId('lamp-bulb').setAttribute('opacity', n(lamp));
+    byId('sill-objects').style.filter = light > 0.98 ? '' : `brightness(${n(1 - (1 - light) * 0.45)})`;
+    return { daylight: d, light, sun, wx, clk, season, background: lerpHex(WALL, dimFill, dim) };
   }
 
   function renderClock(now) {

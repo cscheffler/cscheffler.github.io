@@ -58,6 +58,13 @@ export function mixHex(entries) {
   return rgbToHex([r / tw, g / tw, b / tw]);
 }
 
+// Move a colour towards the grey of the same brightness.
+export function desatHex(hex, t) {
+  const [r, g, b] = hexToRgb(hex);
+  const y = 0.299 * r + 0.587 * g + 0.114 * b;
+  return lerpHex(hex, rgbToHex([y, y, y]), t);
+}
+
 export function shadeHex(hex, f) {
   return rgbToHex(hexToRgb(hex).map(v => v * f));
 }

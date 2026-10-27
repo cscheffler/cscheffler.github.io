@@ -86,18 +86,29 @@ page on your phone.
   three care days later.
 - **Weather** is the real current weather at the office, fetched every ten
   minutes from [Open-Meteo](https://open-meteo.com) (free, no key) for the
-  coordinates in `config.js`. Cloud cover, rain, drizzle, showers, snow,
-  thunderstorms and fog are all shown. Every viewer fetches the same current
-  conditions, so they agree. If the fetch fails, or `LIVE_WEATHER` is off, a
+  coordinates in `config.js`. Cloud is the mean of three forecast models (UK
+  Met Office, DWD ICON and ECMWF, listed in `WEATHER_MODELS` in `weather.js`)
+  over the two hours either side of now, because any one model jumps between
+  clear and overcast from hour to hour. Low and middle cloud fill the sky in
+  proportion to their cover, and merge into a grey deck when it is overcast.
+  High cloud shows as thin cirrus. The modelled sunshine decides how dull the
+  day is and whether the sun shows. A dull day darkens the land and the room,
+  and on a really dull day the desk lamp goes on. Rain and drizzle always fall
+  from a full deck of cloud; showers can fall from a broken sky. Snow,
+  thunderstorms, fog and mist (from the visibility) are shown too, and the
+  clouds drift with the wind's speed and direction. Every viewer fetches the
+  same data, so they agree. If the fetch fails, or `LIVE_WEATHER` is off, a
   smooth random weather keyed on UTC time and a fixed seed takes over, which
-  is also the same for everyone. Weather data by Open-Meteo.com (CC BY 4.0).
+  is also the same for everyone. Add `?debug` to the display page to see the
+  numbers behind the sky. Weather data by Open-Meteo.com (CC BY 4.0).
 - **Daylight** follows the real sun at the office's coordinates (Stirling, UK
   by default): sunrise, sunset, how high the sun climbs, and how long twilight
   lasts. Brightness is driven by the sun's elevation, so a July night in
   Stirling never goes fully dark and a January afternoon fades from 16:10. The landscape follows the northern
   hemisphere seasons: blossom in spring, deep green in summer, orange and
   yellow trees in autumn, bare trees and snow in winter. The wall clock shows
-  office time, the desk lamp and the village windows come on at night.
+  office time, the desk lamp and the village windows come on at night. A cloudy
+  night glows dull orange from the town's lights.
 
 All the numbers live at the top of `plant-model.js` in the `GROWTH` object.
 
@@ -114,6 +125,8 @@ Open the display page with `?demo` to see a synthetic plant, and add any of:
 | `hour` | force the office clock | `?demo&hour=22` for night |
 | `cloud`, `rain` | force the weather, 0 to 1 | `?demo&cloud=0.9&rain=0.8` |
 | `snow`, `fog` | force snow instead of rain, or fog | `?demo&snow=1&rain=0.6&cloud=0.9` |
+| `cirrus`, `wind` | force high cloud, or the wind speed, 0 to 1 | `?demo&cloud=0.3&cirrus=0.9&wind=1` |
+| `debug` | show the weather data and what is drawn from it | `?debug` |
 | `weather=noise` | use the synthetic weather instead of Open-Meteo | `?demo&weather=noise` |
 | `month` | force the season, 1 to 12 | `?demo&month=1` for snow |
 | `doy` | force the day of year, for season blends | `?demo&doy=60` for the winter–spring boundary |

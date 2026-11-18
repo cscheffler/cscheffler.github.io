@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HMC Phase Space</title>
+<style>
+:root{
+  --bg:#f5f4f0; --panel:#ffffff; --ink:#1c1c1f; --muted:#6c6c72; --line:#e2e0da; --grid:#eeede8;
+  --accent:#2b59d1; --energy:#d47a1f; --mom:#7a49cf; --ok:#1d9a52; --bad:#d63838;
+  --dens-lo:#ffffff; --dens-hi:#2b59d1; --forbid-fill:rgba(60,55,50,0.07); --forbid-line:rgba(60,55,50,0.28);
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111215; --panel:#1a1c21; --ink:#e7e7ea; --muted:#9a9ba4; --line:#2c2f36; --grid:#24262c;
+    --accent:#7199ff; --energy:#f2a24b; --mom:#ad88ff; --ok:#3fcf7d; --bad:#ff6767;
+    --dens-lo:#1a1c21; --dens-hi:#5b86ff; --forbid-fill:rgba(0,0,0,0.38); --forbid-line:rgba(255,255,255,0.22);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111215; --panel:#1a1c21; --ink:#e7e7ea; --muted:#9a9ba4; --line:#2c2f36; --grid:#24262c;
+  --accent:#7199ff; --energy:#f2a24b; --mom:#ad88ff; --ok:#3fcf7d; --bad:#ff6767;
+  --dens-lo:#1a1c21; --dens-hi:#5b86ff; --forbid-fill:rgba(0,0,0,0.38); --forbid-line:rgba(255,255,255,0.22);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+.wrap{padding:10px 12px 40px}
+.bar{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:6px 12px;margin:0 auto 10px;width:fit-content;max-width:100%}
+button{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:4px 12px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;min-width:70px}
+.btns{display:flex;gap:6px}
+label.sl{display:flex;align-items:center;gap:8px;color:var(--muted);white-space:nowrap}
+label.sl output{font-family:var(--mono);color:var(--ink);min-width:3.2em;font-size:13px}
+input[type=range]{width:110px;accent-color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:transparent;padding:4px 10px;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--ink);color:var(--panel)}
+.statwrap{display:flex;align-items:center;gap:6px;border-left:1px solid var(--line);padding-left:16px}
+.stats{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:12.5px;color:var(--muted)}
+.stats b{font-family:var(--mono);font-weight:500;color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(var(--cols,2), max-content);gap:10px;justify-content:center}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px 10px}
+.ph{display:flex;align-items:center;justify-content:space-between;height:22px;margin-bottom:6px}
+.panel h2{font-size:13.5px;font-weight:620;margin:0}
+canvas{display:block;border-radius:6px}
+canvas.sq{width:var(--s,400px);height:var(--s,400px)}
+canvas.wide{width:var(--s,400px);height:calc((var(--s,400px) - 8px) / 2)}
+canvas.wide + canvas.wide{margin-top:8px}
+.info{display:inline-grid;place-items:center;width:22px;height:22px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--muted);flex:none}
+.info:hover,.info:focus-visible{color:var(--ink);background:var(--bg)}
+.info svg{width:17px;height:17px}
+.tip-src{display:none}
+#tip{position:fixed;z-index:50;left:0;top:0;max-width:min(360px,calc(100vw - 16px));background:var(--panel);color:var(--ink);border:1px solid var(--line);
+  border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.22);padding:10px 12px;font-size:12.5px;line-height:1.45;pointer-events:none;opacity:0;transition:opacity .1s}
+#tip.on{opacity:1}
+#tip p{margin:0 0 8px}
+#tip .lg{display:grid;gap:3px;color:var(--muted)}
+#tip .lg span{display:flex;align-items:center;gap:7px}
+.sw{display:inline-block;width:14px;height:3px;border-radius:2px;flex:none}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none}
+.read{margin:28px auto 0;max-width:1100px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 20px}
+.read h3{font-size:15px;margin:0 0 8px}
+.read ol{margin:0;padding-left:20px}
+.read li{margin:0 0 8px}
+.read p{margin:10px 0 0}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div class="btns">
+      <button id="play" class="primary">Play</button>
+      <button id="step" title="One proposal (→)">Step</button>
+      <button id="reset">Reset</button>
+    </div>
+    <label class="sl">Leapfrog steps <input id="L" type="range" min="5" max="100" step="1" value="37"><output id="Lo">37</output></label>
+    <label class="sl">Step size Δt <input id="dt" type="range" min="0.025" max="0.6" step="0.025" value="0.1"><output id="dto">0.100</output></label>
+    <div class="seg" id="speed">
+      <button data-s="0.3">Slow</button><button data-s="1" class="on">Normal</button><button data-s="3.5">Fast</button><button data-s="turbo">Turbo</button>
+    </div>
+    <div class="statwrap">
+      <div class="stats" id="stats"></div>
+      <button class="info" aria-label="About these statistics"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="6.2" r="1.1" fill="currentColor"/><path d="M10 9v5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+      <div class="tip-src">
+        <p><b>Mean accept prob</b> averages min(1, e^(−ΔH)) over all proposals.</p>
+        <p><b>Mean e^(−ΔH)</b> should converge to 1 for any reversible, volume-preserving integrator such as leapfrog, which makes it a check that the sampler is correct. Divergent trajectories count as 0.</p>
+        <p><b>Divergent</b> counts trajectories whose energy error exceeded 1000. They are always rejected.</p>
+        <p style="margin:0">Keys: <kbd>Space</kbd> play/pause · <kbd>→</kbd> one proposal.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" id="grid">
+    <div class="panel">
+      <div class="ph"><h2>1 · Position space q</h2>
+        <button class="info" aria-label="About this panel"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="6.2" r="1.1" fill="currentColor"/><path d="M10 9v5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+        <div class="tip-src">
+          <p>The banana target. The hatched region is energetically forbidden at the current energy H₀: you can only reach q where U(q) ≤ H₀. Its edge is where the particle would stop dead.</p>
+          <div class="lg">
+            <span><i class="sw" style="background:var(--accent)"></i>leapfrog path (one dot per step)</span>
+            <span><i class="sw" style="background:var(--mom)"></i>current momentum p</span>
+            <span><i class="sw" style="background:var(--energy)"></i>U(q) = H₀, the turning boundary</span>
+            <span><i class="dot" style="background:var(--muted);opacity:.6"></i>samples (accepted states)</span>
+            <span><i class="dot" style="border:2px solid var(--ok)"></i>accepted endpoint · <b style="color:var(--bad)">✕</b> rejected endpoint</span>
+          </div>
+        </div>
+      </div>
+      <canvas id="cq" class="sq"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h2>2 · Momentum space p</h2>
+        <button class="info" aria-label="About this panel"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="6.2" r="1.1" fill="currentColor"/><path d="M10 9v5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+        <div class="tip-src">
+          <p>The energy surface H = H₀ is a 3-D shell in 4-D. Above each position q it contains one circle of momenta, with radius r = √(2(H₀ − U(q))). Exact dynamics keeps |p| = r as q moves, so |p| grows as q falls into the banana and shrinks as q nears the turning boundary. Leapfrog keeps it close, but not exactly equal.</p>
+          <div class="lg">
+            <span><i class="sw" style="background:var(--mom)"></i>p along the trajectory</span>
+            <span><i class="sw" style="background:var(--muted);opacity:.5"></i>dashed rings: |p| = 1, 2, 3 of the N(0, I) momentum distribution</span>
+          </div>
+        </div>
+      </div>
+      <canvas id="cp" class="sq"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h2>3 · Energy plane (U, K)</h2>
+        <button class="info" aria-label="About this panel"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="6.2" r="1.1" fill="currentColor"/><path d="M10 9v5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+        <div class="tip-src">
+          <p>Each 4-D state collapsed to its potential and kinetic energy. Energy levels are diagonals. Resampling p is a vertical jump, since U is unchanged. Leapfrog then slides along a diagonal, trading U for K.</p>
+          <p>Shading is the joint density e^(−(U+K)). Margins show the Exp(1) densities of K (left) and U (bottom); the bars are the U values of the samples.</p>
+          <div class="lg">
+            <span><i class="sw" style="background:var(--mom)"></i>momentum refresh (U fixed)</span>
+            <span><i class="sw" style="background:var(--accent)"></i>leapfrog trajectory</span>
+            <span><i class="sw" style="background:var(--energy)"></i>H = H₀ (dashed: previous energy)</span>
+            <span><i class="dot" style="background:var(--muted);opacity:.6"></i>recent states</span>
+          </div>
+        </div>
+      </div>
+      <canvas id="ce" class="sq"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h2>4 · Energy error ΔH = H − H₀</h2>
+        <button class="info" aria-label="About this panel"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="6.2" r="1.1" fill="currentColor"/><path d="M10 9v5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+        <div class="tip-src">
+          <p><b>Top:</b> a zoomed-in view of how far leapfrog strays from H₀ at each step. It oscillates instead of drifting, because leapfrog is symplectic. A uniform u is drawn up front, and the proposal is rejected if the final ΔH &gt; −log u. Grey curves are recent trajectories.</p>
+          <p><b>Bottom:</b> final ΔH over all proposals. The dashed curve is the rejection probability for each ΔH. Values beyond the axis range are counted in the edge bins.</p>
+          <div class="lg">
+            <span><i class="sw" style="background:var(--accent)"></i>this trajectory</span>
+            <span><i class="sw" style="background:var(--bad)"></i>reject zone / rejected proposals</span>
+            <span><i class="sw" style="background:var(--ok)"></i>accepted proposals</span>
+            <span><i class="sw" style="background:var(--energy)"></i>P(reject | ΔH) = 1 − e^(−ΔH)</span>
+          </div>
+        </div>
+      </div>
+      <canvas id="cd" class="wide"></canvas>
+      <canvas id="ch" class="wide"></canvas>
+    </div>
+  </div>
+  <div id="tip" role="tooltip"></div>
+
+  <div class="read">
+    <h3>What to look for</h3>
+    <ol>
+      <li><b>Sticking to the energy surface.</b> In panel 2 the momentum magnitude |p| stays close to √(2(H₀ − U(q))), the radius of the energy-surface circle over the current q. |p| grows as q falls into the banana, where potential turns into kinetic energy, and shrinks as q climbs toward the hatched boundary. In panel 3 the path slides along the orange diagonal.</li>
+      <li><b>Not quite sticking.</b> Leapfrog is a discrete approximation, so H wobbles slightly (panel 4). At Δt = 0.1 the wobble is usually around 10⁻², far below the typical rejection threshold −log u ≈ 1. That is why HMC accepts nearly everything, while each proposal still travels a long way.</li>
+      <li><b>Where the rejections come from.</b> The proposal is rejected with probability 1 − e^(−ΔH) when ΔH &gt; 0. Increase Δt to 0.3–0.4: ΔH grows and red appears in the histogram. From about 0.4, trajectories that reach the banana's tips, where the curvature is much higher, start to diverge outright: leapfrog is only stable when Δt is small relative to the local curvature.</li>
+      <li><b>A neat fact about this target.</b> The banana map y = (q₁/a, a·q₂ + ab(q₁² + a²)) has unit Jacobian, so under the target U(q) is exactly Exp(1), just like K(p) for p ~ N(0, I). In the energy plane the joint density is therefore e^(−(U+K)). It is constant along each energy line, and the shading shows it exactly. The bars under panel 3 (U of the samples) should converge to the Exp(1) curve.</li>
+    </ol>
+    <p style="color:var(--muted);font-size:13px">Keys: <kbd>Space</kbd> play/pause · <kbd>→</kbd> one proposal. Target and defaults (37 steps, Δt = 0.1) are taken from <a href="https://chi-feng.github.io/mcmc-demo/" style="color:var(--accent)">chi-feng/mcmc-demo</a>; U(q) = −log π(q) is shifted so that min U = 0.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ---------------- target: chi-feng banana ---------------- */
+const A = 2, B = 0.2, MU1 = 4;
+const SI00 = 4/3, SI01 = -2/3, SI11 = 4/3;           // inverse of [[1,.5],[.5,1]]
+function Upot(x0, x1){
+  const y0 = x0 / A, y1 = x1 * A + A * B * (x0 * x0 + A * A) - MU1;
+  return 0.5 * (SI00 * y0 * y0 + 2 * SI01 * y0 * y1 + SI11 * y1 * y1);
+}
+function gradU(x0, x1){
+  const y0 = x0 / A, y1 = x1 * A + A * B * (x0 * x0 + A * A) - MU1;
+  const g0 = SI00 * y0 + SI01 * y1, g1 = SI01 * y0 + SI11 * y1;
+  return [g0 / A + g1 * A * B * 2 * x0, g1 * A];
+}
+const Kin = p => 0.5 * (p[0] * p[0] + p[1] * p[1]);
+let spare = null;
+function randn(){
+  if (spare !== null){ const s = spare; spare = null; return s; }
+  let u = 0, v = 0; while (u === 0) u = Math.random(); v = Math.random();
+  const r = Math.sqrt(-2 * Math.log(u)); spare = r * Math.sin(2 * Math.PI * v); return r * Math.cos(2 * Math.PI * v);
+}
+
+/* ---------------- grid of U for contours / forbidden region ---------------- */
+const XR = [-6.6, 6.6], YR = [-6.6, 6.6], PR = 3.6, GN = 241;
+const G = new Float64Array(GN * GN);
+const gx = i => XR[0] + (XR[1] - XR[0]) * i / (GN - 1);
+const gy = j => YR[0] + (YR[1] - YR[0]) * j / (GN - 1);
+for (let j = 0; j < GN; j++) for (let i = 0; i < GN; i++) G[j * GN + i] = Upot(gx(i), gy(j));
+
+function contour(level){
+  const segs = [];
+  for (let j = 0; j < GN - 1; j++){
+    const y0 = gy(j), y1 = gy(j + 1);
+    for (let i = 0; i < GN - 1; i++){
+      const v00 = G[j*GN+i], v10 = G[j*GN+i+1], v01 = G[(j+1)*GN+i], v11 = G[(j+1)*GN+i+1];
+      let c = 0; if (v00 > level) c |= 1; if (v10 > level) c |= 2; if (v11 > level) c |= 4; if (v01 > level) c |= 8;
+      if (c === 0 || c === 15) continue;
+      const x0 = gx(i), x1 = gx(i + 1);
+      const eb = () => [x0 + (level - v00) / (v10 - v00) * (x1 - x0), y0];
+      const er = () => [x1, y0 + (level - v10) / (v11 - v10) * (y1 - y0)];
+      const et = () => [x0 + (level - v01) / (v11 - v01) * (x1 - x0), y1];
+      const el = () => [x0, y0 + (level - v00) / (v01 - v00) * (y1 - y0)];
+      const s = (a, b) => segs.push(a[0], a[1], b[0], b[1]);
+      switch (c){
+        case 1: case 14: s(eb(), el()); break;
+        case 2: case 13: s(eb(), er()); break;
+        case 3: case 12: s(el(), er()); break;
+        case 4: case 11: s(er(), et()); break;
+        case 6: case 9:  s(eb(), et()); break;
+        case 7: case 8:  s(el(), et()); break;
+        case 5:  s(el(), et()); s(eb(), er()); break;
+        case 10: s(eb(), el()); s(er(), et()); break;
+      }
+    }
+  }
+  return segs;
+}
+
+/* ---------------- theme ---------------- */
+let C = {};
+const pc = (() => { const c = document.createElement('canvas'); c.width = c.height = 1; return c.getContext('2d', { willReadFrequently: true }); })();
+function rgba(css){ pc.clearRect(0,0,1,1); pc.fillStyle = '#000'; pc.fillStyle = css; pc.fillRect(0,0,1,1); const d = pc.getImageData(0,0,1,1).data; return [d[0], d[1], d[2], d[3] / 255]; }
+function readTheme(){
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ['bg','panel','ink','muted','line','grid','accent','energy','mom','ok','bad','dens-lo','dens-hi','forbid-fill','forbid-line','font','mono'])
+    C[k] = cs.getPropertyValue('--' + k).trim();
+  C.rgb = {}; for (const k of ['ink','accent','energy','mom','ok','bad','dens-lo','dens-hi','panel']) C.rgb[k] = rgba(C[k]);
+}
+const col = (k, a) => { const c = C.rgb[k]; return `rgba(${c[0]},${c[1]},${c[2]},${a})`; };
+const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+
+/* ---------------- canvases ---------------- */
+const cv = { q: document.getElementById('cq'), p: document.getElementById('cp'), e: document.getElementById('ce'), d: document.getElementById('cd'), h: document.getElementById('ch') };
+for (const k in cv){ cv[k]._w = 300; cv[k]._h = 300; cv[k]._dpr = 1; }
+function sizeCanvas(c){
+  const r = c.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const w = Math.max(50, Math.round(r.width)), h = Math.max(30, Math.round(r.height));
+  if (w === c._w && h === c._h && dpr === c._dpr && c.width) return false;
+  c._w = w; c._h = h; c._dpr = dpr; c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); return true;
+}
+function prep(c){
+  const ctx = c.getContext('2d'); ctx.setTransform(c._dpr, 0, 0, c._dpr, 0, 0);
+  ctx.fillStyle = C.panel; ctx.fillRect(0, 0, c._w, c._h); return ctx;
+}
+function offscreen(w, h){ const o = document.createElement('canvas'); o.width = Math.max(1, Math.round(w)); o.height = Math.max(1, Math.round(h)); return o; }
+const font = (px, mono) => `${px}px ${mono ? C.mono : C.font}`;
+
+/* ---------------- simulation state ---------------- */
+let sim, cur = null, phase = 'idle', phaseT = 0, playing = false, pendingStep = false, speed = 1, turbo = false;
+const params = { L: 37, dt: 0.1 };
+const UBIN = 0.25, UBINS = 80;
+
+function resetSim(){
+  sim = {
+    q: [randn(), randn()], lastP: [randn(), randn()],
+    chain: [], n: 0, acc: 0, sumAlpha: 0, sumExp: 0, div: 0,
+    dHlog: [], curves: [], cloud: [], uHist: new Float64Array(UBINS), uN: 0,
+  };
+  cur = null; phase = 'idle'; phaseT = 0; histCache = null;
+  if (layers.samples) clearSamples();
+  needsDraw = true;
+}
+
+function makeProposal(){
+  const L = params.L, dt = params.dt, q0 = sim.q.slice(), p0 = [randn(), randn()];
+  const q = q0.slice(), p = p0.slice();
+  const U0 = Upot(q[0], q[1]), K0 = Kin(p), H0 = U0 + K0;
+  const qs = [q.slice()], ps = [p.slice()], Us = [U0], Ks = [K0], dH = [0];
+  let g = gradU(q[0], q[1]), div = false;
+  for (let i = 0; i < L; i++){
+    p[0] -= 0.5 * dt * g[0]; p[1] -= 0.5 * dt * g[1];
+    q[0] += dt * p[0];       q[1] += dt * p[1];
+    g = gradU(q[0], q[1]);
+    p[0] -= 0.5 * dt * g[0]; p[1] -= 0.5 * dt * g[1];
+    const u = Upot(q[0], q[1]), k = Kin(p), e = u + k - H0;
+    qs.push(q.slice()); ps.push(p.slice()); Us.push(u); Ks.push(k); dH.push(e);
+    if (!isFinite(e) || e > 1000){ div = true; break; }
+  }
+  const n = qs.length - 1, final = dH[n];
+  const u = Math.random(), thr = -Math.log(u);
+  const accept = !div && final < thr;
+  const prevK = Kin(sim.lastP);
+  let maxAbs = 0; for (const v of dH) if (isFinite(v)) maxAbs = Math.max(maxAbs, Math.abs(v));
+  return { L, dt, q0, p0, qs, ps, Us, Ks, dH, n, U0, K0, H0, u, thr, accept, div, final,
+           alpha: div ? 0 : Math.min(1, Math.exp(-final)), prevP: sim.lastP.slice(), prevK, prevH: U0 + prevK, maxAbs };
+}
+
+function commit(pr){
+  sim.n++;
+  if (pr.accept){ sim.acc++; sim.q = pr.qs[pr.n].slice(); sim.lastP = pr.ps[pr.n].slice(); }
+  else { sim.lastP = pr.p0.slice(); }
+  if (pr.div) sim.div++;
+  sim.sumAlpha += pr.alpha;
+  if (!pr.div) sim.sumExp += Math.exp(-pr.final);
+  sim.chain.push(sim.q.slice());
+  addSample(sim.q);
+  const uq = Upot(sim.q[0], sim.q[1]);
+  sim.uHist[Math.min(UBINS - 1, Math.floor(uq / UBIN))]++; sim.uN++;
+  sim.cloud.push([uq, Kin(sim.lastP)]); if (sim.cloud.length > 500) sim.cloud.shift();
+  sim.dHlog.push({ v: pr.final, a: pr.accept, d: pr.div }); histCache = null;
+  sim.curves.push(pr.dH); if (sim.curves.length > 14) sim.curves.shift();
+}
+
+/* ---------------- animation clock ---------------- */
+const BASE_STEPS_PER_SEC = 14, REFRESH_MS = 650, DECIDE_MS = 800, HOLD_MS = 120;
+function startProposal(){ cur = makeProposal(); phase = 'refresh'; phaseT = 0; }
+function advance(ms){
+  if (phase === 'idle'){
+    if (playing || pendingStep){ pendingStep = false; startProposal(); } else return false;
+  }
+  phaseT += ms * speed;
+  if (phase === 'refresh' && phaseT >= REFRESH_MS){ phase = 'integrate'; phaseT = 0; }
+  else if (phase === 'integrate' && phaseT >= cur.n / BASE_STEPS_PER_SEC * 1000 + HOLD_MS){ phase = 'decide'; phaseT = 0; commit(cur); }
+  else if (phase === 'decide' && phaseT >= DECIDE_MS){ phase = 'idle'; phaseT = 0; }
+  return true;
+}
+function runTurbo(count){
+  if (phase !== 'idle' && cur && phase !== 'decide') commit(cur);
+  for (let i = 0; i < count; i++){ cur = makeProposal(); commit(cur); }
+  phase = 'idle'; phaseT = 0;
+}
+
+/* what to display right now */
+const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+function view(){
+  if (!cur){
+    const U = Upot(sim.q[0], sim.q[1]), K = Kin(sim.lastP);
+    return { q: sim.q, p: sim.lastP, U, K, Hlev: U + K, idx: -1 };
+  }
+  if (phase === 'refresh'){
+    const s = ease(Math.min(1, phaseT / REFRESH_MS));
+    const K = cur.prevK + (cur.K0 - cur.prevK) * s;
+    const a0 = Math.atan2(cur.prevP[1], cur.prevP[0]), a1 = Math.atan2(cur.p0[1], cur.p0[0]);
+    let da = a1 - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    const r = Math.sqrt(2 * K), ang = a0 + da * s;
+    return { q: cur.q0, p: [r * Math.cos(ang), r * Math.sin(ang)], U: cur.U0, K, Hlev: cur.U0 + K, idx: -1, refresh: s };
+  }
+  let idx;
+  if (phase === 'integrate') idx = Math.min(cur.n, Math.floor(phaseT / 1000 * BASE_STEPS_PER_SEC));
+  else idx = cur.n;
+  return { q: cur.qs[idx], p: cur.ps[idx], U: cur.Us[idx], K: cur.Ks[idx], Hlev: cur.H0, idx, done: phase !== 'integrate' };
+}
+
+/* ---------------- cached layers ---------------- */
+const layers = {};
+let regionCache = { level: NaN };
+let histCache = null;
+const BG_LEVELS = [0.5, 1, 2, 3, 4.5, 7];
+const bgContours = BG_LEVELS.map(contour);
+
+function buildLayers(){
+  /* position heatmap */
+  {
+    const c = cv.q, W = c.width, H = c.height, R = 260;
+    const hm = offscreen(R, R), hx = hm.getContext('2d'), img = hx.createImageData(R, R);
+    const lo = C.rgb['dens-lo'], hi = C.rgb['dens-hi'];
+    for (let r = 0; r < R; r++) for (let i = 0; i < R; i++){
+      const x = XR[0] + (XR[1] - XR[0]) * (i + 0.5) / R, y = YR[1] - (YR[1] - YR[0]) * (r + 0.5) / R;
+      const v = Math.exp(-Upot(x, y)), m = mix(lo, hi, 0.62 * Math.pow(v, 0.8)), o = (r * R + i) * 4;
+      img.data[o] = m[0]; img.data[o+1] = m[1]; img.data[o+2] = m[2]; img.data[o+3] = 255;
+    }
+    hx.putImageData(img, 0, 0);
+    const bg = offscreen(W, H), bx = bg.getContext('2d');
+    bx.imageSmoothingEnabled = true; bx.drawImage(hm, 0, 0, W, H);
+    const sx = x => (x - XR[0]) / (XR[1] - XR[0]) * W, sy = y => H - (y - YR[0]) / (YR[1] - YR[0]) * H;
+    bx.strokeStyle = col('ink', 0.13); bx.lineWidth = c._dpr;
+    for (const segs of bgContours){ bx.beginPath(); for (let k = 0; k < segs.length; k += 4){ bx.moveTo(sx(segs[k]), sy(segs[k+1])); bx.lineTo(sx(segs[k+2]), sy(segs[k+3])); } bx.stroke(); }
+    bx.strokeStyle = col('ink', 0.10); bx.beginPath(); bx.moveTo(sx(0), 0); bx.lineTo(sx(0), H); bx.moveTo(0, sy(0)); bx.lineTo(W, sy(0)); bx.stroke();
+    layers.bgQ = bg;
+    layers.samples = offscreen(W, H); redrawSamples();
+    layers.region = offscreen(W, H);
+    /* hatch pattern */
+    const d = c._dpr, ps = Math.round(7 * d), pat = offscreen(ps, ps), px = pat.getContext('2d');
+    px.fillStyle = C['forbid-fill']; px.fillRect(0, 0, ps, ps);
+    px.strokeStyle = C['forbid-line']; px.lineWidth = 1 * d; px.beginPath();
+    px.moveTo(-1, ps + 1); px.lineTo(ps + 1, -1); px.moveTo(-1, 1); px.lineTo(1, -1); px.moveTo(ps - 1, ps + 1); px.lineTo(ps + 1, ps - 1); px.stroke();
+    layers.hatch = pat;
+    regionCache = { level: NaN };
+  }
+  /* momentum heatmap */
+  {
+    const c = cv.p, W = c.width, H = c.height, R = 200;
+    const hm = offscreen(R, R), hx = hm.getContext('2d'), img = hx.createImageData(R, R);
+    const lo = C.rgb['dens-lo'], hi = C.rgb.mom;
+    for (let r = 0; r < R; r++) for (let i = 0; i < R; i++){
+      const x = -PR + 2 * PR * (i + 0.5) / R, y = PR - 2 * PR * (r + 0.5) / R;
+      const m = mix(lo, hi, 0.22 * Math.exp(-0.5 * (x * x + y * y))), o = (r * R + i) * 4;
+      img.data[o] = m[0]; img.data[o+1] = m[1]; img.data[o+2] = m[2]; img.data[o+3] = 255;
+    }
+    hx.putImageData(img, 0, 0);
+    const bg = offscreen(W, H), bx = bg.getContext('2d'); bx.drawImage(hm, 0, 0, W, H);
+    bx.scale(c._dpr, c._dpr);
+    const w = c._w, h = c._h, s = w / (2 * PR);
+    bx.strokeStyle = col('ink', 0.10); bx.lineWidth = 1;
+    bx.beginPath(); bx.moveTo(w / 2, 0); bx.lineTo(w / 2, h); bx.moveTo(0, h / 2); bx.lineTo(w, h / 2); bx.stroke();
+    bx.setLineDash([3, 3]); bx.strokeStyle = col('ink', 0.42); bx.lineWidth = 1.2;
+    for (const r of [1, 2, 3]){ bx.beginPath(); bx.arc(w / 2, h / 2, r * s, 0, 2 * Math.PI); bx.stroke(); }
+    bx.setLineDash([]);
+    bx.fillStyle = col('ink', 0.7); bx.font = font(10.5); bx.textAlign = 'left';
+    for (const r of [1, 2, 3]) bx.fillText(`|p|=${r}`, w / 2 + r * s * 0.7071 + 3, h / 2 + r * s * 0.7071 + 11);
+    bx.font = font(12); bx.fillStyle = C.muted;
+    bx.fillText('p₁ →', w - 38, h / 2 - 6); bx.fillText('p₂ ↑', w / 2 + 6, 14);
+    layers.bgP = bg;
+  }
+  layers.bgE = null;   // rebuilt lazily (depends on Emax)
+}
+
+function clearSamples(){ const s = layers.samples; s.getContext('2d').clearRect(0, 0, s.width, s.height); }
+function sampleDot(ctx, q){
+  const c = cv.q, W = c.width, H = c.height, r = 1.25 * c._dpr;
+  const x = (q[0] - XR[0]) / (XR[1] - XR[0]) * W, y = H - (q[1] - YR[0]) / (YR[1] - YR[0]) * H;
+  ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+}
+function addSample(q){ if (!layers.samples) return; const x = layers.samples.getContext('2d'); x.fillStyle = col('ink', 0.22); sampleDot(x, q); }
+function redrawSamples(){ clearSamples(); const x = layers.samples.getContext('2d'); x.fillStyle = col('ink', 0.22); for (const q of sim.chain) sampleDot(x, q); }
+
+function regionFor(level){
+  if (Math.abs(level - regionCache.level) < 1e-9) return regionCache;
+  const c = cv.q, W = c.width, H = c.height;
+  const m = regionCache.mask || offscreen(GN, GN), mx = m.getContext('2d'), img = mx.createImageData(GN, GN);
+  for (let j = 0; j < GN; j++){ const r = GN - 1 - j; for (let i = 0; i < GN; i++) if (G[j * GN + i] > level) img.data[(r * GN + i) * 4 + 3] = 255; }
+  mx.putImageData(img, 0, 0);
+  const L = layers.region, lx = L.getContext('2d');
+  lx.globalCompositeOperation = 'source-over'; lx.clearRect(0, 0, W, H);
+  const cell = W / (GN - 1);
+  lx.imageSmoothingEnabled = true; lx.drawImage(m, -cell / 2, -cell / 2, W + cell, H + cell);
+  lx.globalCompositeOperation = 'source-in'; lx.fillStyle = lx.createPattern(layers.hatch, 'repeat'); lx.fillRect(0, 0, W, H);
+  lx.globalCompositeOperation = 'source-over';
+  regionCache = { level, mask: m, segs: contour(level) };
+  return regionCache;
+}
+
+/* ---------------- drawing helpers ---------------- */
+function arrow(ctx, x0, y0, x1, y1, color, w){
+  const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy); if (len < 1) return;
+  const ux = dx / len, uy = dy / len, hs = Math.min(9, len * 0.5);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = w;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hs * 0.6, y1 - uy * hs * 0.6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hs - uy * hs * 0.45, y1 - uy * hs + ux * hs * 0.45);
+  ctx.lineTo(x1 - ux * hs + uy * hs * 0.45, y1 - uy * hs - ux * hs * 0.45); ctx.closePath(); ctx.fill();
+}
+function disc(ctx, x, y, r, fill, stroke, lw){
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI);
+  if (fill){ ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = lw || 1.5; ctx.stroke(); }
+}
+function cross(ctx, x, y, r, color){
+  ctx.strokeStyle = color; ctx.lineWidth = 2.4; ctx.beginPath();
+  ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke();
+}
+function label(ctx, txt, x, y, opts = {}){
+  ctx.font = font(opts.size || 12, opts.mono); ctx.textAlign = opts.align || 'left'; ctx.textBaseline = opts.base || 'alphabetic';
+  if (opts.halo !== false){ ctx.lineWidth = 3.5; ctx.strokeStyle = col('panel', 0.85); ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); }
+  ctx.fillStyle = opts.color || C.ink; ctx.fillText(txt, x, y);
+}
+function niceCeil(x){
+  if (!(x > 0)) return 1e-3;
+  const e = Math.pow(10, Math.floor(Math.log10(x))), f = x / e;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e;
+}
+function fmt(v){
+  if (v === 0) return '0';
+  const a = Math.abs(v);
+  if (a >= 100) return v.toFixed(0);
+  if (a >= 1) return v.toFixed(2).replace(/\.?0+$/, '');
+  if (a >= 1e-3) return String(+v.toPrecision(3));
+  return v.toExponential(1);
+}
+
+/* ---------------- panel 1: position ---------------- */
+function drawQ(V){
+  const c = cv.q, ctx = prep(c), w = c._w, h = c._h;
+  const sx = x => (x - XR[0]) / (XR[1] - XR[0]) * w, sy = y => h - (y - YR[0]) / (YR[1] - YR[0]) * h;
+  ctx.drawImage(layers.bgQ, 0, 0, w, h);
+  const reg = regionFor(V.Hlev);
+  ctx.drawImage(layers.region, 0, 0, w, h);
+  ctx.drawImage(layers.samples, 0, 0, w, h);
+  ctx.strokeStyle = C.energy; ctx.lineWidth = 1.6; ctx.beginPath();
+  const s = reg.segs; for (let k = 0; k < s.length; k += 4){ ctx.moveTo(sx(s[k]), sy(s[k+1])); ctx.lineTo(sx(s[k+2]), sy(s[k+3])); }
+  ctx.stroke();
+
+  if (cur && V.idx >= 0){
+    const upto = V.idx, faded = phase === 'idle';
+    ctx.globalAlpha = faded ? 0.45 : 1;
+    ctx.strokeStyle = C.accent; ctx.lineWidth = 1.8; ctx.lineJoin = 'round'; ctx.beginPath();
+    for (let i = 0; i <= upto; i++){ const q = cur.qs[i]; i ? ctx.lineTo(sx(q[0]), sy(q[1])) : ctx.moveTo(sx(q[0]), sy(q[1])); }
+    ctx.stroke();
+    ctx.fillStyle = C.accent;
+    for (let i = 0; i <= upto; i++){ const q = cur.qs[i]; ctx.beginPath(); ctx.arc(sx(q[0]), sy(q[1]), 2, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    disc(ctx, sx(cur.q0[0]), sy(cur.q0[1]), 4, null, C.accent, 1.5);
+  }
+  const done = cur && V.done;
+  if (done){
+    const e = cur.qs[cur.n];
+    if (cur.accept) disc(ctx, sx(e[0]), sy(e[1]), 9, null, C.ok, 2.4);
+    else cross(ctx, sx(e[0]), sy(e[1]), 7, C.bad);
+  }
+  /* current state */
+  let q = V.q, p = V.p;
+  if (done && !cur.accept){ q = cur.q0; }
+  const PS = 0.55;
+  if (!(done)) arrow(ctx, sx(q[0]), sy(q[1]), sx(q[0] + PS * p[0]), sy(q[1] + PS * p[1]), C.mom, 2.2);
+  disc(ctx, sx(q[0]), sy(q[1]), 5.5, C.ink, C.panel, 1.8);
+
+  label(ctx, 'q₁ →', w - 8, h - 8, { align: 'right', color: C.muted });
+  label(ctx, 'q₂ ↑', 8, 18, { color: C.muted });
+  label(ctx, `H₀ = ${V.Hlev.toFixed(2)}   U(q) = ${V.U.toFixed(2)}`, 8, h - 8, { mono: true, size: 11.5, color: C.muted });
+  if (done){
+    const msg = cur.div ? 'diverged · rejected' : cur.accept ? 'accepted' : 'rejected · stays at start';
+    label(ctx, msg, w - 8, 18, { align: 'right', color: cur.accept ? C.ok : C.bad, size: 12.5 });
+  } else if (phase === 'refresh') label(ctx, 'resampling momentum p ~ N(0, I)', w - 8, 18, { align: 'right', color: C.mom, size: 12.5 });
+  else if (phase === 'integrate') label(ctx, `leapfrog step ${V.idx} / ${cur.L}`, w - 8, 18, { align: 'right', color: C.accent, size: 12.5 });
+}
+
+/* ---------------- panel 2: momentum ---------------- */
+function drawP(V){
+  const c = cv.p, ctx = prep(c), w = c._w, h = c._h, s = w / (2 * PR);
+  const sx = x => w / 2 + x * s, sy = y => h / 2 - y * s;
+  ctx.drawImage(layers.bgP, 0, 0, w, h);
+  const done = cur && V.done;
+
+  if (cur && V.idx >= 0){
+    ctx.globalAlpha = phase === 'idle' ? 0.45 : 1;
+    ctx.strokeStyle = C.mom; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.beginPath();
+    for (let i = 0; i <= V.idx; i++){ const p = cur.ps[i]; i ? ctx.lineTo(sx(p[0]), sy(p[1])) : ctx.moveTo(sx(p[0]), sy(p[1])); }
+    ctx.stroke(); ctx.fillStyle = C.mom;
+    for (let i = 0; i <= V.idx; i++){ const p = cur.ps[i]; ctx.beginPath(); ctx.arc(sx(p[0]), sy(p[1]), 1.8, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
+  if (phase === 'refresh'){
+    const pp = cur.prevP;
+    disc(ctx, sx(pp[0]), sy(pp[1]), 5, null, col('mom', 0.6), 1.5);
+    ctx.setLineDash([3, 3]); arrow(ctx, sx(pp[0]), sy(pp[1]), sx(cur.p0[0]), sy(cur.p0[1]), col('mom', 0.5), 1.4); ctx.setLineDash([]);
+  }
+  const p = V.p, pr = Math.hypot(p[0], p[1]);
+  disc(ctx, sx(p[0]), sy(p[1]), 5.5, C.mom, C.panel, 1.8);
+
+  const narrow = w < 400;
+  label(ctx, `|p| = ${pr.toFixed(3)}`, narrow ? 8 : w - 8, h - 9, { mono: true, size: 11.5, align: narrow ? 'left' : 'right', color: C.mom });
+}
+
+/* ---------------- panel 3: energy plane ---------------- */
+let Emax = 5;
+function eLayout(w, h){
+  const strip = Math.max(24, Math.min(40, w * 0.07)), padL = 30, padB = 30, padT = 8, padR = 10;
+  return { strip, x0: padL + strip, x1: w - padR, y0: padT, y1: h - padB - strip };
+}
+function buildBgE(){
+  const c = cv.e, w = c._w, h = c._h, L = eLayout(w, h);
+  const bg = offscreen(c.width, c.height), bx = bg.getContext('2d'); bx.scale(c._dpr, c._dpr);
+  bx.fillStyle = C.panel; bx.fillRect(0, 0, w, h);
+  const sx = u => L.x0 + u / Emax * (L.x1 - L.x0), sy = k => L.y1 - k / Emax * (L.y1 - L.y0);
+  /* shading e^{-(U+K)} */
+  const R = 160, hm = offscreen(R, R), hx = hm.getContext('2d'), img = hx.createImageData(R, R);
+  const lo = C.rgb['dens-lo'], hi = C.rgb.energy;
+  for (let r = 0; r < R; r++) for (let i = 0; i < R; i++){
+    const u = Emax * (i + 0.5) / R, k = Emax * (1 - (r + 0.5) / R);
+    const m = mix(lo, hi, 0.32 * Math.exp(-(u + k))), o = (r * R + i) * 4;
+    img.data[o] = m[0]; img.data[o+1] = m[1]; img.data[o+2] = m[2]; img.data[o+3] = 255;
+  }
+  hx.putImageData(img, 0, 0);
+  bx.drawImage(hm, L.x0, L.y0, L.x1 - L.x0, L.y1 - L.y0);
+  /* iso-energy diagonals */
+  bx.save(); bx.beginPath(); bx.rect(L.x0, L.y0, L.x1 - L.x0, L.y1 - L.y0); bx.clip();
+  const stepH = Emax <= 12 ? 1 : Emax <= 24 ? 2 : 5;
+  bx.strokeStyle = col('ink', 0.13); bx.lineWidth = 1;
+  for (let H = stepH; H <= 2 * Emax; H += stepH){ bx.beginPath(); bx.moveTo(sx(0), sy(H)); bx.lineTo(sx(H), sy(0)); bx.stroke(); }
+  bx.restore();
+  bx.fillStyle = C.muted; bx.font = font(10); bx.textAlign = 'left'; bx.textBaseline = 'middle';
+  for (let H = stepH * 2; H < Emax; H += stepH * 2) bx.fillText(`H=${H}`, sx(0) + 3, sy(H) - 1);
+  /* frame */
+  bx.strokeStyle = C.line; bx.lineWidth = 1; bx.strokeRect(L.x0 + 0.5, L.y0 + 0.5, L.x1 - L.x0 - 1, L.y1 - L.y0 - 1);
+  /* ticks on strips */
+  bx.fillStyle = C.muted; bx.font = font(10); bx.textBaseline = 'top'; bx.textAlign = 'center';
+  const tstep = Emax <= 6 ? 1 : Emax <= 12 ? 2 : Emax <= 24 ? 4 : 10;
+  for (let t = 0; t < Emax - 0.5 * tstep; t += tstep){ bx.fillText(t, sx(t), L.y1 + L.strip + 3); }
+  bx.textAlign = 'right'; bx.textBaseline = 'middle';
+  for (let t = tstep; t < Emax - 0.5 * tstep; t += tstep){ bx.fillText(t, L.x0 - L.strip - 3, sy(t)); }
+  /* marginal Exp(1) curves */
+  bx.strokeStyle = col('mom', 0.9); bx.fillStyle = col('mom', 0.14); bx.lineWidth = 1.4; bx.beginPath();
+  bx.moveTo(L.x0, sy(0));
+  for (let k = 0; k <= Emax; k += Emax / 200) bx.lineTo(L.x0 - Math.exp(-k) * (L.strip - 3), sy(k));
+  bx.lineTo(L.x0, sy(Emax)); bx.closePath(); bx.fill(); bx.stroke();
+  /* axis names */
+  bx.fillStyle = C.ink; bx.font = font(11.5); bx.textAlign = 'right'; bx.textBaseline = 'alphabetic';
+  bx.fillText('potential U(q) →', L.x1, h - 4);
+  bx.save(); bx.translate(13, L.y0); bx.rotate(-Math.PI / 2); bx.textAlign = 'right'; bx.fillText('kinetic K(p) →', 0, 0); bx.restore();
+  layers.bgE = bg; layers.bgEmax = Emax;
+}
+function drawE(V){
+  const c = cv.e, w = c._w, h = c._h, L = eLayout(w, h);
+  let want = 5;
+  if (cur){ want = Math.max(want, cur.prevH + 0.6); for (let i = 0; i <= cur.n; i++){ const H = cur.Us[i] + cur.Ks[i]; if (isFinite(H)) want = Math.max(want, Math.min(H, 60) + 0.6); } }
+  else want = Math.max(want, V.U + V.K + 0.6);
+  want = Math.ceil(want);
+  if (want !== Emax){ Emax = want; layers.bgE = null; }
+  if (!layers.bgE) buildBgE();
+  const ctx = prep(c);
+  ctx.drawImage(layers.bgE, 0, 0, w, h);
+  const sx = u => L.x0 + u / Emax * (L.x1 - L.x0), sy = k => L.y1 - k / Emax * (L.y1 - L.y0);
+  /* U histogram of samples vs Exp(1) */
+  {
+    const base = L.y1 + 1, hh = L.strip - 4;
+    if (sim.uN > 0){
+      ctx.fillStyle = col('accent', 0.35);
+      for (let b = 0; b < UBINS; b++){
+        const u0 = b * UBIN; if (u0 >= Emax) break;
+        const dens = sim.uHist[b] / sim.uN / UBIN;
+        ctx.fillRect(sx(u0) + 0.5, base, sx(u0 + UBIN) - sx(u0) - 1, Math.min(1.15, dens) * hh);
+      }
+    }
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2; ctx.beginPath();
+    for (let u = 0; u <= Emax; u += Emax / 200){ const y = base + Math.exp(-u) * hh; u ? ctx.lineTo(sx(u), y) : ctx.moveTo(sx(u), y); }
+    ctx.stroke();
+  }
+  ctx.save(); ctx.beginPath(); ctx.rect(L.x0, L.y0, L.x1 - L.x0, L.y1 - L.y0); ctx.clip();
+  /* cloud of past states */
+  ctx.fillStyle = col('ink', 0.28);
+  for (const [u, k] of sim.cloud){ ctx.fillRect(sx(u) - 1.2, sy(k) - 1.2, 2.4, 2.4); }
+  /* energy lines */
+  const line = (H, color, lw, dash) => { ctx.setLineDash(dash || []); ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(sx(0), sy(H)); ctx.lineTo(sx(H), sy(0)); ctx.stroke(); ctx.setLineDash([]); };
+  if (phase === 'refresh') line(cur.prevH, col('energy', 0.55), 1.4, [5, 4]);
+  line(V.Hlev, C.energy, 2.2);
+  /* refresh jump */
+  if (cur && (phase === 'refresh' || V.idx >= 0)){
+    const k1 = phase === 'refresh' ? V.K : cur.K0;
+    ctx.setLineDash([4, 3]); arrow(ctx, sx(cur.U0), sy(cur.prevK), sx(cur.U0), sy(k1), col('mom', phase === 'idle' ? 0.45 : 0.95), 1.8); ctx.setLineDash([]);
+  }
+  /* trajectory */
+  if (cur && V.idx >= 0){
+    ctx.globalAlpha = phase === 'idle' ? 0.45 : 1;
+    ctx.strokeStyle = C.accent; ctx.lineWidth = 1.6; ctx.beginPath();
+    for (let i = 0; i <= V.idx; i++){ const x = sx(cur.Us[i]), y = sy(cur.Ks[i]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.stroke(); ctx.fillStyle = C.accent;
+    for (let i = 0; i <= V.idx; i++){ ctx.beginPath(); ctx.arc(sx(cur.Us[i]), sy(cur.Ks[i]), 2.2, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
+  const done = cur && V.done;
+  if (done){
+    const x = sx(cur.Us[cur.n]), y = sy(cur.Ks[cur.n]);
+    if (cur.accept) disc(ctx, x, y, 8.5, null, C.ok, 2.2); else cross(ctx, x, y, 6.5, C.bad);
+  }
+  let U = V.U, K = V.K; if (done && !cur.accept){ U = cur.U0; K = cur.K0; }
+  disc(ctx, sx(U), sy(K), 5.5, C.ink, C.panel, 1.8);
+  ctx.restore();
+  label(ctx, `U ${U.toFixed(2)} + K ${K.toFixed(2)} = ${(U + K).toFixed(3)}`, L.x1 - 6, L.y0 + 16, { align: 'right', mono: true, size: 11.5 });
+  label(ctx, `H₀ = ${V.Hlev.toFixed(3)}`, L.x1 - 6, L.y0 + 32, { align: 'right', mono: true, size: 11.5, color: C.energy });
+}
+
+/* ---------------- panel 4a: ΔH along trajectory ---------------- */
+function drawD(V){
+  const c = cv.d, ctx = prep(c), w = c._w, h = c._h;
+  const x0 = 50, x1 = w - 12, y0 = 10, y1 = h - 22;
+  if (!cur){
+    label(ctx, 'Press Play or Step to run a proposal', w / 2, h / 2, { align: 'center', color: C.muted });
+    return;
+  }
+  const n = cur.n, Rng = niceCeil(Math.max(cur.maxAbs * 1.2, 2e-4));
+  const sx = i => x0 + i / Math.max(1, cur.L) * (x1 - x0), sy = v => (y0 + y1) / 2 - Math.max(-1.08, Math.min(1.08, v / Rng)) * (y1 - y0) / 2;
+  /* threshold */
+  const thr = cur.thr;
+  if (thr < Rng){
+    ctx.fillStyle = col('bad', 0.10); ctx.fillRect(x0, y0, x1 - x0, sy(thr) - y0);
+    ctx.setLineDash([5, 4]); ctx.strokeStyle = C.bad; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x0, sy(thr)); ctx.lineTo(x1, sy(thr)); ctx.stroke(); ctx.setLineDash([]);
+    label(ctx, w < 400 ? `reject if ΔH > ${fmt(thr)}` : `reject zone: final ΔH > −log u = ${fmt(thr)}`, x1 - 4, sy(thr) - 5, { align: 'right', color: C.bad, size: 11.5 });
+  } else {
+    const k = thr / Rng, ks = k >= 100 ? Math.round(k).toLocaleString() : k.toFixed(k >= 10 ? 0 : 1);
+    label(ctx, w < 400 ? `↑ −log u = ${fmt(thr)} (${ks}× off-chart)` : `↑ rejection threshold −log u = ${fmt(thr)} is ${ks}× above this chart`, x1 - 4, y0 + 12, { align: 'right', color: C.bad, size: 11.5 });
+  }
+  /* axes */
+  ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.strokeRect(x0 + 0.5, y0 + 0.5, x1 - x0 - 1, y1 - y0 - 1);
+  ctx.strokeStyle = C.energy; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x0, sy(0)); ctx.lineTo(x1, sy(0)); ctx.stroke();
+  label(ctx, w < 400 ? 'exact flow' : 'exact flow: ΔH = 0', x0 + 6, sy(0) + 14, { color: C.energy, size: 11 });
+  ctx.fillStyle = C.muted; ctx.font = font(10.5, true); ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (const t of (h < 160 ? [-1, 0, 1] : [-1, -0.5, 0, 0.5, 1])) ctx.fillText(fmt(t * Rng), x0 - 5, sy(t * Rng));
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.font = font(10.5);
+  ctx.fillText('0', sx(0), y1 + 4); ctx.fillText(`${cur.L}`, sx(cur.L), y1 + 4); ctx.fillText('leapfrog step', (x0 + x1) / 2, y1 + 4);
+  /* clip region */
+  ctx.save(); ctx.beginPath(); ctx.rect(x0, y0 - 2, x1 - x0, y1 - y0 + 4); ctx.clip();
+  /* recent curves */
+  ctx.strokeStyle = col('ink', 0.12); ctx.lineWidth = 1;
+  for (const cv_ of sim.curves){ if (cv_ === cur.dH) continue; ctx.beginPath(); cv_.forEach((v, i) => { const X = x0 + i / Math.max(1, cv_.length - 1) * (x1 - x0); i ? ctx.lineTo(X, sy(v)) : ctx.moveTo(X, sy(v)); }); ctx.stroke(); }
+  if (V.idx >= 0){
+    ctx.strokeStyle = C.accent; ctx.lineWidth = 1.8; ctx.beginPath();
+    for (let i = 0; i <= V.idx; i++){ i ? ctx.lineTo(sx(i), sy(cur.dH[i])) : ctx.moveTo(sx(i), sy(cur.dH[i])); }
+    ctx.stroke(); ctx.fillStyle = C.accent;
+    for (let i = 0; i <= V.idx; i++){ ctx.beginPath(); ctx.arc(sx(i), sy(cur.dH[i]), 1.8, 0, 7); ctx.fill(); }
+  }
+  ctx.restore();
+  if (V.done){
+    const X = sx(n), Y = sy(cur.final);
+    if (cur.accept) disc(ctx, X, Y, 6, null, C.ok, 2.2); else cross(ctx, X, Y, 5.5, C.bad);
+    const txt = cur.div ? 'trajectory diverged → rejected'
+      : `${w < 400 ? 'ΔH' : 'final ΔH'} = ${fmt(cur.final)} → accept prob ${cur.alpha >= 0.9995 && cur.alpha < 1 ? '>0.999' : cur.alpha.toFixed(3)}${w < 400 ? '' : ' · ' + (cur.accept ? 'accepted' : 'rejected')}`;
+    label(ctx, txt, x0 + 6, y1 - 8, { color: cur.accept ? C.ok : C.bad, size: 11.5 });
+  } else if (phase === 'refresh'){
+    label(ctx, `${w < 400 ? 'H' : 'new momentum: H jumps'} ${cur.prevH.toFixed(2)} → ${cur.H0.toFixed(2)}`, x0 + 6, y1 - 8, { color: C.mom, size: 11.5 });
+  }
+}
+
+/* ---------------- panel 4b: histogram of final ΔH ---------------- */
+function drawH(){
+  const c = cv.h, ctx = prep(c), w = c._w, h = c._h;
+  const x0 = 50, x1 = w - 40, y0 = 22, y1 = h - 22;
+  const log = sim.dHlog;
+  const narrow = w < 400;
+  if (!narrow) label(ctx, 'final ΔH over all proposals', x0, 14, { color: C.ink, size: 11.5, halo: false });
+  if (!log.length){ label(ctx, 'no proposals yet', (x0 + x1) / 2, (y0 + y1) / 2, { align: 'center', color: C.muted }); return; }
+  if (!histCache){
+    const vals = log.filter(e => !e.d).map(e => e.v).sort((a, b) => a - b);
+    const abs = vals.map(Math.abs).sort((a, b) => a - b);
+    const qa = abs.length ? abs[Math.floor(0.97 * (abs.length - 1))] : 0.1;
+    const R = niceCeil(Math.max(qa * 1.15, 1e-4)), lo = -R, hi = R;
+    const NB = 41, bw = (hi - lo) / NB, acc = new Float64Array(NB), rej = new Float64Array(NB);
+    for (const e of log){
+      const v = e.d ? hi : e.v; let b = Math.floor((v - lo) / bw); b = Math.max(0, Math.min(NB - 1, b));
+      (e.a ? acc : rej)[b]++;
+    }
+    let mx = 1; for (let b = 0; b < NB; b++) mx = Math.max(mx, acc[b] + rej[b]);
+    histCache = { lo, hi, NB, bw, acc, rej, mx, nrej: log.filter(e => !e.a).length };
+  }
+  const { lo, hi, NB, bw, acc, rej, mx, nrej } = histCache;
+  const sx = v => x0 + (v - lo) / (hi - lo) * (x1 - x0), sy = f => y1 - f * (y1 - y0);
+  /* reject probability shading for ΔH>0 */
+  ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.strokeRect(x0 + 0.5, y0 + 0.5, x1 - x0 - 1, y1 - y0 - 1);
+  for (let b = 0; b < NB; b++){
+    const X = sx(lo + b * bw) + 0.5, W = Math.max(1, sx(lo + (b + 1) * bw) - sx(lo + b * bw) - 1);
+    const ha = acc[b] / mx * (y1 - y0), hr = rej[b] / mx * (y1 - y0);
+    ctx.fillStyle = col('ok', 0.65); ctx.fillRect(X, y1 - ha, W, ha);
+    ctx.fillStyle = C.bad; ctx.fillRect(X, y1 - ha - hr, W, hr);
+  }
+  /* P(reject | ΔH) curve, right axis */
+  ctx.strokeStyle = C.energy; ctx.lineWidth = 1.6; ctx.setLineDash([5, 3]); ctx.beginPath();
+  for (let i = 0; i <= 200; i++){ const v = lo + (hi - lo) * i / 200, pr = v > 0 ? 1 - Math.exp(-v) : 0; i ? ctx.lineTo(sx(v), sy(pr)) : ctx.moveTo(sx(v), sy(pr)); }
+  ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = col('ink', 0.25); ctx.beginPath(); ctx.moveTo(sx(0), y0); ctx.lineTo(sx(0), y1); ctx.stroke();
+  ctx.fillStyle = C.muted; ctx.font = font(10.5, true); ctx.textBaseline = 'top'; ctx.textAlign = 'center';
+  for (const t of [-1, -0.5, 0, 0.5, 1]) ctx.fillText(fmt(t * hi), sx(t * hi), y1 + 4);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = C.energy;
+  for (const t of [0, 0.5, 1]) ctx.fillText(t.toFixed(1), x1 + 5, sy(t));
+  ctx.save(); ctx.translate(w - 6, (y0 + y1) / 2); ctx.rotate(Math.PI / 2); ctx.textAlign = 'center'; ctx.font = font(10); ctx.fillText('P(reject)', 0, 0); ctx.restore();
+  ctx.fillStyle = C.muted; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.font = font(10.5, true);
+  ctx.fillText(String(mx), x0 - 5, y0 + 4); ctx.fillText('0', x0 - 5, y1);
+  ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic'; ctx.font = font(10); ctx.fillStyle = C.muted; if (!narrow) ctx.fillText('edge bins include overflow', x1 - 4, y0 + 12);
+  label(ctx, `${nrej} rejected of ${log.length} (${(100 * nrej / log.length).toFixed(1)}%)`, narrow ? x0 : x1, 14, { align: narrow ? 'left' : 'right', color: nrej ? C.bad : C.muted, size: 11.5, halo: false });
+}
+
+/* ---------------- stats ---------------- */
+const statsEl = document.getElementById('stats');
+let lastStats = '';
+function drawStats(){
+  const s = sim;
+  const parts = [
+    ['Proposals', s.n],
+    ['Accepted', s.n ? `${(100 * s.acc / s.n).toFixed(1)}%` : '—'],
+    ['Mean accept prob', s.n ? s.sumAlpha / s.n : null],
+    ['Mean e^(−ΔH) (→ 1)', s.n ? s.sumExp / s.n : null],
+    ['Divergent', s.div],
+  ];
+  const html = parts.map(([k, v]) => `<span>${k} <b>${v === null ? '—' : typeof v === 'number' && !Number.isInteger(v) ? v.toFixed(4) : v}</b></span>`).join('');
+  if (html !== lastStats){ statsEl.innerHTML = html; lastStats = html; }
+}
+
+/* ---------------- main loop ---------------- */
+let needsDraw = true, lastTs = 0;
+function drawAll(){
+  const V = view();
+  drawQ(V); drawP(V); drawE(V); drawD(V); drawH(); drawStats();
+}
+function frame(ts){
+  const ms = lastTs ? Math.min(100, ts - lastTs) : 16; lastTs = ts;
+  let changed = false;
+  if (turbo && (playing || pendingStep)){
+    runTurbo(playing ? 30 : 1); pendingStep = false; changed = true;
+  } else changed = advance(ms);
+  if (changed || needsDraw){ drawAll(); needsDraw = false; }
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- UI ---------------- */
+const playBtn = document.getElementById('play');
+function setPlaying(v){ playing = v; playBtn.textContent = v ? 'Pause' : 'Play'; }
+playBtn.onclick = () => setPlaying(!playing);
+document.getElementById('step').onclick = () => { setPlaying(false); if (phase === 'idle') pendingStep = true; };
+document.getElementById('reset').onclick = () => { setPlaying(false); resetSim(); };
+const Lin = document.getElementById('L'), Lo = document.getElementById('Lo');
+Lin.oninput = () => { params.L = +Lin.value; Lo.textContent = Lin.value; };
+const dtin = document.getElementById('dt'), dto = document.getElementById('dto');
+dtin.oninput = () => { params.dt = +dtin.value; dto.textContent = (+dtin.value).toFixed(3); };
+document.querySelectorAll('#speed button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#speed button').forEach(x => x.classList.toggle('on', x === b));
+  if (b.dataset.s === 'turbo'){ turbo = true; if (phase !== 'idle'){ if (phase !== 'decide') commit(cur); phase = 'idle'; } }
+  else { turbo = false; speed = +b.dataset.s; }
+  needsDraw = true;
+});
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' && e.key === ' ') return;
+  if (e.key === ' '){ e.preventDefault(); setPlaying(!playing); }
+  else if (e.key === 'ArrowRight'){ e.preventDefault(); document.getElementById('step').click(); }
+});
+
+function relayout(){
+  let any = false;
+  for (const k in cv) any = sizeCanvas(cv[k]) || any;
+  if (any || !layers.bgQ){ buildLayers(); needsDraw = true; }
+}
+readTheme();
+resetSim();
+/* fit all four panels on one screen: pick 2×2 or 1×4, whichever gives bigger plots */
+function fitLayout(){
+  const grid = document.getElementById('grid'), bar = document.querySelector('.bar');
+  const W = document.documentElement.clientWidth - 24;
+  const H = window.innerHeight - bar.getBoundingClientRect().height - 10 - 10 - 10;
+  const gap = 10, hc = 22, vc = 48, MIN = 240;
+  const s2 = Math.min((W - gap) / 2 - hc, (H - gap) / 2 - vc);
+  const s4 = Math.min((W - 3 * gap) / 4 - hc, H - vc);
+  let cols = s4 > s2 ? 4 : 2, s = Math.max(s2, s4);
+  if (s < MIN){   // screen too small to fit: fall back to scrolling
+    cols = W >= 2 * (MIN + hc) + gap ? 2 : 1;
+    s = cols === 2 ? (W - gap) / 2 - hc : W - hc;
+  }
+  grid.style.setProperty('--cols', cols);
+  grid.style.setProperty('--s', Math.floor(Math.max(180, s)) + 'px');
+}
+fitLayout();
+relayout();
+window.addEventListener('resize', () => { fitLayout(); relayout(); });
+new ResizeObserver(() => { fitLayout(); relayout(); }).observe(document.querySelector('.bar'));
+
+/* info-icon tooltips */
+const tip = document.getElementById('tip');
+let tipFor = null;
+function showTip(btn){
+  tip.innerHTML = btn.nextElementSibling.innerHTML; tip.classList.add('on'); tipFor = btn;
+  const r = btn.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  let x = r.right - tw; if (x < 8) x = Math.min(r.left, innerWidth - 8 - tw); x = Math.max(8, x);
+  let y = r.bottom + 6; if (y + th > innerHeight - 8) y = Math.max(8, r.top - 6 - th);
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function hideTip(){ tip.classList.remove('on'); tipFor = null; }
+document.querySelectorAll('.info').forEach(b => {
+  b.addEventListener('mouseenter', () => showTip(b));
+  b.addEventListener('mouseleave', () => { if (document.activeElement !== b) hideTip(); });
+  b.addEventListener('focus', () => showTip(b));
+  b.addEventListener('blur', hideTip);
+  b.addEventListener('click', () => showTip(b));
+});
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && tipFor){ tipFor.blur(); hideTip(); } });
+window.addEventListener('scroll', hideTip, { passive: true });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readTheme(); buildLayers(); needsDraw = true; });
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

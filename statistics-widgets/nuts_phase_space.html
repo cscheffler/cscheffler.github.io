@@ -1,0 +1,1133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NUTS Phase Space</title>
+<style>
+:root{
+  --bg:#f5f4f0; --panel:#ffffff; --ink:#1c1c1f; --muted:#6c6c72; --line:#e2e0da; --grid:#eeede8;
+  --accent:#2b59d1; --energy:#d47a1f; --mom:#7a49cf; --ok:#1d9a52; --bad:#d63838;
+  --dens-lo:#ffffff; --dens-hi:#2b59d1; --forbid-fill:rgba(60,55,50,0.07); --forbid-line:rgba(60,55,50,0.28);
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111215; --panel:#1a1c21; --ink:#e7e7ea; --muted:#9a9ba4; --line:#2c2f36; --grid:#24262c;
+    --accent:#7199ff; --energy:#f2a24b; --mom:#ad88ff; --ok:#3fcf7d; --bad:#ff6767;
+    --dens-lo:#1a1c21; --dens-hi:#5b86ff; --forbid-fill:rgba(0,0,0,0.38); --forbid-line:rgba(255,255,255,0.22);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111215; --panel:#1a1c21; --ink:#e7e7ea; --muted:#9a9ba4; --line:#2c2f36; --grid:#24262c;
+  --accent:#7199ff; --energy:#f2a24b; --mom:#ad88ff; --ok:#3fcf7d; --bad:#ff6767;
+  --dens-lo:#1a1c21; --dens-hi:#5b86ff; --forbid-fill:rgba(0,0,0,0.38); --forbid-line:rgba(255,255,255,0.22);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+.wrap{padding:10px 12px 40px}
+.bar{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:6px 12px;margin:0 auto 10px;width:fit-content;max-width:100%}
+button{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:4px 12px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;min-width:70px}
+.btns{display:flex;gap:6px}
+label.sl{display:flex;align-items:center;gap:8px;color:var(--muted);white-space:nowrap}
+label.sl output{font-family:var(--mono);color:var(--ink);min-width:3.2em;font-size:13px}
+input[type=range]{width:110px;accent-color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:transparent;padding:4px 10px;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--ink);color:var(--panel)}
+.statwrap{display:flex;align-items:center;gap:6px;border-left:1px solid var(--line);padding-left:16px}
+.stats{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:12.5px;color:var(--muted)}
+.stats b{font-family:var(--mono);font-weight:500;color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(var(--cols,2), max-content);gap:10px;justify-content:center}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px 10px}
+.ph{display:flex;align-items:center;justify-content:space-between;height:22px;margin-bottom:6px}
+.panel h2{font-size:13.5px;font-weight:620;margin:0}
+canvas{display:block;border-radius:6px}
+canvas.sq{width:var(--s,400px);height:var(--s,400px)}
+canvas.wide{width:var(--s,400px);height:calc((var(--s,400px) - 8px) / 2)}
+canvas.wide + canvas.wide{margin-top:8px}
+.info{display:inline-grid;place-items:center;width:22px;height:22px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--muted);flex:none}
+.info:hover,.info:focus-visible{color:var(--ink);background:var(--bg)}
+.info svg{width:17px;height:17px}
+.tip-src{display:none}
+#tip{position:fixed;z-index:50;left:0;top:0;max-width:min(360px,calc(100vw - 16px));background:var(--panel);color:var(--ink);border:1px solid var(--line);
+  border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.22);padding:10px 12px;font-size:12.5px;line-height:1.45;pointer-events:none;opacity:0;transition:opacity .1s}
+#tip.on{opacity:1}
+#tip p{margin:0 0 8px}
+#tip .lg{display:grid;gap:3px;color:var(--muted)}
+#tip .lg span{display:flex;align-items:center;gap:7px}
+.sw{display:inline-block;width:14px;height:3px;border-radius:2px;flex:none}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none}
+.read{margin:28px auto 0;max-width:1100px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 20px}
+.read h3{font-size:15px;margin:0 0 8px}
+.read ol{margin:0;padding-left:20px}
+.read li{margin:0 0 8px}
+.read p{margin:10px 0 0}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div class="btns">
+      <button id="play" class="primary">Play</button>
+      <button id="step" title="One iteration (→)">Step</button>
+      <button id="reset">Reset</button>
+    </div>
+    <label class="sl">Max tree depth <input id="MD" type="range" min="1" max="10" step="1" value="10"><output id="MDo">10</output></label>
+    <label class="sl">Step size Δt <input id="dt" type="range" min="0.025" max="0.4" step="0.025" value="0.1"><output id="dto">0.100</output></label>
+    <div class="seg" id="speed">
+      <button data-s="0.3">Slow</button><button data-s="1" class="on">Normal</button><button data-s="3.5">Fast</button><button data-s="turbo">Turbo</button>
+    </div>
+    <div class="statwrap">
+      <div class="stats" id="stats"></div>
+      <button class="info" aria-label="About these statistics"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="6.2" r="1.1" fill="currentColor"/><path d="M10 9v5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+      <div class="tip-src">
+        <p><b>Steps / ESS</b> is the number of gradient evaluations per effective sample. It is the cost of one draw's worth of independent information, and the number to minimise when tuning Δt. ESS is the smaller of the effective sample sizes of q₁ and q₂, from the chain's autocorrelation (Geyer's initial monotone sequence). Only iterations since Δt or max tree depth last changed count, and at least 100 are needed. With a few hundred it is still noisy, so let Turbo run for a while. Hover over it to see the ESS itself.</p>
+        <p><b>Mean depth</b> is the number of doublings that were merged into the trajectory. A trajectory of depth d has 2^d points.</p>
+        <p><b>Steps / iter</b> counts gradient evaluations per iteration, including any half that was built and then discarded. This is the cost of NUTS.</p>
+        <p><b>Mean accept stat</b> averages min(1, e^(−ΔH)) over every point built. It is the quantity Stan's step-size adaptation targets (0.8 by default). Here Δt is fixed.</p>
+        <p><b>Mean |Δθ|</b> is how far round the ring each iteration moves the sample, on average. It measures exploration better than acceptance does.</p>
+        <p><b>Divergent</b> counts iterations stopped because the energy error exceeded 1000.</p>
+        <p style="margin:0">Keys: <kbd>Space</kbd> play/pause · <kbd>→</kbd> one iteration.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" id="grid">
+    <div class="panel">
+      <div class="ph"><h2>1 · Position space q</h2>
+        <button class="info" aria-label="About this panel"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="6.2" r="1.1" fill="currentColor"/><path d="M10 9v5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+        <div class="tip-src">
+          <p>The doughnut target, a thin ring of radius 2.6. NUTS grows a leapfrog trajectory by doubling it, forwards or backwards in time at random, until its two ends start heading back towards each other. The hatched region is energetically forbidden at the current energy H₀, so q is confined to the annulus between the orange circles.</p>
+          <div class="lg">
+            <span><i class="sw" style="background:var(--accent)"></i>leapfrog trajectory (one dot per step)</span>
+            <span><i class="sw" style="background:var(--muted);opacity:.6"></i>discarded half (dashed)</span>
+            <span><i class="sw" style="background:var(--ink);opacity:.6"></i>chord Δq = q⁺ − q⁻ between the two ends (red: U-turn)</span>
+            <span><i class="sw" style="background:var(--mom)"></i>momentum p⁻, p⁺ at the ends (red: pointing back)</span>
+            <span><i class="sw" style="background:var(--energy)"></i>U(q) = H₀, the turning boundary</span>
+            <span><i class="dot" style="background:var(--muted);opacity:.6"></i>samples</span>
+            <span><i class="dot" style="border:2px solid var(--ok)"></i>dashed: current pick · solid: chosen next sample</span>
+          </div>
+        </div>
+      </div>
+      <canvas id="cq" class="sq"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h2>2 · Momentum space p</h2>
+        <button class="info" aria-label="About this panel"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="6.2" r="1.1" fill="currentColor"/><path d="M10 9v5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+        <div class="tip-src">
+          <p>The U-turn test lives here. Let Δq = q⁺ − q⁻ be the chord between the trajectory's two ends. The trajectory is still spreading out as long as both end momenta point along Δq: p⁻·Δq ≥ 0 and p⁺·Δq ≥ 0.</p>
+          <p>The red half-plane is where p·Δq &lt; 0. Once either end's momentum is in it, extending further would bring the ends closer together, so NUTS stops. The test runs only when a subtree is complete, so an end can sit in the zone for a few steps before it is caught.</p>
+          <div class="lg">
+            <span><i class="sw" style="background:var(--mom)"></i>p along the trajectory</span>
+            <span><i class="sw" style="background:var(--ink);opacity:.7"></i>direction of Δq</span>
+            <span><i class="sw" style="background:var(--bad);opacity:.5"></i>U-turn zone p·Δq &lt; 0</span>
+            <span><i class="sw" style="background:var(--muted);opacity:.5"></i>dashed rings: |p| = 1, 2, 3 of the N(0, I) momentum distribution</span>
+          </div>
+        </div>
+      </div>
+      <canvas id="cp" class="sq"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h2>3 · Energy plane (U, K)</h2>
+        <button class="info" aria-label="About this panel"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="6.2" r="1.1" fill="currentColor"/><path d="M10 9v5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+        <div class="tip-src">
+          <p>Each 4-D state collapsed to its potential and kinetic energy. Energy levels are diagonals. Resampling p is a vertical jump, since U is unchanged. Leapfrog then slides along the diagonal, in both directions from the start point, because NUTS integrates backwards in time as well as forwards.</p>
+          <p>Shading is the joint density, proportional to e^(−(U+K)) / √U (capped near U = 0). Margins show the densities of K, which is Exp(1) (left), and U, which is Gamma(½, 1) (bottom, drawn at half height). The bars are the U values of the samples.</p>
+          <div class="lg">
+            <span><i class="sw" style="background:var(--mom)"></i>momentum refresh (U fixed)</span>
+            <span><i class="sw" style="background:var(--accent)"></i>leapfrog trajectory</span>
+            <span><i class="sw" style="background:var(--energy)"></i>H = H₀ (dashed: previous energy)</span>
+            <span><i class="dot" style="background:var(--muted);opacity:.6"></i>recent states</span>
+          </div>
+        </div>
+      </div>
+      <canvas id="ce" class="sq"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h2>4 · Trajectory tree</h2>
+        <button class="info" aria-label="About this panel"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="6.2" r="1.1" fill="currentColor"/><path d="M10 9v5.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+        <div class="tip-src">
+          <p><b>Top:</b> the trajectory laid out by integration time j, the number of leapfrog steps from the start point (negative means integrated backwards). The row of dots is the points. Each bracket above is a U-turn check on a balanced subtree of 2, 4, 8, … points. Every subtree is checked, not only the whole trajectory, and that is what makes NUTS reversible. A failed check (red) inside the half being added throws that whole half away.</p>
+          <p>Green bars give the probability that each point becomes the next sample. Within a new half, points are weighted by e^(−ΔH). The new half then takes over the pick with probability min(1, W_new / W_old), where W is the summed weight. This favours later doublings and pushes the sample away from the start.</p>
+          <p><b>Bottom:</b> tree depth of every iteration, coloured by why doubling stopped.</p>
+          <div class="lg">
+            <span><i class="sw" style="background:var(--ink);opacity:.35"></i>subtree check passed · <i class="sw" style="background:var(--ink);opacity:.8"></i>whole-trajectory check passed</span>
+            <span><i class="sw" style="background:var(--bad)"></i>U-turn found</span>
+            <span><i class="sw" style="background:var(--accent);opacity:.25"></i>half currently being built</span>
+            <span><i class="sw" style="background:var(--ok)"></i>P(pick); solid bar = current pick</span>
+          </div>
+        </div>
+      </div>
+      <canvas id="cd" class="wide"></canvas>
+      <canvas id="ch" class="wide"></canvas>
+    </div>
+  </div>
+  <div id="tip" role="tooltip"></div>
+
+  <div class="read">
+    <h3>What to look for</h3>
+    <ol>
+      <li><b>Doubling in random directions.</b> Each iteration resamples p and then repeatedly doubles the trajectory. It flips a coin for forwards or backwards in time and adds as many leapfrog steps as the trajectory already has: 1, 2, 4, 8, … In panel 4, points left of 0 were integrated backwards from the start. Integrating in both directions is what lets the start point sit anywhere inside the final trajectory.</li>
+      <li><b>The U-turn test.</b> After each doubling NUTS takes the chord Δq = q⁺ − q⁻ between the two ends (dashed in panel 1) and checks the momentum at each end. If p⁻·Δq or p⁺·Δq turns negative, one end has started coming back, so carrying on would mostly retrace ground already covered. Panel 2 shades the half-plane where that happens. On a circle the chord meets the direction of travel at each end at half the arc's angle, so the test trips once the trajectory has gone roughly half way round the ring. At Δt = 0.1 that takes about 56 steps on average, and the sample moves about 45° round the ring per iteration. The depth histogram is bimodal, though. When the fresh momentum points mostly across the ring rather than along it, the trajectory just bounces between the walls. The test then catches the first bounce, after about 4 steps, which shows up as the peak at depth 2. Nobody had to choose a number of leapfrog steps, and the sampler picks a different one for each momentum draw.</li>
+      <li><b>Every subtree is checked.</b> The same test runs on every balanced subtree (the brackets in panel 4), not only the whole trajectory. If a U-turn shows up inside the half being added, that half is discarded (grey) and the iteration ends with the trajectory as it was. On this target that is how about a third of iterations end. This is what makes the scheme reversible: starting from any point of the final trajectory, the same tree could have been built with the same probability.</li>
+      <li><b>Picking the sample.</b> There is no accept/reject step. The next state is drawn from the points of the trajectory. Within each new half, points are weighted by e^(−ΔH). The new half as a whole then takes over the pick with probability min(1, W_new / W_old). Each new half is as large as everything before it, so this is usually close to 1 and the pick tends to land in the last doubling, far from the start. Watch the green bars in panel 4 move outward with each merge.</li>
+      <li><b>Step size and tree depth.</b> Across the ring the potential is a stiff spring: U = (r − R)²/σ² makes q oscillate radially with angular frequency ω = √(2/σ²) ≈ 7.8, about 8 leapfrog steps per wobble at Δt = 0.1, while it drifts slowly round the ring. Halve Δt and the tree grows one level deeper to cover the same arc: steps per iteration double, but the jumps stay just as long. Raise Δt to 0.2–0.25 and ΔH grows, so the weights become uneven and the accept stat falls to about 0.8 and then 0.45, although the sample still moves well. Leapfrog is only stable for ω·Δt &lt; 2, which here means Δt &lt; √2·σ ≈ 0.26. Past that the radial oscillation blows up, trajectories diverge or U-turn after one or two steps, and the sampler barely moves. Watch Mean |Δθ| collapse. To see the trade-off, run Turbo at a few values of Δt and watch <b>Steps / ESS</b>. It falls from about 720 at Δt = 0.025 and about 225 at 0.1 to roughly 75–90 at 0.2–0.25, then jumps to about 900 at 0.275, just past the stability limit. Larger steps are cheaper, right up to the point where they fail. Stan adapts Δt until the accept stat averages 0.8. Here that happens at about Δt = 0.2, close to the optimum but with some margin before the limit. Lower the max tree depth to 4 to see trajectories cut off before they U-turn (orange in the depth histogram): each iteration then only moves about 12° round the ring.</li>
+      <li><b>A neat fact about this target.</b> Each energy level U = u is a pair of circles, at r = R ± σ√u. Their circumferences 2π(R ± σ√u) add up to 4πR whatever u is (as long as the inner circle exists, u &lt; R²/σ² ≈ 205), so the r-dependence cancels: under the target U(q) is Gamma(½, 1), with density e^(−u)/√(πu) and mean ½. It is not Exp(1), because q is 2-D but the potential only constrains its one radial direction. In the energy plane the joint density is therefore e^(−(U+K))/√U. Unlike the banana, it is no longer constant along an energy line: the 1/√U factor piles density up at small U. The bars under panel 3 (U of the samples) should converge to the Gamma(½, 1) curve.</li>
+    </ol>
+    <p style="color:var(--muted);font-size:13px">Keys: <kbd>Space</kbd> play/pause · <kbd>→</kbd> one iteration. Algorithm: multinomial NUTS with biased progressive sampling (Betancourt 2017), using the end-to-end U-turn criterion of Hoffman &amp; Gelman (2014). Stan's generalised criterion replaces Δq with the summed momentum ρ = Σp, which for an identity mass matrix points almost the same way. The doughnut target, log π(q) = −(|q| − 2.6)² / 0.033, is taken from <a href="https://chi-feng.github.io/mcmc-demo/" style="color:var(--accent)">chi-feng/mcmc-demo</a>; U(q) = −log π(q) is already 0 on the ring.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ---- core start ---- */
+/* ---------------- target: chi-feng doughnut ---------------- */
+const RAD = 2.6, SIG2 = 0.033;                         // ring radius, width parameter
+function Upot(x0, x1){
+  const r = Math.hypot(x0, x1);
+  return (r - RAD) * (r - RAD) / SIG2;
+}
+function gradU(x0, x1){
+  const r = Math.hypot(x0, x1); if (r === 0) return [0, 0];
+  const f = 2 * (r - RAD) / (SIG2 * r);
+  return [f * x0, f * x1];
+}
+/* density of U(q) under the target: Gamma(1/2, 1) (see notes below the panels) */
+const Udens = u => u > 0 ? Math.exp(-u) / Math.sqrt(Math.PI * u) : Infinity;
+const Kin = p => 0.5 * (p[0] * p[0] + p[1] * p[1]);
+let spare = null;
+function randn(){
+  if (spare !== null){ const s = spare; spare = null; return s; }
+  let u = 0, v = 0; while (u === 0) u = Math.random(); v = Math.random();
+  const r = Math.sqrt(-2 * Math.log(u)); spare = r * Math.sin(2 * Math.PI * v); return r * Math.cos(2 * Math.PI * v);
+}
+
+/* ---------------- NUTS ---------------- */
+const MAX_DH = 1000;
+function lse(a, b){
+  if (a === -Infinity) return b; if (b === -Infinity) return a;
+  const m = Math.max(a, b); return m + Math.log(Math.exp(a - m) + Math.exp(b - m));
+}
+/* end-to-end criterion: still expanding iff both end momenta point along the chord */
+function noUturn(lo, hi){
+  const d0 = hi.q[0] - lo.q[0], d1 = hi.q[1] - lo.q[1];
+  return d0 * lo.p[0] + d1 * lo.p[1] >= 0 && d0 * hi.p[0] + d1 * hi.p[1] >= 0;
+}
+
+/* One full NUTS transition from (q, fresh p). Records every leapfrog step and every
+   U-turn check as an event so the animation can replay the tree being built. */
+function makeIteration(q0, dt, maxDepth){
+  const p0 = [randn(), randn()];
+  const U0 = Upot(q0[0], q0[1]), K0 = Kin(p0), H0 = U0 + K0;
+  const start = { q: q0.slice(), p: p0.slice(), g: gradU(q0[0], q0[1]), U: U0, K: K0, dH: 0, j: 0, ci: 0, d: -1 };
+  const pts = [start], events = [];
+  let jlo = 0, jhi = 0, cand = 0, logW = 0, curD = 0, curDir = 1, n0 = 1, planLo = 0, planHi = 0;
+  let diverged = false, divCi = -1;
+  let probs = new Float64Array([1]); const snaps = [probs];
+  const rec = e => {
+    e.idx = events.length; e.nc = pts.length; e.jlo = jlo; e.jhi = jhi; e.d = curD; e.dir = curDir; e.n0 = n0;
+    e.cand = cand; e.snap = snaps.length - 1; e.planLo = planLo; e.planHi = planHi;
+    events.push(e); return e;
+  };
+  function leaf(from, v){
+    const h = v * dt, q = from.q.slice(), p = from.p.slice(), g0 = from.g;
+    p[0] -= 0.5 * h * g0[0]; p[1] -= 0.5 * h * g0[1];
+    q[0] += h * p[0];        q[1] += h * p[1];
+    const g = gradU(q[0], q[1]);
+    p[0] -= 0.5 * h * g[0];  p[1] -= 0.5 * h * g[1];
+    const U = Upot(q[0], q[1]), K = Kin(p), dH = U + K - H0;
+    const pt = { q, p, g, U, K, dH, j: from.j + v, ci: pts.length, d: curD };
+    pts.push(pt); if (pt.j < jlo) jlo = pt.j; if (pt.j > jhi) jhi = pt.j;
+    rec({ t: 'step', ci: pt.ci });
+    if (!(dH <= MAX_DH)){ diverged = true; divCi = pt.ci; rec({ t: 'div', ci: pt.ci }); return { lo: pt, hi: pt, logw: -Infinity, sample: pt.ci, valid: false }; }
+    return { lo: pt, hi: pt, logw: -dH, sample: pt.ci, valid: true };
+  }
+  function build(from, v, l){
+    if (l === 0) return leaf(from, v);
+    const a = build(from, v, l - 1); if (!a.valid) return a;
+    const b = build(v > 0 ? a.hi : a.lo, v, l - 1); if (!b.valid) return b;
+    const logw = lse(a.logw, b.logw);
+    const sample = Math.random() < Math.exp(b.logw - logw) ? b.sample : a.sample;   // uniform progressive sampling
+    const lo = v > 0 ? a.lo : b.lo, hi = v > 0 ? b.hi : a.hi;
+    const ok = noUturn(lo, hi);
+    rec({ t: 'chk', lo: lo.j, hi: hi.j, lvl: l, ok });
+    return { lo, hi, logw, sample, valid: ok };
+  }
+
+  let L = start, R = start, depth = 0, reason = 'maxdepth', fail = null, discardFrom = Infinity, discIdx = -1;
+  while (depth < maxDepth){
+    curD = depth; curDir = Math.random() < 0.5 ? -1 : 1; n0 = pts.length;
+    planLo = curDir < 0 ? jlo - (1 << depth) : jlo; planHi = curDir > 0 ? jhi + (1 << depth) : jhi;
+    rec({ t: 'dbl' });
+    const sub = build(curDir > 0 ? R : L, curDir, depth);
+    if (!sub.valid){
+      discardFrom = n0; discIdx = events.length - 1;
+      if (diverged) reason = 'div'; else { reason = 'subturn'; fail = events[events.length - 1]; }
+      break;
+    }
+    /* biased progressive sampling: the new half takes over with prob min(1, W_new / W_old) */
+    const pNew = Math.min(1, Math.exp(sub.logw - logW));
+    if (Math.random() < pNew) cand = sub.sample;
+    const np = new Float64Array(pts.length);
+    for (let i = 0; i < n0; i++) np[i] = probs[i] * (1 - pNew);
+    for (let i = n0; i < pts.length; i++) np[i] = pNew * Math.exp(-pts[i].dH - sub.logw);
+    probs = np; snaps.push(np);
+    logW = lse(logW, sub.logw);
+    if (curDir > 0) R = sub.hi; else L = sub.lo;
+    depth++;
+    const ok = noUturn(L, R);
+    const e = rec({ t: 'top', lo: L.j, hi: R.j, lvl: depth, ok, pNew, max: ok && depth >= maxDepth });
+    if (!ok){ reason = 'uturn'; fail = e; break; }
+  }
+  rec({ t: 'end' });
+
+  let jmin = 0, jmax = 0; for (const pt of pts){ if (pt.j < jmin) jmin = pt.j; if (pt.j > jmax) jmax = pt.j; }
+  const byJ = new Int32Array(jmax - jmin + 1); for (const pt of pts) byJ[pt.j - jmin] = pt.ci;
+  let accSum = 0; for (let i = 1; i < pts.length; i++){ const a = Math.exp(-pts[i].dH); accSum += a >= 1 ? 1 : a > 0 ? a : 0; }
+  const nsteps = pts.length - 1;
+  let mainPath = [L.j, R.j], discPath = null;
+  if (discardFrom < Infinity) discPath = pts[discardFrom].j > 0 ? [R.j, jmax] : [jmin, L.j];
+  return { q0: q0.slice(), p0, U0, K0, H0, pts, events, snaps, sel: cand, reason, fail, failIdx: fail ? fail.idx : -1,
+           discardFrom, discIdx, divCi, depth, lastD: curD, nsteps, acceptStat: nsteps ? accSum / nsteps : 1,
+           jmin, jmax, byJ, Lj: L.j, Rj: R.j, mainPath, discPath };
+}
+/* ---------------- effective sample size ---------------- */
+function fft(re, im){                                   // in-place radix-2, length a power of 2
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++){
+    let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit;
+    if (i < j){ let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+  }
+  for (let len = 2; len <= n; len <<= 1){
+    const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang), h = len >> 1;
+    for (let i = 0; i < n; i += len){
+      let cr = 1, ci = 0;
+      for (let k = 0; k < h; k++){
+        const a = i + k, b = a + h, tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+        const nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+      }
+    }
+  }
+}
+/* single-chain ESS via Geyer's initial monotone sequence; capped at N·log10(N) as in Stan */
+function ess(x){
+  const N = x.length; if (N < 10) return NaN;
+  let m = 0; for (let i = 0; i < N; i++) m += x[i]; m /= N;
+  let n = 1; while (n < 2 * N) n <<= 1;
+  const re = new Float64Array(n), im = new Float64Array(n);
+  for (let i = 0; i < N; i++) re[i] = x[i] - m;
+  fft(re, im);
+  for (let i = 0; i < n; i++){ re[i] = re[i] * re[i] + im[i] * im[i]; im[i] = 0; }
+  fft(re, im);                                          // spectrum is real and even, so this is the inverse (×n)
+  const r0 = re[0]; if (!(r0 > 0)) return NaN;
+  let sum = 0, prev = Infinity;
+  for (let k = 0; 2 * k + 1 < N; k++){
+    let P = (re[2 * k] + re[2 * k + 1]) / r0;           // autocorrelation pairs ρ(2k) + ρ(2k+1)
+    if (!(P > 0)) break;
+    if (P > prev) P = prev; prev = P; sum += P;
+  }
+  const tau = Math.max(-1 + 2 * sum, 1 / Math.log10(N));
+  return N / tau;
+}
+/* ---- core end ---- */
+
+/* ---------------- grid of U for contours / forbidden region ---------------- */
+const XR = [-4, 4], YR = [-4, 4], PR = 3.6, GN = 321;
+const G = new Float64Array(GN * GN);
+const gx = i => XR[0] + (XR[1] - XR[0]) * i / (GN - 1);
+const gy = j => YR[0] + (YR[1] - YR[0]) * j / (GN - 1);
+for (let j = 0; j < GN; j++) for (let i = 0; i < GN; i++) G[j * GN + i] = Upot(gx(i), gy(j));
+
+function contour(level){
+  const segs = [];
+  for (let j = 0; j < GN - 1; j++){
+    const y0 = gy(j), y1 = gy(j + 1);
+    for (let i = 0; i < GN - 1; i++){
+      const v00 = G[j*GN+i], v10 = G[j*GN+i+1], v01 = G[(j+1)*GN+i], v11 = G[(j+1)*GN+i+1];
+      let c = 0; if (v00 > level) c |= 1; if (v10 > level) c |= 2; if (v11 > level) c |= 4; if (v01 > level) c |= 8;
+      if (c === 0 || c === 15) continue;
+      const x0 = gx(i), x1 = gx(i + 1);
+      const eb = () => [x0 + (level - v00) / (v10 - v00) * (x1 - x0), y0];
+      const er = () => [x1, y0 + (level - v10) / (v11 - v10) * (y1 - y0)];
+      const et = () => [x0 + (level - v01) / (v11 - v01) * (x1 - x0), y1];
+      const el = () => [x0, y0 + (level - v00) / (v01 - v00) * (y1 - y0)];
+      const s = (a, b) => segs.push(a[0], a[1], b[0], b[1]);
+      switch (c){
+        case 1: case 14: s(eb(), el()); break;
+        case 2: case 13: s(eb(), er()); break;
+        case 3: case 12: s(el(), er()); break;
+        case 4: case 11: s(er(), et()); break;
+        case 6: case 9:  s(eb(), et()); break;
+        case 7: case 8:  s(el(), et()); break;
+        case 5:  s(el(), et()); s(eb(), er()); break;
+        case 10: s(eb(), el()); s(er(), et()); break;
+      }
+    }
+  }
+  return segs;
+}
+
+/* ---------------- theme ---------------- */
+let C = {};
+const pc = (() => { const c = document.createElement('canvas'); c.width = c.height = 1; return c.getContext('2d', { willReadFrequently: true }); })();
+function rgba(css){ pc.clearRect(0,0,1,1); pc.fillStyle = '#000'; pc.fillStyle = css; pc.fillRect(0,0,1,1); const d = pc.getImageData(0,0,1,1).data; return [d[0], d[1], d[2], d[3] / 255]; }
+function readTheme(){
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ['bg','panel','ink','muted','line','grid','accent','energy','mom','ok','bad','dens-lo','dens-hi','forbid-fill','forbid-line','font','mono'])
+    C[k] = cs.getPropertyValue('--' + k).trim();
+  C.rgb = {}; for (const k of ['ink','accent','energy','mom','ok','bad','dens-lo','dens-hi','panel']) C.rgb[k] = rgba(C[k]);
+}
+const col = (k, a) => { const c = C.rgb[k]; return `rgba(${c[0]},${c[1]},${c[2]},${a})`; };
+const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+
+/* ---------------- canvases ---------------- */
+const cv = { q: document.getElementById('cq'), p: document.getElementById('cp'), e: document.getElementById('ce'), d: document.getElementById('cd'), h: document.getElementById('ch') };
+for (const k in cv){ cv[k]._w = 300; cv[k]._h = 300; cv[k]._dpr = 1; }
+function sizeCanvas(c){
+  const r = c.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const w = Math.max(50, Math.round(r.width)), h = Math.max(30, Math.round(r.height));
+  if (w === c._w && h === c._h && dpr === c._dpr && c.width) return false;
+  c._w = w; c._h = h; c._dpr = dpr; c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); return true;
+}
+function prep(c){
+  const ctx = c.getContext('2d'); ctx.setTransform(c._dpr, 0, 0, c._dpr, 0, 0);
+  ctx.fillStyle = C.panel; ctx.fillRect(0, 0, c._w, c._h); return ctx;
+}
+function offscreen(w, h){ const o = document.createElement('canvas'); o.width = Math.max(1, Math.round(w)); o.height = Math.max(1, Math.round(h)); return o; }
+const font = (px, mono) => `${px}px ${mono ? C.mono : C.font}`;
+const cl = v => v > 1e5 ? 1e5 : v < -1e5 ? -1e5 : v;   // keep diverged coordinates drawable
+
+/* ---------------- simulation state ---------------- */
+let sim, cur = null, phase = 'idle', phaseT = 0, playing = false, pendingStep = false, speed = 1, turbo = false;
+const params = { maxDepth: 10, dt: 0.1 };
+const UBIN = 0.25, UBINS = 80, DMAX = 10;
+
+/* samples since Δt or max depth last changed, for steps per ESS */
+const ESS_MIN = 100;
+function newSegment(){ return { q1: [], q2: [], steps: 0, dt: params.dt, maxDepth: params.maxDepth, essN: -1, ess: NaN, essT: -Infinity, essCost: 0 }; }
+function resetSim(){
+  const a0 = 2 * Math.PI * Math.random(), r0 = RAD + 0.13 * randn();
+  sim = {
+    q: [r0 * Math.cos(a0), r0 * Math.sin(a0)], lastP: [randn(), randn()],
+    chain: [], n: 0, depthSum: 0, steps: 0, sumAcc: 0, div: 0, angSum: 0,
+    seg: newSegment(),
+    hU: new Float64Array(DMAX + 1), hM: new Float64Array(DMAX + 1), hD: new Float64Array(DMAX + 1),
+    cloud: [], uHist: new Float64Array(UBINS), uN: 0,
+  };
+  cur = null; phase = 'idle'; phaseT = 0;
+  if (layers.samples) clearSamples();
+  needsDraw = true;
+}
+
+/* animation timing per event (ms at Normal speed); later doublings get shorter steps */
+function evDur(e){
+  switch (e.t){
+    case 'dbl':  return 140;
+    case 'step': return Math.min(65, 1300 / (1 << e.d));
+    case 'chk':  return e.ok ? 0 : 950;
+    case 'top':  return e.ok ? 380 : 950;
+    case 'div':  return 950;
+    default:     return 0;
+  }
+}
+function newIteration(){
+  const it = makeIteration(sim.q, params.dt, params.maxDepth);
+  it.dt = params.dt; it.maxDepth = params.maxDepth;
+  it.prevP = sim.lastP.slice(); it.prevK = Kin(sim.lastP); it.prevH = it.U0 + it.prevK;
+  const T = new Float64Array(it.events.length); let t = 0;
+  for (let k = 0; k < it.events.length; k++){ T[k] = t; t += evDur(it.events[k]); }
+  it.T = T; it.Ttot = t;
+  return it;
+}
+
+function commit(it){
+  sim.n++;
+  const s = it.pts[it.sel];
+  let da = Math.atan2(s.q[1], s.q[0]) - Math.atan2(it.q0[1], it.q0[0]);
+  while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+  sim.angSum += Math.abs(da) * 180 / Math.PI;
+  sim.q = s.q.slice(); sim.lastP = s.p.slice();
+  const seg = sim.seg;   // an iteration built before a settings change does not count towards the new segment
+  if (it.dt === seg.dt && it.maxDepth === seg.maxDepth){ seg.q1.push(s.q[0]); seg.q2.push(s.q[1]); seg.steps += it.nsteps; }
+  sim.depthSum += it.depth; sim.steps += it.nsteps; sim.sumAcc += it.acceptStat;
+  const d = Math.min(DMAX, it.depth);
+  if (it.reason === 'div'){ sim.div++; sim.hD[d]++; }
+  else if (it.reason === 'maxdepth') sim.hM[d]++;
+  else sim.hU[d]++;
+  sim.chain.push(sim.q.slice());
+  addSample(sim.q);
+  const uq = Upot(sim.q[0], sim.q[1]);
+  sim.uHist[Math.min(UBINS - 1, Math.floor(uq / UBIN))]++; sim.uN++;
+  sim.cloud.push([uq, Kin(sim.lastP)]); if (sim.cloud.length > 500) sim.cloud.shift();
+}
+
+/* ---------------- animation clock ---------------- */
+const REFRESH_MS = 650, DECIDE_MS = 1100, HOLD_MS = 150;
+function startIteration(){ cur = newIteration(); phase = 'refresh'; phaseT = 0; }
+function advance(ms){
+  if (phase === 'idle'){
+    if (playing || pendingStep){ pendingStep = false; startIteration(); } else return false;
+  }
+  phaseT += ms * speed;
+  if (phase === 'refresh' && phaseT >= REFRESH_MS){ phase = 'build'; phaseT = 0; }
+  else if (phase === 'build' && phaseT >= cur.Ttot + HOLD_MS){ phase = 'decide'; phaseT = 0; commit(cur); }
+  else if (phase === 'decide' && phaseT >= DECIDE_MS){ phase = 'idle'; phaseT = 0; }
+  return true;
+}
+function runTurbo(count){
+  if (phase !== 'idle' && cur && phase !== 'decide') commit(cur);
+  for (let i = 0; i < count; i++){ cur = newIteration(); commit(cur); }
+  phase = 'idle'; phaseT = 0;
+}
+
+/* what to display right now */
+const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+function view(){
+  if (!cur){
+    const U = Upot(sim.q[0], sim.q[1]), K = Kin(sim.lastP);
+    return { q: sim.q, p: sim.lastP, U, K, Hlev: U + K, k: -1 };
+  }
+  if (phase === 'refresh'){
+    const s = ease(Math.min(1, phaseT / REFRESH_MS));
+    const K = cur.prevK + (cur.K0 - cur.prevK) * s;
+    const a0 = Math.atan2(cur.prevP[1], cur.prevP[0]), a1 = Math.atan2(cur.p0[1], cur.p0[0]);
+    let da = a1 - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    const r = Math.sqrt(2 * K), ang = a0 + da * s;
+    return { q: cur.q0, p: [r * Math.cos(ang), r * Math.sin(ang)], U: cur.U0, K, Hlev: cur.U0 + K, k: -1, refresh: s };
+  }
+  if (phase === 'build'){
+    const T = cur.T; let lo = 0, hi = T.length - 1;
+    while (lo < hi){ const m = (lo + hi + 1) >> 1; if (T[m] <= phaseT) lo = m; else hi = m - 1; }
+    const e = cur.events[lo], head = cur.pts[e.nc - 1];
+    return { q: head.q, p: head.p, U: head.U, K: head.K, Hlev: cur.H0, k: lo, e, nc: e.nc };
+  }
+  const k = cur.events.length - 1, s = cur.pts[cur.sel];
+  return { q: s.q, p: s.p, U: s.U, K: s.K, Hlev: cur.H0, k, e: cur.events[k], nc: cur.pts.length, done: true };
+}
+
+/* trajectory helpers */
+const P = j => cur.pts[cur.byJ[j - cur.jmin]];
+const discVisible = V => cur && cur.discIdx >= 0 && V.k >= cur.discIdx;
+function ranges(V){
+  if (!cur || V.k < 0) return null;
+  if (discVisible(V)) return { main: cur.mainPath, disc: cur.discPath };
+  return { main: [V.e.jlo, V.e.jhi], disc: null };
+}
+/* the chord currently being tested: the failing one once it is found, otherwise the live ends */
+function chord(V){
+  if (!cur || V.k < 0) return null;
+  let lo, hi, bad = false;
+  if (cur.fail && V.k >= cur.failIdx){ lo = cur.fail.lo; hi = cur.fail.hi; bad = true; }
+  else if (discVisible(V)){ lo = cur.Lj; hi = cur.Rj; }
+  else { lo = V.e.jlo; hi = V.e.jhi; }
+  if (lo === hi) return null;
+  const a = P(lo), b = P(hi), dq = [b.q[0] - a.q[0], b.q[1] - a.q[1]];
+  if (!isFinite(dq[0]) || !isFinite(dq[1]) || !isFinite(a.p[0] + a.p[1] + b.p[0] + b.p[1])) return null;
+  return { a, b, dq, sLo: dq[0] * a.p[0] + dq[1] * a.p[1], sHi: dq[0] * b.p[0] + dq[1] * b.p[1], bad, sub: bad && cur.fail.t === 'chk' };
+}
+function poly(ctx, r, f){
+  ctx.beginPath(); let pen = false;
+  for (let j = r[0]; j <= r[1]; j++){
+    const xy = f(P(j)); if (!isFinite(xy[0]) || !isFinite(xy[1])){ pen = false; continue; }
+    pen ? ctx.lineTo(xy[0], xy[1]) : ctx.moveTo(xy[0], xy[1]); pen = true;
+  }
+  ctx.stroke();
+}
+function dots(ctx, r, f, rad){
+  ctx.beginPath();
+  for (let j = r[0]; j <= r[1]; j++){
+    const xy = f(P(j)); if (!isFinite(xy[0]) || !isFinite(xy[1])) continue;
+    ctx.moveTo(xy[0] + rad, xy[1]); ctx.arc(xy[0], xy[1], rad, 0, 2 * Math.PI);
+  }
+  ctx.fill();
+}
+function drawTraj(ctx, V, f, lw){
+  const R = ranges(V); if (!R) return;
+  const n = R.main[1] - R.main[0] + 1 + (R.disc ? R.disc[1] - R.disc[0] : 0), rad = n > 150 ? 1.25 : 2;
+  ctx.lineJoin = 'round';
+  if (R.disc){
+    ctx.setLineDash([4, 3]); ctx.strokeStyle = col('ink', 0.32); ctx.lineWidth = lw * 0.8; poly(ctx, R.disc, f); ctx.setLineDash([]);
+    ctx.fillStyle = col('ink', 0.32); dots(ctx, R.disc, f, rad * 0.9);
+  }
+  ctx.strokeStyle = f.color; ctx.lineWidth = lw; poly(ctx, R.main, f);
+  ctx.fillStyle = f.color; dots(ctx, R.main, f, rad);
+}
+function statusText(V){
+  if (!cur) return null;
+  if (phase === 'refresh') return ['resampling momentum p ~ N(0, I)', C.mom];
+  if (V.done){
+    const s = cur.pts[cur.sel], where = cur.sel === 0 ? 'stayed at start' : `picked j = ${s.j > 0 ? '+' : ''}${s.j}`;
+    const why = { uturn: 'U-turn', subturn: 'U-turn in new half', div: 'diverged', maxdepth: 'max depth' }[cur.reason];
+    return [`${why} · ${where}`, cur.reason === 'div' ? C.bad : C.ok];
+  }
+  const e = V.e;
+  if (e.t === 'div') return ['diverged · discarding new half', C.bad];
+  if (e.t === 'chk' && !e.ok) return ['U-turn inside new half · discard', C.bad];
+  if (e.t === 'top') return e.max ? ['max tree depth reached', C.energy] : e.ok ? ['no U-turn · keep doubling', C.ink] : ['U-turn · stop doubling', C.bad];
+  return [`doubling ${e.d + 1} · ${e.dir > 0 ? 'forward →' : '← backward'} · ${1 << e.d} step${e.d ? 's' : ''}`, C.accent];
+}
+
+/* ---------------- cached layers ---------------- */
+const layers = {};
+let regionCache = { level: NaN };
+const BG_LEVELS = [0.5, 1, 2, 3, 4.5, 7];
+const bgContours = BG_LEVELS.map(contour);
+
+function buildLayers(){
+  /* position heatmap */
+  {
+    const c = cv.q, W = c.width, H = c.height, R = 360;
+    const hm = offscreen(R, R), hx = hm.getContext('2d'), img = hx.createImageData(R, R);
+    const lo = C.rgb['dens-lo'], hi = C.rgb['dens-hi'];
+    for (let r = 0; r < R; r++) for (let i = 0; i < R; i++){
+      const x = XR[0] + (XR[1] - XR[0]) * (i + 0.5) / R, y = YR[1] - (YR[1] - YR[0]) * (r + 0.5) / R;
+      const v = Math.exp(-Upot(x, y)), m = mix(lo, hi, 0.62 * Math.pow(v, 0.8)), o = (r * R + i) * 4;
+      img.data[o] = m[0]; img.data[o+1] = m[1]; img.data[o+2] = m[2]; img.data[o+3] = 255;
+    }
+    hx.putImageData(img, 0, 0);
+    const bg = offscreen(W, H), bx = bg.getContext('2d');
+    bx.imageSmoothingEnabled = true; bx.drawImage(hm, 0, 0, W, H);
+    const sx = x => (x - XR[0]) / (XR[1] - XR[0]) * W, sy = y => H - (y - YR[0]) / (YR[1] - YR[0]) * H;
+    bx.strokeStyle = col('ink', 0.13); bx.lineWidth = c._dpr;
+    for (const segs of bgContours){ bx.beginPath(); for (let k = 0; k < segs.length; k += 4){ bx.moveTo(sx(segs[k]), sy(segs[k+1])); bx.lineTo(sx(segs[k+2]), sy(segs[k+3])); } bx.stroke(); }
+    bx.strokeStyle = col('ink', 0.10); bx.beginPath(); bx.moveTo(sx(0), 0); bx.lineTo(sx(0), H); bx.moveTo(0, sy(0)); bx.lineTo(W, sy(0)); bx.stroke();
+    layers.bgQ = bg;
+    layers.samples = offscreen(W, H); redrawSamples();
+    layers.region = offscreen(W, H);
+    /* hatch pattern */
+    const d = c._dpr, ps = Math.round(7 * d), pat = offscreen(ps, ps), px = pat.getContext('2d');
+    px.fillStyle = C['forbid-fill']; px.fillRect(0, 0, ps, ps);
+    px.strokeStyle = C['forbid-line']; px.lineWidth = 1 * d; px.beginPath();
+    px.moveTo(-1, ps + 1); px.lineTo(ps + 1, -1); px.moveTo(-1, 1); px.lineTo(1, -1); px.moveTo(ps - 1, ps + 1); px.lineTo(ps + 1, ps - 1); px.stroke();
+    layers.hatch = pat;
+    regionCache = { level: NaN };
+  }
+  /* momentum heatmap */
+  {
+    const c = cv.p, W = c.width, H = c.height, R = 200;
+    const hm = offscreen(R, R), hx = hm.getContext('2d'), img = hx.createImageData(R, R);
+    const lo = C.rgb['dens-lo'], hi = C.rgb.mom;
+    for (let r = 0; r < R; r++) for (let i = 0; i < R; i++){
+      const x = -PR + 2 * PR * (i + 0.5) / R, y = PR - 2 * PR * (r + 0.5) / R;
+      const m = mix(lo, hi, 0.22 * Math.exp(-0.5 * (x * x + y * y))), o = (r * R + i) * 4;
+      img.data[o] = m[0]; img.data[o+1] = m[1]; img.data[o+2] = m[2]; img.data[o+3] = 255;
+    }
+    hx.putImageData(img, 0, 0);
+    const bg = offscreen(W, H), bx = bg.getContext('2d'); bx.drawImage(hm, 0, 0, W, H);
+    bx.scale(c._dpr, c._dpr);
+    const w = c._w, h = c._h, s = w / (2 * PR);
+    bx.strokeStyle = col('ink', 0.10); bx.lineWidth = 1;
+    bx.beginPath(); bx.moveTo(w / 2, 0); bx.lineTo(w / 2, h); bx.moveTo(0, h / 2); bx.lineTo(w, h / 2); bx.stroke();
+    bx.setLineDash([3, 3]); bx.strokeStyle = col('ink', 0.42); bx.lineWidth = 1.2;
+    for (const r of [1, 2, 3]){ bx.beginPath(); bx.arc(w / 2, h / 2, r * s, 0, 2 * Math.PI); bx.stroke(); }
+    bx.setLineDash([]);
+    bx.fillStyle = col('ink', 0.7); bx.font = font(10.5); bx.textAlign = 'left';
+    for (const r of [1, 2, 3]) bx.fillText(`|p|=${r}`, w / 2 + r * s * 0.7071 + 3, h / 2 + r * s * 0.7071 + 11);
+    bx.font = font(12); bx.fillStyle = C.muted;
+    bx.fillText('p₁ →', w - 38, h / 2 - 6); bx.fillText('p₂ ↑', w / 2 + 6, 14);
+    layers.bgP = bg;
+  }
+  layers.bgE = null;   // rebuilt lazily (depends on Emax)
+}
+
+function clearSamples(){ const s = layers.samples; s.getContext('2d').clearRect(0, 0, s.width, s.height); }
+function sampleDot(ctx, q){
+  const c = cv.q, W = c.width, H = c.height, r = 1.25 * c._dpr;
+  const x = (q[0] - XR[0]) / (XR[1] - XR[0]) * W, y = H - (q[1] - YR[0]) / (YR[1] - YR[0]) * H;
+  ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+}
+function addSample(q){ if (!layers.samples) return; const x = layers.samples.getContext('2d'); x.fillStyle = col('ink', 0.22); sampleDot(x, q); }
+function redrawSamples(){ clearSamples(); const x = layers.samples.getContext('2d'); x.fillStyle = col('ink', 0.22); for (const q of sim.chain) sampleDot(x, q); }
+
+function regionFor(level){
+  if (Math.abs(level - regionCache.level) < 1e-9) return regionCache;
+  const c = cv.q, W = c.width, H = c.height;
+  const m = regionCache.mask || offscreen(GN, GN), mx = m.getContext('2d'), img = mx.createImageData(GN, GN);
+  for (let j = 0; j < GN; j++){ const r = GN - 1 - j; for (let i = 0; i < GN; i++) if (G[j * GN + i] > level) img.data[(r * GN + i) * 4 + 3] = 255; }
+  mx.putImageData(img, 0, 0);
+  const L = layers.region, lx = L.getContext('2d');
+  lx.globalCompositeOperation = 'source-over'; lx.clearRect(0, 0, W, H);
+  const cell = W / (GN - 1);
+  lx.imageSmoothingEnabled = true; lx.drawImage(m, -cell / 2, -cell / 2, W + cell, H + cell);
+  lx.globalCompositeOperation = 'source-in'; lx.fillStyle = lx.createPattern(layers.hatch, 'repeat'); lx.fillRect(0, 0, W, H);
+  lx.globalCompositeOperation = 'source-over';
+  regionCache = { level, mask: m, segs: contour(level) };
+  return regionCache;
+}
+
+/* ---------------- drawing helpers ---------------- */
+function arrow(ctx, x0, y0, x1, y1, color, w){
+  const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy); if (!(len >= 1)) return;
+  const ux = dx / len, uy = dy / len, hs = Math.min(9, len * 0.5);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = w;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hs * 0.6, y1 - uy * hs * 0.6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hs - uy * hs * 0.45, y1 - uy * hs + ux * hs * 0.45);
+  ctx.lineTo(x1 - ux * hs + uy * hs * 0.45, y1 - uy * hs - ux * hs * 0.45); ctx.closePath(); ctx.fill();
+}
+function disc(ctx, x, y, r, fill, stroke, lw){
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI);
+  if (fill){ ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = lw || 1.5; ctx.stroke(); }
+}
+function cross(ctx, x, y, r, color){
+  ctx.strokeStyle = color; ctx.lineWidth = 2.4; ctx.beginPath();
+  ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke();
+}
+function label(ctx, txt, x, y, opts = {}){
+  ctx.font = font(opts.size || 12, opts.mono); ctx.textAlign = opts.align || 'left'; ctx.textBaseline = opts.base || 'alphabetic';
+  if (opts.halo !== false){ ctx.lineWidth = 3.5; ctx.strokeStyle = col('panel', 0.85); ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); }
+  ctx.fillStyle = opts.color || C.ink; ctx.fillText(txt, x, y);
+}
+function fmt(v){
+  if (v === 0) return '0';
+  const a = Math.abs(v);
+  if (a >= 100) return v.toFixed(0);
+  if (a >= 1) return v.toFixed(2).replace(/\.?0+$/, '');
+  if (a >= 1e-3) return String(+v.toPrecision(3));
+  return v.toExponential(1);
+}
+const signed = j => j > 0 ? `+${j}` : String(j);
+const fade = () => phase === 'idle' ? 0.45 : 1;
+
+/* ---------------- panel 1: position ---------------- */
+function drawQ(V){
+  const c = cv.q, ctx = prep(c), w = c._w, h = c._h;
+  const sx = x => cl((x - XR[0]) / (XR[1] - XR[0]) * w), sy = y => cl(h - (y - YR[0]) / (YR[1] - YR[0]) * h);
+  ctx.drawImage(layers.bgQ, 0, 0, w, h);
+  const reg = regionFor(V.Hlev);
+  ctx.drawImage(layers.region, 0, 0, w, h);
+  ctx.drawImage(layers.samples, 0, 0, w, h);
+  ctx.strokeStyle = C.energy; ctx.lineWidth = 1.6; ctx.beginPath();
+  const s = reg.segs; for (let k = 0; k < s.length; k += 4){ ctx.moveTo(sx(s[k]), sy(s[k+1])); ctx.lineTo(sx(s[k+2]), sy(s[k+3])); }
+  ctx.stroke();
+
+  const fq = pt => [sx(pt.q[0]), sy(pt.q[1])]; fq.color = C.accent;
+  ctx.globalAlpha = fade();
+  drawTraj(ctx, V, fq, 1.8);
+  if (cur) disc(ctx, sx(cur.q0[0]), sy(cur.q0[1]), 4, null, C.accent, 1.5);
+  if (cur && cur.divCi >= 0 && V.nc > cur.divCi){
+    const pt = cur.pts[cur.divCi], x = Math.max(8, Math.min(w - 8, sx(pt.q[0]))), y = Math.max(8, Math.min(h - 8, sy(pt.q[1])));
+    if (isFinite(x) && isFinite(y)) cross(ctx, x, y, 6, C.bad);
+  }
+  /* the U-turn test: chord between the ends and the momentum at each end */
+  const ch = chord(V), PS = 0.55;
+  if (ch){
+    const [ax, ay] = fq(ch.a), [bx, by] = fq(ch.b);
+    ctx.setLineDash([6, 4]); ctx.strokeStyle = ch.bad ? C.bad : col('ink', 0.6); ctx.lineWidth = ch.bad ? 2 : 1.5;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); ctx.setLineDash([]);
+    for (const [pt, sc, nm] of [[ch.a, ch.sLo, 'q⁻'], [ch.b, ch.sHi, 'q⁺']]){
+      const [x, y] = fq(pt), tx = sx(pt.q[0] + PS * pt.p[0]), ty = sy(pt.q[1] + PS * pt.p[1]);
+      arrow(ctx, x, y, tx, ty, sc < 0 ? C.bad : C.mom, 2.2);
+      const dx = tx - x, dy = ty - y, n = Math.hypot(dx, dy) || 1;
+      label(ctx, nm, x - dx / n * 13, y - dy / n * 13, { align: 'center', base: 'middle', size: 12.5, color: C.ink });
+    }
+  }
+  /* current pick / chosen sample */
+  if (cur && phase === 'build' && V.e){
+    const cp = cur.pts[V.e.cand]; ctx.setLineDash([3, 3]); disc(ctx, sx(cp.q[0]), sy(cp.q[1]), 8, null, C.ok, 1.8); ctx.setLineDash([]);
+  }
+  ctx.globalAlpha = 1;
+  if (cur && V.done){ const sp = cur.pts[cur.sel]; disc(ctx, sx(sp.q[0]), sy(sp.q[1]), 9, null, C.ok, 2.4); }
+  /* current state */
+  const q = V.q;
+  if (phase === 'refresh') arrow(ctx, sx(q[0]), sy(q[1]), sx(q[0] + PS * V.p[0]), sy(q[1] + PS * V.p[1]), C.mom, 2.2);
+  if (isFinite(sx(q[0])) && isFinite(sy(q[1]))) disc(ctx, sx(q[0]), sy(q[1]), 5.5, C.ink, C.panel, 1.8);
+
+  label(ctx, 'q₁ →', w - 8, h - 8, { align: 'right', color: C.muted });
+  label(ctx, 'q₂ ↑', 8, 18, { color: C.muted });
+  label(ctx, `H₀ = ${V.Hlev.toFixed(2)}   U(q) = ${isFinite(V.U) ? V.U.toFixed(2) : '∞'}`, 8, h - 8, { mono: true, size: 11.5, color: C.muted });
+  const st = statusText(V);
+  if (st) label(ctx, st[0], w - 8, 18, { align: 'right', color: st[1], size: 12.5 });
+}
+
+/* ---------------- panel 2: momentum ---------------- */
+function drawP(V){
+  const c = cv.p, ctx = prep(c), w = c._w, h = c._h, s = w / (2 * PR);
+  const sx = x => cl(w / 2 + x * s), sy = y => cl(h / 2 - y * s);
+  ctx.drawImage(layers.bgP, 0, 0, w, h);
+  const ch = chord(V);
+  ctx.globalAlpha = fade();
+  /* U-turn half-plane p·Δq < 0 */
+  if (ch){
+    const n = Math.hypot(ch.dq[0], ch.dq[1]), ux = ch.dq[0] / n, uy = ch.dq[1] / n, Bg = 2 * w;
+    ctx.save(); ctx.translate(w / 2, h / 2); ctx.rotate(Math.atan2(-uy, ux));
+    ctx.fillStyle = col('bad', ch.bad ? 0.13 : 0.08); ctx.fillRect(-Bg, -Bg, Bg, 2 * Bg);
+    ctx.strokeStyle = col('bad', 0.55); ctx.lineWidth = 1.2; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(0, -Bg); ctx.lineTo(0, Bg); ctx.stroke(); ctx.setLineDash([]);
+    ctx.restore();
+    arrow(ctx, w / 2, h / 2, sx(1.5 * ux), sy(1.5 * uy), col('ink', 0.75), 1.8);
+    label(ctx, 'Δq', sx(1.5 * ux + 0.28 * ux), sy(1.5 * uy + 0.28 * uy), { align: 'center', base: 'middle', size: 12 });
+    const zx = Math.max(60, Math.min(w - 60, sx(-2.3 * ux))), zy = Math.max(30, Math.min(h - 30, sy(-2.3 * uy)));
+    label(ctx, 'U-turn zone', zx, zy, { align: 'center', base: 'middle', size: 11.5, color: C.bad });
+  }
+  const fp = pt => [sx(pt.p[0]), sy(pt.p[1])]; fp.color = C.mom;
+  drawTraj(ctx, V, fp, 1.5);
+  ctx.globalAlpha = 1;
+  if (phase === 'refresh'){
+    const pp = cur.prevP;
+    disc(ctx, sx(pp[0]), sy(pp[1]), 5, null, col('mom', 0.6), 1.5);
+    ctx.setLineDash([3, 3]); arrow(ctx, sx(pp[0]), sy(pp[1]), sx(cur.p0[0]), sy(cur.p0[1]), col('mom', 0.5), 1.4); ctx.setLineDash([]);
+  }
+  const p = V.p;
+  if (isFinite(sx(p[0])) && isFinite(sy(p[1]))) disc(ctx, sx(p[0]), sy(p[1]), 5.5, C.mom, C.panel, 1.8);
+  if (V.done) disc(ctx, sx(p[0]), sy(p[1]), 9, null, C.ok, 2.2);
+  if (ch){
+    for (const [pt, sc, nm] of [[ch.a, ch.sLo, 'p⁻'], [ch.b, ch.sHi, 'p⁺']]){
+      const x = sx(pt.p[0]), y = sy(pt.p[1]);
+      disc(ctx, x, y, 5.5, sc < 0 ? C.bad : C.mom, C.panel, 1.8);
+      label(ctx, nm, x + 8, y - 8, { size: 12.5, color: sc < 0 ? C.bad : C.ink });
+    }
+    const narrow = w < 400;
+    label(ctx, `p⁻·Δq ${ch.sLo >= 0 ? '+' : '−'}${fmt(Math.abs(ch.sLo))}`, 8, h - 9, { mono: true, size: 11.5, color: ch.sLo < 0 ? C.bad : C.mom });
+    label(ctx, `p⁺·Δq ${ch.sHi >= 0 ? '+' : '−'}${fmt(Math.abs(ch.sHi))}`, narrow ? 8 : w - 8, narrow ? h - 25 : h - 9, { mono: true, size: 11.5, align: narrow ? 'left' : 'right', color: ch.sHi < 0 ? C.bad : C.mom });
+  } else {
+    label(ctx, `|p| = ${Math.hypot(p[0], p[1]).toFixed(3)}`, w - 8, h - 9, { mono: true, size: 11.5, align: 'right', color: C.mom });
+  }
+}
+
+/* ---------------- panel 3: energy plane ---------------- */
+let Emax = 5;
+function eLayout(w, h){
+  const strip = Math.max(24, Math.min(40, w * 0.07)), padL = 30, padB = 30, padT = 8, padR = 10;
+  return { strip, x0: padL + strip, x1: w - padR, y0: padT, y1: h - padB - strip };
+}
+function buildBgE(){
+  const c = cv.e, w = c._w, h = c._h, L = eLayout(w, h);
+  const bg = offscreen(c.width, c.height), bx = bg.getContext('2d'); bx.scale(c._dpr, c._dpr);
+  bx.fillStyle = C.panel; bx.fillRect(0, 0, w, h);
+  const sx = u => L.x0 + u / Emax * (L.x1 - L.x0), sy = k => L.y1 - k / Emax * (L.y1 - L.y0);
+  /* shading: joint density e^{-K} · Gamma(1/2,1)(U) ∝ e^{-(U+K)} / √U, capped near U = 0 */
+  const R = 160, hm = offscreen(R, R), hx = hm.getContext('2d'), img = hx.createImageData(R, R);
+  const lo = C.rgb['dens-lo'], hi = C.rgb.energy;
+  for (let r = 0; r < R; r++) for (let i = 0; i < R; i++){
+    const u = Emax * (i + 0.5) / R, k = Emax * (1 - (r + 0.5) / R);
+    const m = mix(lo, hi, 0.36 * Math.min(1, Math.exp(-(u + k)) * Math.sqrt(0.12 / u))), o = (r * R + i) * 4;
+    img.data[o] = m[0]; img.data[o+1] = m[1]; img.data[o+2] = m[2]; img.data[o+3] = 255;
+  }
+  hx.putImageData(img, 0, 0);
+  bx.drawImage(hm, L.x0, L.y0, L.x1 - L.x0, L.y1 - L.y0);
+  /* iso-energy diagonals */
+  bx.save(); bx.beginPath(); bx.rect(L.x0, L.y0, L.x1 - L.x0, L.y1 - L.y0); bx.clip();
+  const stepH = Emax <= 12 ? 1 : Emax <= 24 ? 2 : 5;
+  bx.strokeStyle = col('ink', 0.13); bx.lineWidth = 1;
+  for (let H = stepH; H <= 2 * Emax; H += stepH){ bx.beginPath(); bx.moveTo(sx(0), sy(H)); bx.lineTo(sx(H), sy(0)); bx.stroke(); }
+  bx.restore();
+  bx.fillStyle = C.muted; bx.font = font(10); bx.textAlign = 'left'; bx.textBaseline = 'middle';
+  for (let H = stepH * 2; H < Emax; H += stepH * 2) bx.fillText(`H=${H}`, sx(0) + 3, sy(H) - 1);
+  /* frame */
+  bx.strokeStyle = C.line; bx.lineWidth = 1; bx.strokeRect(L.x0 + 0.5, L.y0 + 0.5, L.x1 - L.x0 - 1, L.y1 - L.y0 - 1);
+  /* ticks on strips */
+  bx.fillStyle = C.muted; bx.font = font(10); bx.textBaseline = 'top'; bx.textAlign = 'center';
+  const tstep = Emax <= 6 ? 1 : Emax <= 12 ? 2 : Emax <= 24 ? 4 : 10;
+  for (let t = 0; t < Emax - 0.5 * tstep; t += tstep){ bx.fillText(t, sx(t), L.y1 + L.strip + 3); }
+  bx.textAlign = 'right'; bx.textBaseline = 'middle';
+  for (let t = tstep; t < Emax - 0.5 * tstep; t += tstep){ bx.fillText(t, L.x0 - L.strip - 3, sy(t)); }
+  /* marginal Exp(1) curves */
+  bx.strokeStyle = col('mom', 0.9); bx.fillStyle = col('mom', 0.14); bx.lineWidth = 1.4; bx.beginPath();
+  bx.moveTo(L.x0, sy(0));
+  for (let k = 0; k <= Emax; k += Emax / 200) bx.lineTo(L.x0 - Math.exp(-k) * (L.strip - 3), sy(k));
+  bx.lineTo(L.x0, sy(Emax)); bx.closePath(); bx.fill(); bx.stroke();
+  /* axis names */
+  bx.fillStyle = C.ink; bx.font = font(11.5); bx.textAlign = 'right'; bx.textBaseline = 'alphabetic';
+  bx.fillText('potential U(q) →', L.x1, h - 4);
+  bx.save(); bx.translate(13, L.y0); bx.rotate(-Math.PI / 2); bx.textAlign = 'right'; bx.fillText('kinetic K(p) →', 0, 0); bx.restore();
+  layers.bgE = bg; layers.bgEmax = Emax;
+}
+function drawE(V){
+  const c = cv.e, w = c._w, h = c._h, L = eLayout(w, h);
+  let want = 5;
+  /* scale to the trajectory, ignoring points that are on their way to diverging */
+  if (cur){ want = Math.max(want, cur.prevH + 0.6); for (const pt of cur.pts){ const H = pt.U + pt.K; if (Math.abs(pt.dH) < 20) want = Math.max(want, Math.min(H, 60) + 0.6); } }
+  else want = Math.max(want, V.U + V.K + 0.6);
+  want = Math.ceil(want);
+  if (want !== Emax){ Emax = want; layers.bgE = null; }
+  if (!layers.bgE) buildBgE();
+  const ctx = prep(c);
+  ctx.drawImage(layers.bgE, 0, 0, w, h);
+  const sx = u => cl(L.x0 + u / Emax * (L.x1 - L.x0)), sy = k => cl(L.y1 - k / Emax * (L.y1 - L.y0));
+  /* U histogram of samples vs Gamma(1/2, 1); density shown at half scale, clipped at the strip */
+  {
+    const base = L.y1 + 1, hh = L.strip - 4, DS = 0.5, cap = 1.1;
+    if (sim.uN > 0){
+      ctx.fillStyle = col('accent', 0.35);
+      for (let b = 0; b < UBINS; b++){
+        const u0 = b * UBIN; if (u0 >= Emax) break;
+        const dens = sim.uHist[b] / sim.uN / UBIN;
+        ctx.fillRect(sx(u0) + 0.5, base, sx(u0 + UBIN) - sx(u0) - 1, Math.min(cap, DS * dens) * hh);
+      }
+    }
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2; ctx.beginPath();
+    for (let i = 0; i <= 300; i++){ const u = Emax * Math.pow(i / 300, 2), y = base + Math.min(cap, DS * Udens(u)) * hh; i ? ctx.lineTo(sx(u), y) : ctx.moveTo(sx(u), y); }
+    ctx.stroke();
+  }
+  ctx.save(); ctx.beginPath(); ctx.rect(L.x0, L.y0, L.x1 - L.x0, L.y1 - L.y0); ctx.clip();
+  /* cloud of past states */
+  ctx.fillStyle = col('ink', 0.28);
+  for (const [u, k] of sim.cloud){ ctx.fillRect(sx(u) - 1.2, sy(k) - 1.2, 2.4, 2.4); }
+  /* energy lines */
+  const line = (H, color, lw, dash) => { ctx.setLineDash(dash || []); ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(sx(0), sy(H)); ctx.lineTo(sx(H), sy(0)); ctx.stroke(); ctx.setLineDash([]); };
+  if (phase === 'refresh') line(cur.prevH, col('energy', 0.55), 1.4, [5, 4]);
+  line(V.Hlev, C.energy, 2.2);
+  /* refresh jump */
+  if (cur && (phase === 'refresh' || V.k >= 0)){
+    const k1 = phase === 'refresh' ? V.K : cur.K0;
+    ctx.setLineDash([4, 3]); arrow(ctx, sx(cur.U0), sy(cur.prevK), sx(cur.U0), sy(k1), col('mom', phase === 'idle' ? 0.45 : 0.95), 1.8); ctx.setLineDash([]);
+  }
+  /* trajectory, both directions from the start */
+  const fe = pt => [sx(pt.U), sy(pt.K)]; fe.color = C.accent;
+  ctx.globalAlpha = fade(); drawTraj(ctx, V, fe, 1.6); ctx.globalAlpha = 1;
+  if (cur && V.done){ const sp = cur.pts[cur.sel]; disc(ctx, sx(sp.U), sy(sp.K), 8.5, null, C.ok, 2.2); }
+  if (isFinite(sx(V.U)) && isFinite(sy(V.K))) disc(ctx, sx(V.U), sy(V.K), 5.5, C.ink, C.panel, 1.8);
+  ctx.restore();
+  const tot = V.U + V.K;
+  label(ctx, isFinite(tot) ? `U ${V.U.toFixed(2)} + K ${V.K.toFixed(2)} = ${tot.toFixed(3)}` : 'H = ∞ (diverged)', L.x1 - 6, L.y0 + 16, { align: 'right', mono: true, size: 11.5 });
+  label(ctx, `H₀ = ${V.Hlev.toFixed(3)}`, L.x1 - 6, L.y0 + 32, { align: 'right', mono: true, size: 11.5, color: C.energy });
+}
+
+/* ---------------- panel 4a: the trajectory tree ---------------- */
+function drawT(V){
+  const c = cv.d, ctx = prep(c), w = c._w, h = c._h;
+  if (!cur){ label(ctx, 'Press Play or Step to run an iteration', w / 2, h / 2, { align: 'center', color: C.muted }); return; }
+  const x0 = 16, x1 = w - 16, yTop = 26, yAx = h - 17;
+  const probH = Math.max(16, Math.round((yAx - yTop) * 0.26)), yLeaf = yAx - probH - 8;
+  const e = V.e;
+  /* status line */
+  let st, stc = C.ink;
+  if (!e){ st = 'new iteration · start point is j = 0'; stc = C.mom; }
+  else if (V.done){
+    const kept = cur.Rj - cur.Lj + 1, disc_ = cur.discPath ? cur.pts.length - cur.discardFrom : 0;
+    st = `${kept} point${kept > 1 ? 's' : ''} kept · depth ${cur.depth}${disc_ ? ` · ${disc_} discarded` : ''}`; stc = C.muted;
+  }
+  else if (e.t === 'top'){ st = `merged · P(pick moves to new half) = ${e.pNew >= 0.9995 && e.pNew < 1 ? '>0.999' : e.pNew.toFixed(3)}`; stc = C.ok; }
+  else if (e.t === 'chk' && !e.ok){ st = `U-turn inside new half (${e.hi - e.lo + 1} pts) → discard`; stc = C.bad; }
+  else if (e.t === 'div'){ st = 'divergence (ΔH > 1000) → discard new half'; stc = C.bad; }
+  else { st = `doubling ${e.d + 1} ${e.dir > 0 ? '→' : '←'} · ${e.nc - e.n0} of ${1 << e.d} new steps`; stc = C.accent; }
+  label(ctx, st, x0, 15, { size: 11.5, color: stc, halo: false });
+
+  const ja = e ? e.planLo : 0, jb = e ? e.planHi : 0;
+  const N = jb - ja + 1, cw = (x1 - x0) / N, X = j => x0 + (j - ja + 0.5) * cw;
+  const rows = e ? e.d + 1 : 0, rowH = rows ? Math.min(16, (yLeaf - yTop - 2) / rows) : 16;
+  const rowY = l => yLeaf - l * rowH;
+  /* half under construction */
+  if (e && phase === 'build' && e.t !== 'top'){
+    const n = 1 << e.d, a = e.dir > 0 ? jb - n + 1 : ja, top = rowY(e.d) - rowH * 0.5 - 2;
+    ctx.fillStyle = col('accent', 0.08); ctx.fillRect(X(a) - cw / 2, top, n * cw, yAx - top);
+  }
+  /* start marker */
+  ctx.strokeStyle = col('ink', 0.14); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(0), yTop); ctx.lineTo(X(0), yAx); ctx.stroke();
+  ctx.globalAlpha = fade();
+  /* brackets: one per U-turn check, at row log2(size) */
+  if (e){
+    const okSub = [], okTop = [], bad = [];
+    for (let k = 0; k <= V.k; k++){ const ev = cur.events[k]; if (ev.t !== 'chk' && ev.t !== 'top') continue; (ev.ok ? (ev.t === 'top' ? okTop : okSub) : bad).push(ev); }
+    const inset = Math.min(1.5, cw * 0.2), tick = Math.min(5, rowH * 0.45);
+    const br = (list, color, lw) => {
+      ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath();
+      for (const ev of list){ const y = rowY(ev.lvl), a = X(ev.lo) - cw / 2 + inset, b = X(ev.hi) + cw / 2 - inset; ctx.moveTo(a, y + tick); ctx.lineTo(a, y); ctx.lineTo(b, y); ctx.lineTo(b, y + tick); }
+      ctx.stroke();
+    };
+    br(okSub, col('ink', 0.3), 1.1); br(okTop, col('ink', 0.8), 1.6); br(bad, C.bad, 2.4);
+  }
+  /* leaves */
+  const dv = discVisible(V), lr = cw >= 5 ? Math.min(3.2, cw * 0.32) : 0;
+  const jl = e ? e.jlo : 0, jh = e ? e.jhi : 0;
+  for (let j = jl; j <= jh; j++){
+    const pt = P(j);
+    ctx.fillStyle = pt.ci === 0 ? C.ink : pt.ci === cur.divCi ? C.bad : dv && pt.ci >= cur.discardFrom ? col('ink', 0.3) : C.accent;
+    if (lr){ ctx.beginPath(); ctx.arc(X(j), yLeaf, pt.ci === 0 ? lr + 0.8 : lr, 0, 2 * Math.PI); ctx.fill(); }
+    else ctx.fillRect(X(j) - cw / 2, yLeaf - 3, Math.max(1, cw), 6);
+  }
+  ctx.globalAlpha = 1;
+  /* selection probabilities after the latest merge */
+  const snap = cur.snaps[e ? e.snap : 0], cand = e ? e.cand : 0;
+  let pm = 0; for (let i = 0; i < snap.length; i++) pm = Math.max(pm, snap[i]);
+  const bw = Math.min(14, cw > 3 ? cw - 1 : Math.max(cw, 0.8));
+  for (let i = 0; i < snap.length; i++){
+    const hh = pm > 0 ? snap[i] / pm * probH : 0;
+    ctx.fillStyle = i === cand ? C.ok : col('ok', 0.42); ctx.fillRect(X(cur.pts[i].j) - bw / 2, yAx - hh, bw, hh);
+  }
+  ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, yAx + 0.5); ctx.lineTo(x1, yAx + 0.5); ctx.stroke();
+  disc(ctx, X(cur.pts[cand].j), yLeaf, Math.max(5, lr + 2.5), null, C.ok, V.done ? 2.2 : 1.5);
+  ctx.save(); ctx.translate(8, yAx - probH / 2); ctx.rotate(-Math.PI / 2);
+  ctx.font = font(9.5); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = C.ok; ctx.fillText('P(pick)', 0, 0); ctx.restore();
+  /* axis */
+  ctx.fillStyle = C.muted; ctx.font = font(10.5, true); ctx.textBaseline = 'top';
+  ctx.textAlign = 'left'; ctx.fillText(signed(ja), x0, yAx + 3);
+  if (jb !== ja){ ctx.textAlign = 'right'; ctx.fillText(signed(jb), x1, yAx + 3); }
+  if (ja !== 0 && jb !== 0 && X(0) - x0 > 24 && x1 - X(0) > 24){ ctx.textAlign = 'center'; ctx.fillText('0', X(0), yAx + 3); }
+  if (w >= 360){ ctx.font = font(10); ctx.textAlign = 'center'; ctx.fillText('← backward · time j · forward →', (x0 + x1) / 2 + (ja !== 0 && jb !== 0 && Math.abs(X(0) - (x0 + x1) / 2) < 70 ? (X(0) < (x0 + x1) / 2 ? 75 : -75) : 0), yAx + 4); }
+}
+
+/* ---------------- panel 4b: tree depth histogram ---------------- */
+function drawH(){
+  const c = cv.h, ctx = prep(c), w = c._w, h = c._h;
+  const x0 = 40, x1 = w - 12, y0 = 22, y1 = h - 22;
+  const narrow = w < 400;
+  if (!narrow) label(ctx, 'tree depth over all iterations', x0, 14, { color: C.ink, size: 11.5, halo: false });
+  /* legend, right-aligned */
+  {
+    ctx.font = font(11); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'right';
+    let x = x1;
+    for (const [t, k] of [['divergent', 'bad'], ['max depth', 'energy'], ['U-turn', 'accent']]){
+      ctx.fillStyle = C[k]; ctx.fillText(t, x, 14); x -= ctx.measureText(t).width + 5;
+      ctx.fillRect(x - 8, 6, 8, 8); x -= 16;
+    }
+  }
+  if (!sim.n){ label(ctx, 'no iterations yet', (x0 + x1) / 2, (y0 + y1) / 2, { align: 'center', color: C.muted }); return; }
+  let dObs = 0, mx = 1;
+  for (let d = 0; d <= DMAX; d++){ const t = sim.hU[d] + sim.hM[d] + sim.hD[d]; if (t) dObs = d; mx = Math.max(mx, t); }
+  const D = Math.max(params.maxDepth, dObs), NB = D + 1, bw = (x1 - x0) / NB;
+  ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.strokeRect(x0 + 0.5, y0 + 0.5, x1 - x0 - 1, y1 - y0 - 1);
+  for (let d = 0; d < NB; d++){
+    const X = x0 + d * bw + 1.5, W = Math.max(1, bw - 3); let y = y1;
+    for (const [arr, color] of [[sim.hU, col('accent', 0.6)], [sim.hM, col('energy', 0.8)], [sim.hD, C.bad]]){
+      const hh = arr[d] / mx * (y1 - y0); if (!hh) continue;
+      ctx.fillStyle = color; ctx.fillRect(X, y - hh, W, hh); y -= hh;
+    }
+  }
+  /* mean depth marker */
+  const mean = sim.depthSum / sim.n, mxX = x0 + (mean + 0.5) * bw;
+  ctx.setLineDash([4, 3]); ctx.strokeStyle = col('ink', 0.55); ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(mxX, y0); ctx.lineTo(mxX, y1); ctx.stroke(); ctx.setLineDash([]);
+  label(ctx, `mean ${mean.toFixed(2)}`, mxX + (mxX > (x0 + x1) / 2 ? -4 : 4), y0 + 13, { align: mxX > (x0 + x1) / 2 ? 'right' : 'left', size: 10.5, color: C.ink });
+  ctx.fillStyle = C.muted; ctx.font = font(10.5, true); ctx.textBaseline = 'top'; ctx.textAlign = 'center';
+  for (let d = 0; d < NB; d++) ctx.fillText(String(d), x0 + (d + 0.5) * bw, y1 + 4);
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(mx), x0 - 5, y0 + 4); ctx.fillText('0', x0 - 5, y1);
+}
+
+/* ---------------- stats ---------------- */
+const statsEl = document.getElementById('stats');
+let lastStats = '';
+/* ESS is O(N log N); recompute at most every 300 ms, and spend no more than ~10% of the time on it */
+function essStale(){ const g = sim.seg; return g.q1.length >= ESS_MIN && g.q1.length !== g.essN; }
+function updateEss(){
+  const g = sim.seg, now = performance.now();
+  if (!essStale() || now - g.essT < Math.max(300, 10 * g.essCost)) return;
+  g.ess = Math.min(ess(g.q1), ess(g.q2)); g.essN = g.q1.length;
+  g.essT = performance.now(); g.essCost = g.essT - now;
+}
+function drawStats(){
+  const s = sim, n = s.n, g = s.seg;
+  updateEss();
+  const ok = g.q1.length >= ESS_MIN && g.ess > 0;
+  const spe = ok ? (g.steps * g.essN / g.q1.length) / g.ess : null;   // steps over the same samples the ESS used
+  const essTitle = ok ? `ESS ${g.ess.toFixed(0)} from ${g.essN} iterations at Δt = ${g.dt.toFixed(3)}, max depth ${g.maxDepth}`
+                      : `needs ${ESS_MIN} iterations at the current settings (${g.q1.length} so far)`;
+  const parts = [
+    ['Iterations', n],
+    ['Steps / ESS', ok ? (spe >= 100 ? spe.toFixed(0) : spe.toFixed(1)) : '—', essTitle],
+    ['Mean depth', n ? (s.depthSum / n).toFixed(2) : '—'],
+    ['Steps / iter', n ? (s.steps / n).toFixed(1) : '—'],
+    ['Mean accept stat', n ? (s.sumAcc / n).toFixed(4) : '—'],
+    ['Mean |Δθ|', n ? `${(s.angSum / n).toFixed(1)}°` : '—'],
+    ['Divergent', s.div],
+  ];
+  const html = parts.map(([k, v, t]) => `<span${t ? ` title="${t}"` : ''}>${k} <b>${v}</b></span>`).join('');
+  if (html !== lastStats){ statsEl.innerHTML = html; lastStats = html; }
+}
+
+/* ---------------- main loop ---------------- */
+let needsDraw = true, lastTs = 0;
+function drawAll(){
+  const V = view();
+  drawQ(V); drawP(V); drawE(V); drawT(V); drawH(); drawStats();
+}
+function frame(ts){
+  const ms = lastTs ? Math.min(100, ts - lastTs) : 16; lastTs = ts;
+  let changed = false;
+  if (turbo && (playing || pendingStep)){
+    runTurbo(playing ? 30 : 1); pendingStep = false; changed = true;
+  } else changed = advance(ms);
+  if (changed || needsDraw){ drawAll(); needsDraw = false; }
+  else if (essStale()) drawStats();   // catch up on a throttled ESS once sampling pauses
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- UI ---------------- */
+const playBtn = document.getElementById('play');
+function setPlaying(v){ playing = v; playBtn.textContent = v ? 'Pause' : 'Play'; }
+playBtn.onclick = () => setPlaying(!playing);
+document.getElementById('step').onclick = () => { setPlaying(false); if (phase === 'idle') pendingStep = true; };
+document.getElementById('reset').onclick = () => { setPlaying(false); resetSim(); };
+const MDin = document.getElementById('MD'), MDo = document.getElementById('MDo');
+MDin.oninput = () => { params.maxDepth = +MDin.value; MDo.textContent = MDin.value; sim.seg = newSegment(); needsDraw = true; };
+const dtin = document.getElementById('dt'), dto = document.getElementById('dto');
+dtin.oninput = () => { params.dt = +dtin.value; dto.textContent = (+dtin.value).toFixed(3); sim.seg = newSegment(); needsDraw = true; };
+document.querySelectorAll('#speed button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#speed button').forEach(x => x.classList.toggle('on', x === b));
+  if (b.dataset.s === 'turbo'){ turbo = true; if (phase !== 'idle'){ if (phase !== 'decide') commit(cur); phase = 'idle'; } }
+  else { turbo = false; speed = +b.dataset.s; }
+  needsDraw = true;
+});
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' && e.key === ' ') return;
+  if (e.key === ' '){ e.preventDefault(); setPlaying(!playing); }
+  else if (e.key === 'ArrowRight'){ e.preventDefault(); document.getElementById('step').click(); }
+});
+
+function relayout(){
+  let any = false;
+  for (const k in cv) any = sizeCanvas(cv[k]) || any;
+  if (any || !layers.bgQ){ buildLayers(); needsDraw = true; }
+}
+readTheme();
+resetSim();
+/* fit all four panels on one screen: pick 2×2 or 1×4, whichever gives bigger plots */
+function fitLayout(){
+  const grid = document.getElementById('grid'), bar = document.querySelector('.bar');
+  const W = document.documentElement.clientWidth - 24;
+  const H = window.innerHeight - bar.getBoundingClientRect().height - 10 - 10 - 10;
+  const gap = 10, hc = 22, vc = 48, MIN = 240;
+  const s2 = Math.min((W - gap) / 2 - hc, (H - gap) / 2 - vc);
+  const s4 = Math.min((W - 3 * gap) / 4 - hc, H - vc);
+  let cols = s4 > s2 ? 4 : 2, s = Math.max(s2, s4);
+  if (s < MIN){   // screen too small to fit: fall back to scrolling
+    cols = W >= 2 * (MIN + hc) + gap ? 2 : 1;
+    s = cols === 2 ? (W - gap) / 2 - hc : W - hc;
+  }
+  grid.style.setProperty('--cols', cols);
+  grid.style.setProperty('--s', Math.floor(Math.max(180, s)) + 'px');
+}
+fitLayout();
+relayout();
+window.addEventListener('resize', () => { fitLayout(); relayout(); });
+new ResizeObserver(() => { fitLayout(); relayout(); }).observe(document.querySelector('.bar'));
+
+/* info-icon tooltips */
+const tip = document.getElementById('tip');
+let tipFor = null;
+function showTip(btn){
+  tip.innerHTML = btn.nextElementSibling.innerHTML; tip.classList.add('on'); tipFor = btn;
+  const r = btn.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  let x = r.right - tw; if (x < 8) x = Math.min(r.left, innerWidth - 8 - tw); x = Math.max(8, x);
+  let y = r.bottom + 6; if (y + th > innerHeight - 8) y = Math.max(8, r.top - 6 - th);
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function hideTip(){ tip.classList.remove('on'); tipFor = null; }
+document.querySelectorAll('.info').forEach(b => {
+  b.addEventListener('mouseenter', () => showTip(b));
+  b.addEventListener('mouseleave', () => { if (document.activeElement !== b) hideTip(); });
+  b.addEventListener('focus', () => showTip(b));
+  b.addEventListener('blur', hideTip);
+  b.addEventListener('click', () => showTip(b));
+});
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && tipFor){ tipFor.blur(); hideTip(); } });
+window.addEventListener('scroll', hideTip, { passive: true });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readTheme(); buildLayers(); needsDraw = true; });
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

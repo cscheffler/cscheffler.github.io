@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Safety Flashcards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Layout: top bar with section tabs; one centred column (44rem) holding the practice card or a section's panels; modal for refreshers and card details. */
+  --bg:#f3f5f8; --surface:#ffffff; --raised:#f8f9fb; --ink:#18212d; --muted:#5a6575; --line:#d7dde5; --code:#eceff4;
+  --accent:#1d5ea6; --accent-ink:#ffffff;
+  --g0:#b3342b; --g1:#a86a08; --g2:#2a7a4b;
+  --display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f141b; --surface:#17202a; --raised:#1b2531; --ink:#e3e8ef; --muted:#97a2b2; --line:#2a3441; --code:#1c2531;
+    --accent:#72aaea; --accent-ink:#0f141b; --g0:#ec6c62; --g1:#e3a44a; --g2:#5fc189;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f141b; --surface:#17202a; --raised:#1b2531; --ink:#e3e8ef; --muted:#97a2b2; --line:#2a3441; --code:#1c2531;
+  --accent:#72aaea; --accent-ink:#0f141b; --g0:#ec6c62; --g1:#e3a44a; --g2:#5fc189;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--body)}
+a{color:var(--accent);text-underline-offset:2px}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+kbd{font:500 .72rem var(--mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 .3rem;color:var(--muted);background:var(--raised)}
+code{font:.88em var(--mono);background:var(--code);padding:.08em .3em;border-radius:3px}
+pre{font:13px/1.55 var(--mono);background:var(--code);border:1px solid var(--line);border-radius:6px;padding:.8rem 1rem;overflow-x:auto}
+pre code{background:none;padding:0;font-size:inherit}
+
+/* Top bar */
+.top{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:1rem;padding:.6rem 1.25rem;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:.55rem;font:600 1.05rem var(--display);white-space:nowrap}
+.logo{width:1.4rem;height:1.05rem;border:2px solid var(--accent);border-radius:3px;position:relative;transform:rotate(-6deg)}
+.logo::after{content:"";position:absolute;inset:2px -6px -6px 2px;border:2px solid var(--accent);border-radius:3px;opacity:.45}
+nav{display:flex;gap:.15rem;overflow-x:auto;flex:1;min-width:0}
+nav button{background:none;border:0;padding:.4rem .7rem;border-radius:6px;cursor:pointer;color:var(--muted);font-weight:500;white-space:nowrap}
+nav button:hover{color:var(--ink);background:var(--raised)}
+nav button[aria-current="page"]{color:var(--ink);background:var(--surface);box-shadow:inset 0 -2px 0 var(--accent)}
+.who{font-size:.82rem;color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:.4rem}
+.who .dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--g2)}
+.who .dot.local{background:var(--g1)}
+
+main{max-width:46rem;margin:0 auto;padding:1.6rem 1.25rem 5rem}
+h1{font:600 2rem/1.15 var(--display);margin:0 0 .5rem;text-wrap:balance}
+h2{font:600 1.25rem/1.25 var(--display);margin:0 0 .5rem;text-wrap:balance}
+h3{font:600 1rem/1.3 var(--display);margin:1rem 0 .3rem}
+p{margin:.55rem 0}
+.muted{color:var(--muted)}
+.loading{color:var(--muted);text-align:center;padding:3rem 0}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:.45rem;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:.5rem .9rem;cursor:pointer;font-weight:500;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--g0);border-color:color-mix(in srgb,var(--g0) 50%,var(--line))}
+.btn.small{padding:.3rem .65rem;font-size:.88rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.link{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.btnrow{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.8rem 0 0}
+.icon-btn{display:inline-grid;place-items:center;width:2.2rem;height:2.2rem;border-radius:50%;border:1px solid var(--line);background:var(--surface);cursor:pointer;color:var(--muted)}
+.icon-btn:hover{color:var(--accent);border-color:var(--accent)}
+.icon-btn svg{width:1.15rem;height:1.15rem}
+
+/* Chips, pills */
+.chip{display:inline-block;font:500 .74rem/1.5 var(--mono);padding:.05rem .5rem;border-radius:999px;background:var(--raised);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.chip.new{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.chip.tag{border-style:dashed}
+
+/* Practise */
+.prac-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem;margin-bottom:1rem}
+.prac-bar label{font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:.4rem}
+select,input[type=search],input[type=number],input[type=text]{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:.4rem .55rem}
+.counts{display:flex;gap:.9rem;font:500 .85rem var(--mono);color:var(--muted);margin-left:auto}
+.counts b{color:var(--ink);font-weight:600}
+.fc:focus{outline:none}
+.fc{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.2rem 1.4rem 1.1rem;box-shadow:0 1px 0 var(--line),0 10px 30px -18px color-mix(in srgb,var(--ink) 35%,transparent)}
+.fc-meta{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem}
+.spacer{flex:1}
+.fc-q{font-size:1.14rem;line-height:1.55}
+.fc-label{font:500 .72rem var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:1.1rem 0 .2rem}
+.fc-a{border-top:1px dashed var(--line);margin-top:1rem}
+.reveal{margin-top:1.4rem;display:flex;justify-content:center}
+.reveal .btn{padding:.65rem 1.4rem}
+.grades{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-top:1.3rem}
+.grade{display:grid;justify-items:center;gap:.1rem;padding:.7rem .4rem .6rem;border-radius:10px;border:1px solid var(--line);background:var(--raised);cursor:pointer;position:relative}
+.grade .emo{font-size:1.9rem;line-height:1.1}
+.grade .gl{font-weight:600;font-size:.92rem}
+.grade .gi{font:500 .78rem var(--mono);color:var(--muted)}
+.grade kbd{position:absolute;top:.4rem;right:.45rem}
+.grade.g0:hover,.grade.g0:focus-visible{border-color:var(--g0);background:color-mix(in srgb,var(--g0) 10%,var(--raised))}
+.grade.g1:hover,.grade.g1:focus-visible{border-color:var(--g1);background:color-mix(in srgb,var(--g1) 10%,var(--raised))}
+.grade.g2:hover,.grade.g2:focus-visible{border-color:var(--g2);background:color-mix(in srgb,var(--g2) 10%,var(--raised))}
+.fc-stats{font-size:.82rem;color:var(--muted);margin:1rem 0 0;font-variant-numeric:tabular-nums}
+.undo{font-size:.86rem;color:var(--muted);text-align:center;margin-top:.9rem}
+.done{text-align:center;padding:2.2rem 1rem;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.done .big{font-size:2.4rem}
+
+/* Markdown content */
+.md{overflow-wrap:anywhere}
+.md > :first-child{margin-top:0} .md > :last-child{margin-bottom:0}
+.md p{margin:.5rem 0}
+.md ul,.md ol{padding-left:1.3rem;margin:.5rem 0} .md li{margin:.2rem 0}
+.md mjx-container[display="true"]{overflow-x:auto;overflow-y:hidden;max-width:100%;padding:.1rem 0}
+.md blockquote{margin:.6rem 0;padding-left:.8rem;border-left:3px solid var(--line);color:var(--muted)}
+.md table{border-collapse:collapse;font-size:.92rem} .md td,.md th{border:1px solid var(--line);padding:.25rem .5rem}
+.md img{max-width:100%}
+
+/* Panels, lists */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.2rem;margin:0 0 1rem}
+.panel > h2{margin-bottom:.3rem}
+textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:.6rem .7rem;font:13px/1.5 var(--mono);resize:vertical}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.list-tools{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.8rem}
+.list-tools input[type=search]{flex:1;min-width:12rem}
+.row{display:grid;grid-template-columns:1fr auto;gap:.3rem 1rem;padding:.75rem .9rem;border:1px solid var(--line);background:var(--surface);border-radius:10px;margin-bottom:.45rem;cursor:pointer;align-items:start}
+.row:hover{border-color:var(--muted)}
+.row-q{max-height:4.8em;overflow:hidden;font-size:.95rem}
+.row-meta{display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;font:500 .78rem var(--mono);color:var(--muted);white-space:nowrap}
+.status-new{color:var(--accent)} .status-due{color:var(--g0)}
+.imp-list{max-height:18rem;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:.6rem}
+.imp-list div{display:flex;gap:.6rem;padding:.35rem .6rem;border-top:1px solid var(--line);font-size:.88rem;align-items:baseline}
+.imp-list div:first-child{border-top:0}
+.imp-list code{white-space:nowrap}
+.errors{color:var(--g0);font-size:.88rem;padding-left:1.2rem}
+.ok{color:var(--g2)}
+details{margin:.6rem 0}
+summary{cursor:pointer;font-weight:500}
+ol.steps{padding-left:1.3rem} ol.steps li{margin:.35rem 0}
+
+/* Stats */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr));gap:.6rem;margin-bottom:1rem}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.7rem .85rem}
+.tile small{display:block;color:var(--muted);font-size:.78rem}
+.tile b{font:600 1.55rem/1.2 var(--display);font-variant-numeric:tabular-nums}
+.chart svg{display:block;width:100%;height:auto;color:var(--ink)}
+.chart figcaption{font-size:.84rem;color:var(--muted);margin-top:.3rem}
+.chart .bar{fill:var(--accent)} .chart .bar.today{fill:var(--g2)}
+.chart text{font:11px var(--mono);fill:var(--muted)}
+.chart line{stroke:var(--line)}
+table.data{width:100%;border-collapse:collapse;font-size:.9rem}
+table.data th,table.data td{padding:.4rem .45rem;border-top:1px solid var(--line);text-align:left}
+table.data th{font-weight:500;color:var(--muted);font-size:.8rem}
+table.data td.n,table.data th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto}
+
+/* Start */
+.start{padding-top:1rem}
+.start .lede{font-size:1.08rem;color:var(--muted);max-width:38rem}
+.options{display:grid;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));gap:1rem;margin-top:1.4rem}
+.note{border-left:3px solid var(--g1);background:var(--surface);padding:.7rem .9rem;border-radius:0 8px 8px 0;font-size:.92rem;margin:1rem 0}
+.note.err{border-left-color:var(--g0)}
+
+/* Modal */
+.modal{position:fixed;inset:0;z-index:50;background:color-mix(in srgb,#000 45%,transparent);display:grid;place-items:center;padding:1rem}
+.modal[hidden]{display:none}
+.modal-box{background:var(--surface);border:1px solid var(--line);border-radius:14px;width:min(44rem,100%);max-height:min(88vh,100%);display:flex;flex-direction:column;box-shadow:0 20px 60px -20px #000}
+.modal-head{display:flex;align-items:center;gap:.6rem;padding:.9rem 1.1rem .7rem;border-bottom:1px solid var(--line)}
+.modal-head h2{flex:1;margin:0;font-size:1.15rem}
+.modal-body{padding:1rem 1.2rem 1.2rem;overflow-y:auto}
+.modal-q{font-size:.92rem;color:var(--muted);border-left:3px solid var(--line);padding-left:.7rem;margin:0 0 1rem}
+.detail-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.4rem .9rem;margin:1rem 0 .2rem;font-size:.86rem}
+.detail-stats small{display:block;color:var(--muted);font-size:.76rem}
+.detail-stats span{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+#toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--bg);padding:.6rem 1rem;border-radius:8px;font-size:.9rem;max-width:min(32rem,calc(100vw - 2rem));box-shadow:0 8px 24px -10px #000}
+#toast[hidden]{display:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:560px){
+  .top{gap:.4rem .8rem;padding:.5rem .9rem}
+  nav{order:3;flex-basis:100%}
+  .fc{padding:1rem 1rem .9rem}
+  .grade kbd{display:none}
+  .counts{margin-left:0}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+<script>
+window.MathJax = {
+  tex: {inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']]},
+  svg: {fontCache: 'global'},
+  options: {skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']},
+  startup: {typeset: false, ready(){ MathJax.startup.defaultReady(); MathJax.startup.promise.then(() => { if (window.__mjReady) window.__mjReady(); }); }}
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true"></span>AI Safety Flashcards</div>
+  <nav id="nav" aria-label="Sections" hidden>
+    <button type="button" data-view="practise">Practise</button>
+    <button type="button" data-view="cards">Cards</button>
+    <button type="button" data-view="add">Add cards</button>
+    <button type="button" data-view="stats">Stats</button>
+    <button type="button" data-view="settings">Settings</button>
+  </nav>
+  <div id="who" class="who"></div>
+</header>
+<main id="view" tabindex="-1"><p class="loading">Loading…</p></main>
+<div id="modal" class="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-head"><h2 id="modal-title"></h2><button type="button" class="icon-btn" id="modal-close" aria-label="Close">&#x2715;</button></div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+'use strict';
+/* ==== Configuration ====================================================
+   Paste your Firebase web-app config here so every device picks it up, e.g.
+   const FIREBASE_CONFIG = { apiKey: "...", authDomain: "...", projectId: "...", appId: "..." };
+   Leave as null to paste it in the app instead (stored in this browser). */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAKe8qeK99dWEd-4jSIf_tRuyX_xgDklOU",
+  authDomain: "ais-flash-cards-86344.firebaseapp.com",
+  databaseURL: "https://ais-flash-cards-86344-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "ais-flash-cards-86344",
+  storageBucket: "ais-flash-cards-86344.firebasestorage.app",
+  messagingSenderId: "708280838506",
+  appId: "1:708280838506:web:ad5a4e764977614fd91d13"
+};
+
+const STARTER_DECK = "<\!--\nStarter deck: transferable technical AI safety knowledge.\nCard format: \"# card-id\", then \"deck:\" and \"tags:\" lines, then \"## Question\", \"## Answer\" and \"## Refresher\" sections.\nMarkdown is supported everywhere, with maths as $inline$ and $$display$$ (or \\( \\) and \\[ \\]).\n-->\n\n# moe-sparse-layer\ndeck: Architectures\ntags: mixture-of-experts, routing\n\n## Question\nHow does a sparse mixture-of-experts (MoE) layer compute its output for one token?\n\n## Answer\nA learned router scores the experts, $g(x)=\\operatorname{softmax}(W_r x)$, and only the top-$k$ experts run:\n$$y=\\sum_{i\\in\\operatorname{TopK}(g(x))} g_i(x)\\,E_i(x)$$\nTotal parameters grow with the number of experts. Per-token compute grows only with $k$.\n\n## Refresher\nEach expert $E_i$ is usually an ordinary transformer MLP. Shazeer et al. (2017) introduced noisy top-$k$ gating, and Switch Transformers (Fedus et al., 2021) showed that top-1 routing works at scale.\n\nImplementations differ in whether the kept gate values are renormalised to sum to 1, and in capacity limits. Each expert accepts at most a fixed number of tokens per batch, and overflow tokens skip the layer through the residual stream.\n\nSources: [Shazeer et al. 2017](https://arxiv.org/abs/1701.06538) · [Switch Transformers](https://arxiv.org/abs/2101.03961) · [Mixture of Experts Explained (Hugging Face)](https://huggingface.co/blog/moe)\n\n# moe-load-balancing\ndeck: Architectures\ntags: mixture-of-experts, routing\n\n## Question\nWhy do sparse MoE models need a load-balancing mechanism?\n\n## Answer\nRouting reinforces itself. Experts that receive more tokens get more gradient, improve, and attract even more tokens. Without a balancing term, the router collapses onto a few experts, the rest go unused, and capacity overflow drops tokens.\n\n## Refresher\nThe Switch Transformer auxiliary loss is\n$$\\alpha N \\sum_{i=1}^{N} f_i P_i,$$\nwhere $f_i$ is the fraction of tokens dispatched to expert $i$ and $P_i$ is the mean router probability for expert $i$. Uniform routing minimises it.\n\nLater designs add a router z-loss that penalises large router logits (ST-MoE), or balance load by adjusting per-expert routing biases without any auxiliary loss (DeepSeek-V3).\n\nSources: [Switch Transformers](https://arxiv.org/abs/2101.03961)\n\n# moe-experts-not-domains\ndeck: Architectures\ntags: mixture-of-experts, capability-removal, modularity\n\n## Question\nWhy can't you usually remove a domain (say, virology) from a standard sparse MoE by deleting one expert?\n\n## Answer\nLearned token-level routing doesn't produce experts that line up with human domains. Experts tend to specialise in token- or syntax-level patterns, and domain knowledge is spread across many experts and the shared attention layers. Deleting one expert damages many things and removes no single domain.\n\n## Refresher\nRemovable modules need routing tied to labels *you* choose, for example the document's domain or gradient masks keyed to data labels. A router trained only to minimise loss won't give you that.\n\nDomain-routed designs include DEMix and Branch-Train-Merge. Gradient routing is another way to get there.\n\nSources: [Mixture of Experts Explained (Hugging Face)](https://huggingface.co/blog/moe)\n\n# demix-layers\ndeck: Architectures\ntags: modularity, domain-experts\n\n## Question\nHow does a DEMix layer choose its expert, and what does that design cost?\n\n## Answer\nIt chooses by metadata. During training, a document labelled with domain $d$ runs only expert $E_d$, and only $E_d$ gets gradients. At inference, experts can be mixed using an estimated domain posterior, added, or removed.\n\nThe cost is **fragmentation**. Nothing in that layer is shared, so general knowledge gets split across experts.\n\n## Refresher\nDEMix (Gururangan et al., 2021) replaces each feed-forward layer with one expert per domain and keeps the other layers shared. Removing an expert narrows the model's domain coverage, which makes DEMix a natural baseline for modular capability control.\n\nEach expert sees only its own domain's data. Small domains therefore get little capacity and no transfer from the rest of the corpus at that layer.\n\nSources: [DEMix Layers](https://arxiv.org/abs/2108.05036)\n\n# branch-train-merge\ndeck: Architectures\ntags: modularity, domain-experts\n\n## Question\nWhat is Branch-Train-Merge (BTM)?\n\n## Answer\nA way to build domain experts as whole models:\n1. Copy a seed language model.\n2. Train each copy on one domain, independently and in parallel.\n3. Ensemble or parameter-average the copies at inference.\n\n## Refresher\nLi et al. (2022) call each copy an Expert Language Model (ELM). Branches never communicate, so training is embarrassingly parallel, and you can add a new domain later by branching again.\n\nThe downside is inference cost if you ensemble many full models, or interference if you average their weights.\n\nSources: [Branch-Train-Merge](https://arxiv.org/abs/2208.03306)\n\n# shared-core-plus-modules\ndeck: Architectures\ntags: modularity, capability-removal, access-control\n\n## Question\nFor removable capabilities, what does a \"large shared core plus small switchable modules\" design gain over pure domain experts?\n\n## Answer\nGeneral knowledge is pooled in the shared core instead of being split across experts. Each capability lives in a small add-on module chosen by a fixed mask at deployment. Removing a capability means dropping its module, and $k$ modules give $2^k$ capability profiles from one training run.\n\n## Refresher\nThe layer has the form\n$$h_{\\text{out}} = E_{\\text{core}}(h_{\\text{in}}) + \\sum_i m_i\\,E_i(h_{\\text{in}}),\\qquad m_i\\in\\{0,1\\}.$$\nThere is no learned router. What each module learns is decided during training, for example by gradient routing.\n\nTwo things must hold for this to work:\n- the modules must actually contain the capability, so the core can't do it alone;\n- modules switched on together must still add up cleanly (composability).\n\n# transformer-mlp-role\ndeck: Architectures\ntags: transformers, interpretability, localisation\n\n## Question\nWhat does the MLP sublayer of a transformer block do, and why is it a natural place to localise knowledge?\n\n## Answer\nIt applies the same two-layer feed-forward network to every position ($d \\to d_{\\text{ff}} \\to d$, usually $d_{\\text{ff}}\\approx 4d$, with a nonlinearity) and adds the result to the residual stream. Interpretability work suggests that MLPs act like key–value memories holding much of a model's factual knowledge.\n\n## Refresher\nGeva et al. (2021) showed that rows of the first MLP layer act as pattern detectors (\"keys\") and columns of the second write associated output distributions (\"values\"). ROME (Meng et al., 2022) located factual recall in mid-layer MLPs and edited facts there.\n\nMLP outputs are simply added to the residual stream, so parallel MLPs (a core plus modules) can be combined by summation.\n\nSources: [Geva et al. 2021](https://arxiv.org/abs/2012.14913) · [Meng et al. 2022 (ROME)](https://arxiv.org/abs/2202.05262)\n\n# lora-basics\ndeck: Training & optimisation\ntags: finetuning, adapters\n\n## Question\nWhat does LoRA train, and how many parameters does it add to a $d\\times k$ weight matrix?\n\n## Answer\nIt freezes $W$ and learns a low-rank update $\\Delta W = BA$, with $B\\in\\mathbb{R}^{d\\times r}$, $A\\in\\mathbb{R}^{r\\times k}$ and $r\\ll\\min(d,k)$. That adds $r(d+k)$ parameters instead of $dk$.\n\n## Refresher\n$B$ starts at zero, so training begins exactly at the base model. The update is scaled by $\\alpha/r$. After training, $BA$ can be merged into $W$, so inference costs nothing extra, and many adapters can share one base model.\n\nSources: [Hu et al. 2021 (LoRA)](https://arxiv.org/abs/2106.09685)\n\n# adapter-composition\ndeck: Training & optimisation\ntags: adapters, modularity\n\n## Question\nWhy might separately trained adapters (for example, two LoRAs) misbehave when switched on together, and what training trick helps?\n\n## Answer\nEach adapter was trained against the base model alone, so nothing made their updates additive. In a nonlinear network, their combined effect on the residual stream interferes.\n\nTraining modules **jointly**, with other modules randomly switched on during training, teaches them to coexist.\n\n## Refresher\nNaively adding adapters ($B_1A_1 + B_2A_2$) often degrades both tasks. That motivated merging methods such as task arithmetic and TIES-merging.\n\nWhen you plan to serve capability profiles, the stronger fix is to train with combinations active, so the shared parameters and every module see the configurations they'll be deployed in.\n\n# adam-update\ndeck: Training & optimisation\ntags: optimisers, adam\n\n## Question\nWrite down the AdamW update for one parameter.\n\n## Answer\n$$m_t=\\beta_1 m_{t-1}+(1-\\beta_1)g_t,\\qquad v_t=\\beta_2 v_{t-1}+(1-\\beta_2)g_t^2$$\n$$\\hat m_t=\\frac{m_t}{1-\\beta_1^t},\\qquad \\hat v_t=\\frac{v_t}{1-\\beta_2^t}$$\n$$\\theta_t=\\theta_{t-1}-\\eta\\Big(\\frac{\\hat m_t}{\\sqrt{\\hat v_t}+\\epsilon}+\\lambda\\,\\theta_{t-1}\\Big)$$\n\n## Refresher\n$m$ is a running mean of the gradient (momentum). $v$ is a running mean of the squared gradient, which gives each parameter its own effective step size.\n\nTypical LLM settings are $\\beta_1=0.9$, $\\beta_2=0.95$, $\\epsilon=10^{-8}$ and weight decay $\\lambda\\approx 0.1$. PyTorch's AdamW applies the decay as $\\theta \\leftarrow \\theta(1-\\eta\\lambda)$ before the Adam step.\n\nSources: [Loshchilov & Hutter (AdamW)](https://arxiv.org/abs/1711.05101) · [torch.optim.AdamW](https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html)\n\n# adam-bias-correction\ndeck: Training & optimisation\ntags: optimisers, adam\n\n## Question\nWhy does Adam divide its moment estimates by $1-\\beta^t$?\n\n## Answer\n$m$ and $v$ start at zero, so in early steps they are biased toward zero. Dividing by $1-\\beta_1^t$ and $1-\\beta_2^t$ removes that bias. The correction fades as $t$ grows.\n\n## Refresher\nWithout the correction, the step is scaled by roughly $(1-\\beta_1^t)/\\sqrt{1-\\beta_2^t}$. With $\\beta_1=0.9$ and $\\beta_2=0.999$, that factor is about 6.5 at $t=10$, so early steps would be several times too large. That's one reason warm-up schedules help.\n\n# adamw-vs-l2\ndeck: Training & optimisation\ntags: optimisers, regularisation\n\n## Question\nHow does AdamW's weight decay differ from adding an L2 penalty to the loss when using Adam?\n\n## Answer\nAn L2 penalty adds $\\lambda\\theta$ to the gradient, which Adam then divides by $\\sqrt{\\hat v}$. Parameters with large gradient variance therefore get *less* regularisation.\n\nAdamW subtracts $\\eta\\lambda\\theta$ directly from the weights, so every parameter decays at the same relative rate.\n\n## Refresher\nFor plain SGD the two are equivalent, up to learning-rate scaling. For adaptive methods they are not. Loshchilov & Hutter showed that decoupling improves generalisation and makes the best $\\lambda$ less tied to the learning rate. Decoupled decay is now the default for transformer training.\n\nSources: [Loshchilov & Hutter](https://arxiv.org/abs/1711.05101)\n\n# zero-grad-still-moves\ndeck: Training & optimisation\ntags: optimisers, adam, partial-updates\n\n## Question\nUnder AdamW, a parameter receives an exactly zero gradient for several steps. Does it stay put?\n\n## Answer\nNo. Its momentum $\\hat m$ is still non-zero, so it keeps moving, with the step shrinking roughly like $(\\beta_1/\\sqrt{\\beta_2})^k$. Weight decay also keeps pulling it toward zero. PyTorch skips a parameter only when its `.grad` is `None`.\n\n## Refresher\nThis matters whenever you train only part of a model on each step, for example with routing, masking or alternating objectives. Ways to truly freeze a parameter:\n- set `requires_grad=False`;\n- make sure no gradient reaches it, so `.grad` stays `None` (with `zero_grad(set_to_none=True)`);\n- give each parameter group its own optimizer and only call `step()` on the groups you mean to update.\n\nMultiplying gradients by zero does **not** freeze a parameter.\n\n# grad-accumulation-normalisation\ndeck: Training & optimisation\ntags: gradient-accumulation, training-loops\n\n## Question\nWhen accumulating gradients over micro-batches with different token counts, how should you normalise the loss?\n\n## Answer\nSum per-token losses over all micro-batches and divide by $T$, the total token count of the whole accumulation window:\n$$g=\\frac{1}{T}\\sum_{k}\\sum_{t\\in b_k}\\nabla_\\theta\\,\\ell_t$$\nAveraging each micro-batch's mean loss over-weights tokens in short micro-batches.\n\n## Refresher\nThis was a long-standing bug in popular training loops, fixed in Hugging Face Transformers in 2024. With padding and variable sequence lengths, accumulated training drifted away from the equivalent large-batch run.\n\nIn practice, count the non-padding tokens across the window first, then scale each micro-batch's *summed* loss by $1/T$.\n\nSources: [Fixing Gradient Accumulation (Hugging Face)](https://huggingface.co/blog/gradient_accumulation)\n\n# stop-gradient-mask\ndeck: Training & optimisation\ntags: autograd, gradient-routing\n\n## Question\nHow do you let a tensor contribute to the forward pass but block gradient flow through it, selectively per element?\n\n## Answer\nMix it with a stop-gradient copy:\n$$\\tilde a = m\\odot a + (1-m)\\odot\\operatorname{sg}(a)$$\nThe forward value doesn't change ($\\tilde a=a$), but gradient flows only where $m=1$.\n\n## Refresher\nIn PyTorch this is `m * a + (1 - m) * a.detach()`. In JAX, use `jax.lax.stop_gradient`.\n\nThe forward pass is untouched, so the loss is the same. Only *which parameters learn* from that data changes. Applying different masks to different examples is the core of gradient routing.\n\n# masked-accumulation-pitfall\ndeck: Training & optimisation\ntags: gradient-accumulation, gradient-routing, partial-updates\n\n## Question\nYou accumulate gradients over micro-batches, and each micro-batch may update a different set of parameters. What goes wrong if you apply the mask only once, after accumulation?\n\n## Answer\nThe `.grad` buffers are shared, so gradients from a micro-batch that shouldn't touch a parameter get summed together with those that should. The mask has to act inside each micro-batch's backward pass, for example by detaching forbidden parameters. Afterwards, only step the optimizers whose parameters legitimately received gradient.\n\n## Refresher\nThere are two clean options:\n- give the whole accumulation window one routing decision (simple, but it constrains how data is mixed);\n- detach forbidden parameters separately in each micro-batch (\"heterogeneous\" accumulation).\n\nSwitching between these regimes can change the effective update rate of each parameter group, so retune any data-sampling ratios afterwards.\n\n# chinchilla-rule\ndeck: Scaling & evaluation\ntags: scaling-laws, compute\n\n## Question\nWhat is the Chinchilla rule of thumb for compute-optimal training?\n\n## Answer\nTrain on about **20 tokens per parameter**. With training compute $C\\approx 6ND$, the optimal model size $N$ and token count $D$ both grow roughly as $\\sqrt{C}$.\n\n## Refresher\nHoffmann et al. (2022) fitted\n$$L(N,D)=E+\\frac{A}{N^\\alpha}+\\frac{B}{D^\\beta}$$\nand found that earlier large models (such as Gopher) were undertrained. \"Compute-optimal\" means minimising training compute for a target loss. Many deployed models now train far beyond 20 tokens per parameter, because inference costs favour smaller models.\n\nSources: [Hoffmann et al. 2022 (Chinchilla)](https://arxiv.org/abs/2203.15556)\n\n# six-nd\ndeck: Scaling & evaluation\ntags: compute, scaling-laws\n\n## Question\nWhy is training compute approximately $6ND$ FLOPs for $N$ parameters and $D$ tokens?\n\n## Answer\nA forward pass costs about $2N$ FLOPs per token (one multiply and one add per parameter). The backward pass costs about twice the forward pass. That gives $6N$ per token, times $D$ tokens.\n\n## Refresher\nThe estimate ignores attention's dependence on context length, which adds a term proportional to layers × context × width per token. It also ignores embeddings and any recomputation from activation checkpointing.\n\nExample: 800M parameters trained on 16B tokens is about $6 \\times 8\\times10^{8} \\times 1.6\\times10^{10} \\approx 7.7\\times10^{19}$ FLOPs.\n\n# lr-batch-scaling\ndeck: Scaling & evaluation\ntags: scaling-laws, hyperparameters\n\n## Question\nHow do the optimal learning rate and batch size typically change as models get bigger?\n\n## Answer\nThe optimal learning rate falls and the optimal batch size rises, both roughly as power laws in parameter count $N$. The fits depend on the setup. One recent fit found $\\text{LR}^*\\propto N^{-0.3}$ and $\\text{BS}^*\\propto N^{0.8}$.\n\n## Refresher\nPorian et al. (2024) showed that the apparent disagreement between the Kaplan and Chinchilla scaling laws came partly from hyperparameters that weren't tuned for each model size, including AdamW's $\\beta_2$ at small batch sizes.\n\nWhen you run scaling experiments, fit these hyperparameters at a few small sizes and extrapolate. Don't reuse one setting for every size.\n\nSources: [Porian et al. 2024](https://arxiv.org/abs/2406.19146)\n\n# loss-power-law\ndeck: Scaling & evaluation\ntags: scaling-laws, curve-fitting\n\n## Question\nWhat simple functional form is often fitted to loss against training step, and what does the Chinchilla form add?\n\n## Answer\nA shifted power law, $L(s)=A\\,(s+s_0)^{-\\alpha}$. The Chinchilla form adds an irreducible-loss floor $E$:\n$$L(N,D)=E+\\frac{A}{N^\\alpha}+\\frac{B}{D^\\beta}$$\nWithout a floor, the fitted curve keeps falling forever. That matters whenever you extrapolate.\n\n## Refresher\nThe shift $s_0$ absorbs early-training behaviour. Fits are usually done by nonlinear least squares (for example `scipy.optimize.curve_fit`) or in log space, often discarding the first few percent of steps. Kaplan et al. (2020) popularised power laws in compute, data and model size.\n\nSources: [Kaplan et al. 2020](https://arxiv.org/abs/2001.08361) · [scipy curve_fit](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html)\n\n# compute-equivalent-metric\ndeck: Scaling & evaluation\ntags: evaluation, compute, curve-fitting\n\n## Question\nHow do you turn a model's loss on a dataset into a \"compute-equivalent\" score against a baseline?\n\n## Answer\nFit the baseline's learning curve $L(s)$. Invert it to find the step at which the baseline reached the model's loss, then divide by the baseline's own step count:\n$$s_{\\text{eq}}(L)=\\Big(\\frac{L}{A}\\Big)^{-1/\\alpha}-s_0,\\qquad \\text{ratio}=\\frac{s_{\\text{eq}}(L_{\\text{model}})}{s_{\\text{eq}}(L_{\\text{baseline}})}$$\n\n## Refresher\nA ratio of 0.77 means the model matches the baseline at 77% of its training. On data you want kept, higher is better. On data you want removed, lower is better. Steps can stand in for compute when the cost per step is fixed.\n\nThe same idea underlies \"compute-equivalent gain\" (Davidson et al., 2023), which prices an enhancement as the extra training compute that would give the same improvement.\n\nSources: [Davidson et al. 2023](https://arxiv.org/abs/2312.07413)\n\n# compute-ratio-sensitivity\ndeck: Scaling & evaluation\ntags: evaluation, curve-fitting\n\n## Question\nWhy can equal compute-equivalent ratios on two datasets hide very different loss gaps?\n\n## Answer\nThe mapping from loss to ratio depends on the curve's exponent. Near the end of training,\n$$\\text{ratio}\\approx\\Big(\\frac{L_{\\text{model}}}{L_{\\text{base}}}\\Big)^{-1/\\alpha}.$$\nOn a flat curve (small $\\alpha$), a tiny loss gap becomes a big ratio gap. On a steep curve, a large loss gap barely moves the ratio.\n\n## Refresher\nFor a ratio of 0.77, the model's loss must be about 1.3% higher than the baseline's when $\\alpha=0.05$, 4% higher when $\\alpha=0.15$, and 11% higher when $\\alpha=0.4$.\n\nAlways look at raw loss differences alongside the ratios, and ask what $\\alpha$ each dataset's curve has.\n\n# extrapolation-above-one\ndeck: Scaling & evaluation\ntags: evaluation, curve-fitting\n\n## Question\nWhat does a compute-equivalent ratio above 1 depend on?\n\n## Answer\nOn extrapolating the fitted baseline curve beyond its last observed step. Those values are the most sensitive to the curve's functional form (such as whether it has an irreducible-loss floor) and to uncertainty in the fitted parameters.\n\n## Refresher\nA curve with a floor $E$ flattens toward $E$. Losses just below the baseline's final value then map to far more steps, and losses below $E$ are never reached at all. Different plausible curve forms can give very different answers above 1, so treat those values as soft.\n\n# fit-uncertainty\ndeck: Scaling & evaluation\ntags: statistics, evaluation, curve-fitting\n\n## Question\nSeed-based confidence intervals on a metric derived from a fitted curve leave out what source of uncertainty? How would you include it?\n\n## Answer\nThey ignore uncertainty in the fitted curve's parameters (here $A$, $s_0$ and $\\alpha$). To include it, bootstrap: resample seeds or checkpoints, refit the curve each time, recompute the metric, and take percentile intervals. Alternatively, propagate the fit's covariance with the delta method.\n\n## Refresher\nFit uncertainty is largest where the metric relies on extrapolation. With few seeds, intervals are wide anyway: a 90% t-interval from three seeds uses $t_{0.95,\\,2}\\approx 2.92$. Single-seed results at large scale have no interval at all, so treat them as indicative.\n\n# loss-vs-capability\ndeck: Scaling & evaluation\ntags: evaluation, capability-removal\n\n## Question\nWhy be cautious when a capability-removal claim rests only on cross-entropy loss?\n\n## Answer\nLoss on domain text measures how well the model predicts that text, not whether it can carry out the dangerous task. Small loss differences may or may not matter for real ability, so claims also need downstream evaluations: benchmarks such as WMDP, task success rates, and elicitation attacks.\n\n## Refresher\nLoss is smooth and cheap, which makes it good for comparing training methods. But abilities don't track loss linearly. A model can predict generic domain text well while lacking specific hazardous know-how, or the reverse. Strong papers report both.\n\n# removal-key-question\ndeck: Unlearning & capability removal\ntags: capability-removal, evaluation\n\n## Question\nWhat is the key question to ask of any capability-removal method?\n\n## Answer\nIs the knowledge **gone from the weights**, or only suppressed in behaviour? Find out by trying to get it back (finetuning, jailbreaks, probing), and compare against a model that never learned it.\n\n## Refresher\nMethods act at different points:\n- **data filtering:** the model never learns the knowledge;\n- **post-hoc unlearning:** the weights are changed after learning;\n- **refusal training:** behaviour is changed;\n- **input/output classifiers:** a wrapper around the model.\n\nOnly the first reliably removes knowledge. The others leave something that an attacker with access to the weights can reach.\n\n# data-filtering-tradeoffs\ndeck: Unlearning & capability removal\ntags: capability-removal, data-filtering, pretraining\n\n## Question\nWhat are the strengths and limits of pretraining data filtering for removing a capability?\n\n## Answer\n**Strength:** the model never learns the content, so there's nothing to recover. Filtered models resist adversarial finetuning far better than models protected by post-hoc defences.\n\n**Limits:**\n- you need one full pretraining run per capability profile;\n- knowledge still transfers from neighbouring data (biology teaches some virology);\n- documents the filter misses are learned normally.\n\n## Refresher\nDeep Ignorance (O'Brien et al., 2025) filtered biothreat-proxy content from the pretraining data of 6.9B-parameter models. They found the filtered models much more resistant to adversarial finetuning than post-training safeguards.\n\nThe filter's recall is the weak point. With imperfect labels, every missed document stays in training and is learned in full.\n\nSources: [Deep Ignorance](https://arxiv.org/abs/2508.06601)\n\n# maxent-unlearning\ndeck: Unlearning & capability removal\ntags: unlearning\n\n## Question\nWhat does MaxEnt unlearning optimise, and what is its typical weakness?\n\n## Answer\nIt pushes the model's next-token distribution on forget text toward uniform (maximum entropy), while keeping ordinary cross-entropy low on retain text. For example:\n$$\\mathcal{L}=\\mathbb{E}_{x\\sim D_f}\\big[-H\\big(p_\\theta(\\cdot\\mid x)\\big)\\big]+\\lambda\\,\\mathbb{E}_{x\\sim D_r}\\,\\mathcal{L}_{\\text{CE}}(x)$$\n**Weakness:** it suppresses rather than deletes, so a small finetune on related data restores most of the capability.\n\n## Refresher\nMaximising entropy is the same as minimising $\\mathrm{KL}(p_\\theta\\,\\|\\,U) = \\log V - H(p_\\theta)$. Some implementations instead use cross-entropy against a uniform target, which equals $\\mathrm{KL}(U\\,\\|\\,p_\\theta)$ up to a constant. Both are minimised at the uniform distribution.\n\nUnlike gradient ascent, the target is bounded, so the model doesn't diverge. But \"confused\" outputs can sit on top of intact internal representations, which is why relearning is fast.\n\n# gradient-ascent-unlearning\ndeck: Unlearning & capability removal\ntags: unlearning\n\n## Question\nWhy is plain gradient ascent on forget data a poor unlearning method?\n\n## Answer\nMaximising loss is unbounded. The model is pushed toward degenerate outputs, damage spreads to retain data, and the result depends on when you stop. It also tends to be shallow, so finetuning brings the knowledge back.\n\n## Refresher\nCommon fixes:\n- bounded targets (the uniform distribution, as in MaxEnt);\n- objectives on internal representations (RMU);\n- retain-set losses that keep general performance;\n- preference-style objectives such as Negative Preference Optimization (NPO).\n\n# rmu\ndeck: Unlearning & capability removal\ntags: unlearning, representations\n\n## Question\nHow does RMU (Representation Misdirection for Unlearning) work?\n\n## Answer\nAt one chosen layer, it trains the model so that activations on forget data move toward a fixed, scaled random vector $c\\,u$, while activations on retain data stay equal to those of a frozen copy:\n$$\\mathcal{L}=\\mathbb{E}_{x_f}\\big\\lVert h_\\theta(x_f)-c\\,u\\big\\rVert^2+\\alpha\\,\\mathbb{E}_{x_r}\\big\\lVert h_\\theta(x_r)-h_{\\text{frozen}}(x_r)\\big\\rVert^2$$\n\n## Refresher\nRMU was introduced with the WMDP benchmark (Li et al., 2024) and updates only a few layers' MLP weights. The scrambled activations make later layers produce noise on hazardous prompts. Like other post-hoc methods, it has been shown to be partly reversible by finetuning on related data.\n\nSources: [WMDP and RMU](https://arxiv.org/abs/2403.03218)\n\n# wmdp\ndeck: Unlearning & capability removal\ntags: benchmarks, unlearning, dual-use\n\n## Question\nWhat is WMDP and what is it used for?\n\n## Answer\nThe Weapons of Mass Destruction Proxy benchmark: multiple-choice questions on hazardous knowledge in biosecurity, cybersecurity and chemistry. It measures how much dual-use knowledge a model has, and how much an unlearning method removes.\n\n## Refresher\nThe questions are proxies: written to correlate with hazardous capability without being dangerous themselves. There are roughly 3,700 of them. A good unlearning result pushes WMDP accuracy toward chance (25%) while keeping general benchmarks such as MMLU.\n\nSources: [The WMDP Benchmark](https://arxiv.org/abs/2403.03218)\n\n# refusal-not-removal\ndeck: Unlearning & capability removal\ntags: capability-removal, safeguards\n\n## Question\nWhy aren't refusal training and output classifiers forms of capability removal?\n\n## Answer\nThe capability stays intact in the weights. They only change or filter behaviour, so jailbreaks, finetuning or direct weight access get around them. They are policy layers, and they offer nothing once the weights are released.\n\n## Refresher\nThey're still useful in API deployments as defence in depth, and they're cheap to update. But for access control, where weights served to lower-trust users must not contain a capability, you need removal that survives finetuning.\n\n# relearning-attack\ndeck: Unlearning & capability removal\ntags: evaluation, unlearning, red-teaming\n\n## Question\nWhat is a relearning (elicitation) attack, and what is the fair baseline for judging it?\n\n## Answer\nFinetune the unlearned model on a small amount of forget-domain (or related) data, then measure how much capability returns. Compare with a model that never learned the domain, finetuned the same way. If recovery is much faster than that reference, the knowledge was latent, not removed.\n\n## Refresher\nDeeb & Roger (2024) recovered at least 88% of pre-unlearning accuracy for every unlearning method they tested. A weak attack (a few hundred sequences) is a sanity check. Strong claims need a curve of recovery against the attacker's budget.\n\nSources: [Deeb & Roger 2024](https://arxiv.org/abs/2410.08827)\n\n# unlearning-eval-checklist\ndeck: Unlearning & capability removal\ntags: evaluation, unlearning\n\n## Question\nBeyond benchmark accuracy, what kinds of evaluation should a robust unlearning claim survive?\n\n## Answer\nFor example:\n- relearning by finetuning;\n- adversarial or jailbreak prompts;\n- in-context relearning;\n- probing internal representations for the \"removed\" knowledge;\n- rephrased or translated questions;\n- side-effect checks on related knowledge that is allowed.\n\n## Refresher\nLynch et al. (2024) proposed eight such methods and applied them to the \"Who's Harry Potter?\" unlearning approach. They found the knowledge was often still extractable. No single metric is enough.\n\nSources: [Lynch et al. 2024](https://arxiv.org/abs/2402.16835)\n\n# probing-removed-knowledge\ndeck: Unlearning & capability removal\ntags: interpretability, probing, unlearning\n\n## Question\nHow can linear probes test whether unlearning really removed knowledge?\n\n## Answer\nTrain a linear probe on the model's internal activations to predict answers to forget-domain questions. If probe accuracy stays high after unlearning, the information is still linearly present, even though the model's outputs no longer show it.\n\n## Refresher\nProbes show that information is *present*, not that the model *uses* it, so pair them with relearning attacks. Use control tasks or random-label baselines to make sure the probe isn't learning the task itself. Probe several layers: removal can be shallow at the layer where an objective was applied and intact elsewhere.\n\n# tiered-access\ndeck: Unlearning & capability removal\ntags: access-control, dual-use, governance\n\n## Question\nWhat is tiered (structured) access for dual-use AI capabilities, and what does it require technically?\n\n## Answer\nServing different capability profiles to users with different levels of verified trust, instead of an all-or-nothing release. Technically, it needs capability removal that holds up in the model versions served to lower tiers, ideally without one full training run per profile.\n\n## Refresher\nFor example, a vetted virology lab gets a model with biology modules switched on, and general users get one without them. The options range from separate filtered pretraining runs (robust but costly) to modular models in which capabilities live in removable components.\n\n# gradient-routing\ndeck: Localisation & gradient routing\ntags: gradient-routing, localisation\n\n## Question\nWhat is gradient routing?\n\n## Answer\nApplying data-dependent masks to gradients during backpropagation, so that chosen data updates only designated parameters while the forward pass stays unchanged. It lets you choose **where** in the network a capability is learned.\n\n## Refresher\nCloud et al. (2024) demonstrated it on MNIST autoencoders, language-model unlearning and reinforcement learning. It is implemented as a per-example stop-gradient mask:\n$$\\tilde a=m\\odot a+(1-m)\\odot\\operatorname{sg}(a)$$\nEvery parameter still takes part in computing the loss. Only the learning is redirected.\n\nSources: [Gradient Routing](https://arxiv.org/abs/2410.04332)\n\n# expand-route-ablate\ndeck: Localisation & gradient routing\ntags: gradient-routing, unlearning\n\n## Question\nWhat are the three steps of Expand, Route, Ablate (ERA)?\n\n## Answer\n1. **Expand:** add parameters reserved for the domain you want to remove.\n2. **Route:** during training, send that domain's gradients mainly into those parameters.\n3. **Ablate:** delete those parameters afterwards.\n\nThe rest of the network was never under pressure to store the domain, so the removal is harder to undo.\n\n## Refresher\nUnlike post-hoc unlearning, ERA builds removability in during training. It costs a little extra capacity and training complexity in exchange for robustness. It also works when only part of the domain's data is labelled (see absorption).\n\nSources: [Gradient Routing](https://arxiv.org/abs/2410.04332)\n\n# absorption-effect\ndeck: Localisation & gradient routing\ntags: gradient-routing, labels\n\n## Question\nWhat is the \"absorption\" effect in gradient routing?\n\n## Answer\nRouting only a **labelled subset** of a domain's data also localises related **unlabelled** data into the routed parameters.\n\nOne intuition: once those parameters are good at the domain, unlabelled examples of it are predicted mostly through them, so the shared parameters feel little pressure to learn it.\n\n## Refresher\nThe effect is empirical, and the intuition above is not an established mechanism. Absorption is why routing can stay robust when labels are incomplete or noisy. Selective Gradient Masking (Shilov et al., 2025) studies that robustness directly.\n\nSources: [Beyond Data Filtering (SGTM)](https://arxiv.org/abs/2512.05648)\n\n# routing-vs-filtering-partial-labels\ndeck: Localisation & gradient routing\ntags: gradient-routing, data-filtering, labels\n\n## Question\nWhy can gradient routing beat data filtering when only some of the target data is labelled?\n\n## Answer\nFiltering removes only labelled documents. Everything it misses stays in training and is learned by the whole model. Routing has the same missing labels, but absorption tends to pull those documents' knowledge into the removable parameters anyway.\n\n## Refresher\nSo which method wins depends on label quality. With perfect labels, filtering is the gold standard. As label recall drops, routing degrades more gracefully. This matters because real classifiers for hazardous content are imperfect.\n\n# routing-spread-tradeoff\ndeck: Localisation & gradient routing\ntags: gradient-routing, hyperparameters\n\n## Question\nIn routed training, what does letting a fraction of the target domain's batches also update the shared parameters trade off?\n\n## Answer\nMore spread helps the shared parameters with related, allowed knowledge and keeps general performance up. But it also leaks more of the target domain into parameters you can't remove, which weakens removal.\n\n## Refresher\nA related knob is randomly switching modules on during shared-data training, so the shared parameters learn to work with or without them. Tune both probabilities against retain performance and robust-forget metrics together, not one at a time.\n";
+/* ====================================================================== */
+
+const DAY = 86400000;
+const GRADES = [
+  {g: 0, emoji: '\u{1F615}', label: 'Didn’t know', cls: 'g0'},
+  {g: 1, emoji: '\u{1F610}', label: 'Okay', cls: 'g1'},
+  {g: 2, emoji: '\u{1F642}', label: 'Great', cls: 'g2'}
+];
+const ICON_INFO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><line x1="12" y1="11" x2="12" y2="17"/><circle cx="12" cy="7.5" r="1.1" fill="currentColor" stroke="none"/></svg>';
+const RULES = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}`;
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} };
+const pct = x => x == null || isNaN(x) ? '–' : Math.round(x * 100) + '%';
+const clean = o => JSON.parse(JSON.stringify(o));
+const framed = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+
+/* ---------- Markdown + maths rendering ---------- */
+let mjResolve; const mjReady = new Promise(r => { mjResolve = r; }); window.__mjReady = () => mjResolve();
+let mjChain = Promise.resolve();
+
+function mdToHtml(src){
+  const code = [], math = [];
+  let s = String(src || '').replace(/```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]+`/g, m => { code.push(m); return 'MDCODE' + (code.length - 1) + 'ZZ'; });
+  const keep = tex => { math.push(tex); return 'MDMATH' + (math.length - 1) + 'ZZ'; };
+  s = s.replace(/\$\$([\s\S]+?)\$\$/g, (m, t) => keep('\\[' + t + '\\]'))
+       .replace(/\\\[([\s\S]+?)\\\]/g, (m, t) => keep('\\[' + t + '\\]'))
+       .replace(/\\\(([\s\S]+?)\\\)/g, (m, t) => keep('\\(' + t + '\\)'))
+       .replace(/(^|[^\\$\w])\$(?!\s)([^$\n]+?)(?<![\s\\])\$(?![\w$])/g, (m, pre, t) => pre + keep('\\(' + t + '\\)'))
+       .replace(/MDCODE(\d+)ZZ/g, (m, i) => code[+i]);
+  let html;
+  if (window.marked && window.DOMPurify) html = DOMPurify.sanitize(marked.parse(s, {gfm: true, breaks: false}), {ADD_ATTR: ['target']});
+  else html = '<p>' + esc(s).replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+  return html.replace(/MDMATH(\d+)ZZ/g, (m, i) => esc(math[+i]));
+}
+function setMD(el, src){
+  if (!el) return;
+  try { if (window.MathJax && MathJax.typesetClear) MathJax.typesetClear([el]); } catch (e) {}
+  el.innerHTML = mdToHtml(src);
+  mjChain = mjChain.then(() => mjReady).then(() => MathJax.typesetPromise([el])).catch(() => {});
+}
+
+/* ---------- Card format ---------- */
+function slugify(s){ return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80); }
+function hashId(s){ let h = 2166136261; for (const ch of s) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); } return 'card-' + (h >>> 0).toString(36); }
+
+function parseCards(text){
+  text = String(text || '').replace(/\r\n?/g, '\n');
+  const t = text.trim();
+  if (t.startsWith('[') || t.startsWith('{')) return parseJSON(t);
+  const lines = text.replace(/<!--[\s\S]*?-->/g, m => m.replace(/[^\n]/g, '')).split('\n');
+  const cards = [], errors = [], seen = new Set();
+  let cur = null, sec = null, fence = null;
+  const flush = () => {
+    if (!cur) return;
+    const get = k => (cur.secs[k] || []).join('\n').trim();
+    const q = get('q'), a = get('a'), r = get('r');
+    const id = slugify(cur.idRaw) || hashId(q);
+    if (!q || !a) errors.push(`Card “${cur.idRaw}” (line ${cur.line}) needs both a “## Question” and an “## Answer” section.`);
+    else if (seen.has(id)) errors.push(`Card id “${id}” (line ${cur.line}) is used more than once in this text.`);
+    else {
+      seen.add(id);
+      cards.push({id, deck: cur.meta.deck || 'Unsorted', tags: (cur.meta.tags || '').split(',').map(x => x.trim()).filter(Boolean), q, a, refresher: r});
+    }
+    cur = null;
+  };
+  lines.forEach((l, i) => {
+    const fm = l.match(/^\s*(`{3,}|~{3,})/);
+    if (fm) { if (!fence) fence = fm[1][0]; else if (fm[1][0] === fence) fence = null; }
+    else if (!fence) {
+      let m;
+      if ((m = l.match(/^#\s+(.+?)\s*#*\s*$/))) { flush(); cur = {idRaw: m[1], line: i + 1, meta: {}, secs: {}}; sec = 'meta'; return; }
+      if (cur && (m = l.match(/^##\s+(.+?)\s*#*\s*$/))) {
+        const n = m[1].toLowerCase();
+        sec = /^(q|question|front)$/.test(n) ? 'q' : /^(a|answer|back)$/.test(n) ? 'a' : /^(r|refresher|more|details|context|info)$/.test(n) ? 'r' : 'skip';
+        if (sec === 'skip') errors.push(`Line ${i + 1}: unknown section “## ${m[1]}”. Use Question, Answer or Refresher.`);
+        return;
+      }
+      if (cur && sec === 'meta') {
+        const mm = l.match(/^\s*([A-Za-z]+)\s*:\s*(.*)$/);
+        if (mm) cur.meta[mm[1].toLowerCase()] = mm[2].trim();
+        else if (l.trim()) errors.push(`Line ${i + 1}: text before “## Question” is ignored.`);
+        return;
+      }
+    }
+    if (cur && sec && sec !== 'meta' && sec !== 'skip') (cur.secs[sec] = cur.secs[sec] || []).push(l);
+  });
+  flush();
+  if (!cards.length && !errors.length) errors.push('No cards found. Each card starts with a line like “# my-card-id”.');
+  return {cards, errors, states: null};
+}
+
+function parseJSON(t){
+  let data;
+  try { data = JSON.parse(t); } catch (e) { return {cards: [], errors: ['This looks like JSON but doesn’t parse: ' + e.message], states: null}; }
+  const arr = Array.isArray(data) ? data : (data.cards || []);
+  const cards = [], errors = [];
+  arr.forEach((o, i) => {
+    const q = o.q || o.question || o.front, a = o.a || o.answer || o.back;
+    if (!q || !a) { errors.push(`Item ${i + 1} needs a question and an answer.`); return; }
+    const tags = Array.isArray(o.tags) ? o.tags : String(o.tags || '').split(',').map(x => x.trim()).filter(Boolean);
+    const c = {id: slugify(o.id || '') || hashId(q), deck: o.deck || 'Unsorted', tags, q, a, refresher: o.refresher || o.r || ''};
+    if (o.added) c.added = o.added;
+    cards.push(c);
+  });
+  return {cards, errors, states: (!Array.isArray(data) && data.states) ? data.states : null};
+}
+
+function serialiseCard(c){
+  return `# ${c.id}\ndeck: ${c.deck}\ntags: ${(c.tags || []).join(', ')}\n\n## Question\n${c.q}\n\n## Answer\n${c.a}\n` + (c.refresher ? `\n## Refresher\n${c.refresher}\n` : '');
+}
+const sameContent = (a, b) => a.q === b.q && a.a === b.a && (a.refresher || '') === (b.refresher || '') && a.deck === b.deck && (a.tags || []).join() === (b.tags || []).join();
+
+/* ---------- Scheduling ----------
+   SM-2-style intervals (Anki-like) plus an exponential forgetting curve.
+   Predicted recall R = 0.9^(days since review / interval), so R is 90% when a card falls due.
+   Your success rate on the card (😕 = 0, 😐 = 0.5, 🙂 = 1) nudges intervals and review order. */
+function defaultState(){ return {reps: 0, lapses: 0, ease: 2.5, interval: 0, due: 0, n: [0, 0, 0], last: null, firstSeen: null, lastGrade: null}; }
+function successRate(s){ if (!s || !s.n) return null; const t = s.n[0] + s.n[1] + s.n[2]; return t ? (s.n[1] * 0.5 + s.n[2]) / t : null; }
+function recall(s, now = Date.now()){ if (!s || !s.last) return null; const I = Math.max(s.interval, 1 / 1440); return Math.pow(0.9, ((now - s.last) / DAY) / I); }
+function nextState(s0, g, now, fuzz){
+  s0 = s0 || defaultState();
+  const s = Object.assign({}, s0, {n: [...(s0.n || [0, 0, 0])]});
+  const prevI = s0.interval || 0, elapsed = s0.last ? (now - s0.last) / DAY : 0;
+  s.n[g]++; s.last = now; s.lastGrade = g; if (!s.firstSeen) s.firstSeen = now;
+  const total = s.n[0] + s.n[1] + s.n[2], sr = (s.n[1] * 0.5 + s.n[2]) / total;
+  const m = total >= 3 ? 0.75 + 0.5 * sr : 1;           // weak history shortens intervals, strong history stretches them
+  const base = Math.max(elapsed, prevI * 0.5);         // credit late recall; damp reviews done early
+  let I;
+  if (g === 0) { s.lapses = (s.lapses || 0) + 1; s.reps = 0; s.ease = Math.max(1.3, s.ease - 0.2); I = 10 / 1440; }
+  else if (g === 1) { s.ease = Math.max(1.3, s.ease - 0.15); I = s.reps === 0 ? 1 : Math.max(prevI + 1, base * 1.2) * m; s.reps++; }
+  else { s.ease = Math.min(3.5, s.ease + 0.05); I = s.reps === 0 ? (s.lapses ? 1 : 2) : s.reps === 1 ? 5 * m : Math.max(prevI + 1, base * s.ease * m); s.reps++; }
+  if (fuzz && I >= 3) I *= 1 + (Math.random() * 0.1 - 0.05);
+  s.interval = Math.min(I, 3650); s.due = now + s.interval * DAY;
+  return s;
+}
+function fmtDays(d){
+  if (d < 1 / 24) return Math.max(1, Math.round(d * 1440)) + ' min';
+  if (d < 1) return Math.round(d * 24) + ' h';
+  if (d < 30) return Math.round(d) + ' d';
+  if (d < 365) return (d / 30.4).toFixed(1).replace(/\.0$/, '') + ' mo';
+  return (d / 365).toFixed(1).replace(/\.0$/, '') + ' y';
+}
+function dueLabel(s, now = Date.now()){ if (!s || !s.last) return 'new'; return s.due <= now ? 'due now' : 'in ' + fmtDays((s.due - now) / DAY); }
+function startOfDay(t = Date.now()){ const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
+
+/* ---------- Storage backends ---------- */
+class LocalStore {
+  constructor(){ this.key = 'fc-local-v1'; this.mem = null; this.kind = 'local'; }
+  _d(){
+    if (this.mem) return this.mem;
+    let d = null; try { d = JSON.parse(localStorage.getItem(this.key) || 'null'); } catch (e) {}
+    this.mem = d || {cards: {}, states: {}, settings: {}, log: []};
+    return this.mem;
+  }
+  _save(){ try { localStorage.setItem(this.key, JSON.stringify(this.mem)); } catch (e) { toast('This browser refused to save. Your progress will be lost when you close the page.'); } }
+  hasData(){ const d = this._d(); return Object.keys(d.cards).length > 0; }
+  async load(){ const d = this._d(); return {cards: Object.values(d.cards), states: d.states, settings: d.settings}; }
+  async putCards(cs){ const d = this._d(); cs.forEach(c => { d.cards[c.id] = clean(c); }); this._save(); }
+  async putStates(entries){ const d = this._d(); entries.forEach(([id, s]) => { d.states[id] = clean(s); }); this._save(); }
+  putState(id, s){ const d = this._d(); if (s) d.states[id] = clean(s); else delete d.states[id]; this._save(); return Promise.resolve(); }
+  async deleteCard(id){ const d = this._d(); delete d.cards[id]; delete d.states[id]; this._save(); }
+  addLog(e){ const d = this._d(); const id = 'l' + e.at + '-' + Math.random().toString(36).slice(2, 7); d.log.push(Object.assign({id}, e)); if (d.log.length > 20000) d.log = d.log.slice(-20000); this._save(); return {id, done: Promise.resolve()}; }
+  removeLog(id){ const d = this._d(); d.log = d.log.filter(x => x.id !== id); this._save(); return Promise.resolve(); }
+  async logSince(ts){ return this._d().log.filter(x => x.at >= ts); }
+  putSettings(s){ this._d().settings = clean(s); this._save(); return Promise.resolve(); }
+  erase(){ this.mem = {cards: {}, states: {}, settings: {}, log: []}; lsSet(this.key, null); }
+}
+
+class FirebaseStore {
+  constructor(db, uid){ this.db = db; this.root = db.collection('users').doc(uid); this.kind = 'firebase'; }
+  col(n){ return this.root.collection(n); }
+  async load(){
+    const [cs, ss, st] = await Promise.all([this.col('cards').get(), this.col('states').get(), this.col('meta').doc('settings').get()]);
+    const states = {}; ss.forEach(d => { states[d.id] = d.data(); });
+    return {cards: cs.docs.map(d => d.data()), states, settings: st.exists ? st.data() : {}};
+  }
+  async _batched(items, fn){ for (let i = 0; i < items.length; i += 400) { const b = this.db.batch(); items.slice(i, i + 400).forEach(x => fn(b, x)); await b.commit(); } }
+  putCards(cs){ return this._batched(cs, (b, c) => b.set(this.col('cards').doc(c.id), clean(c))); }
+  putStates(entries){ return this._batched(entries, (b, [id, s]) => b.set(this.col('states').doc(id), clean(s))); }
+  putState(id, s){ const ref = this.col('states').doc(id); return s ? ref.set(clean(s)) : ref.delete(); }
+  async deleteCard(id){ const b = this.db.batch(); b.delete(this.col('cards').doc(id)); b.delete(this.col('states').doc(id)); await b.commit(); }
+  addLog(e){ const ref = this.col('log').doc(); return {id: ref.id, done: ref.set(e)}; }
+  removeLog(id){ return this.col('log').doc(id).delete(); }
+  async logSince(ts){ const q = await this.col('log').where('at', '>=', ts).get(); return q.docs.map(d => d.data()); }
+  putSettings(s){ return this.col('meta').doc('settings').set(clean(s)); }
+}
+
+/* ---------- Firebase ---------- */
+let FB = null;
+function readConfig(){
+  if (FIREBASE_CONFIG) return FIREBASE_CONFIG;
+  try { return JSON.parse(lsGet('fc-firebase-config') || 'null'); } catch (e) { return null; }
+}
+function parseConfigText(txt){
+  const m = String(txt).match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('Paste the whole config object, from { to }.');
+  let j = m[0].replace(/\/\/[^\n]*/g, '').replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":').replace(/'/g, '"').replace(/,\s*}/g, '}');
+  const cfg = JSON.parse(j);
+  ['apiKey', 'authDomain', 'projectId'].forEach(k => { if (!cfg[k]) throw new Error(`The config is missing “${k}”.`); });
+  return cfg;
+}
+function initFirebase(){
+  const cfg = readConfig();
+  if (!cfg || !window.firebase) return null;
+  try {
+    const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(cfg);
+    const db = firebase.firestore();
+    try { db.enablePersistence({synchronizeTabs: true}).catch(() => {}); } catch (e) {}
+    return {app, auth: firebase.auth(), db, cfg};
+  } catch (e) { console.warn(e); return null; }
+}
+function authMessage(e){
+  const c = e && e.code || '';
+  if (c === 'auth/unauthorized-domain') return `Firebase hasn’t authorised this site (${location.hostname || 'this page'}). Add it under Authentication → Settings → Authorized domains.`;
+  if (c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request') return 'Sign-in was cancelled.';
+  if (c === 'auth/operation-not-supported-in-this-environment' || c === 'auth/web-storage-unsupported') return 'Google sign-in can’t run in this view. Open the page from your own site (e.g. GitHub Pages), or use “this browser only”.';
+  if (c === 'auth/network-request-failed') return 'Couldn’t reach Google. Check your connection; inside the Claude preview, network access to Firebase is blocked.';
+  if (c === 'permission-denied') return 'Firestore refused access. Check that your security rules match the ones in Settings → Firebase.';
+  return (e && e.message) || 'Something went wrong.';
+}
+async function signIn(){
+  if (!FB) { toast('Connect a Firebase project first.'); return; }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try { await FB.auth.signInWithPopup(provider); }
+  catch (e) {
+    if (e && e.code === 'auth/popup-blocked') { try { await FB.auth.signInWithRedirect(provider); } catch (e2) { toast(authMessage(e2)); } }
+    else toast(authMessage(e));
+  }
+}
+
+/* ---------- App state ---------- */
+const S = {store: null, mode: null, user: null, cards: new Map(), states: new Map(), settings: {newPerDay: 15},
+  view: 'practise', deck: 'all', current: null, revealed: false, ahead: false, sinceNew: 0, extraNew: 0, lastId: null, undo: null, reviewsToday: 0, timer: null};
+let STARTER = [];
+
+function deckList(){ return [...new Set([...S.cards.values()].map(c => c.deck))].sort(); }
+function inDeck(c){ return S.deck === 'all' || c.deck === S.deck; }
+function priority(c, now){ const s = S.states.get(c.id); return (1 - (recall(s, now) ?? 0)) + 0.3 * (1 - (successRate(s) ?? 0.5)); }
+function cardOrder(a, b){ return (a.added || 0) - (b.added || 0) || a.id.localeCompare(b.id); }
+function newSeenToday(){ const t0 = startOfDay(); let n = 0; S.states.forEach(s => { if (s.firstSeen && s.firstSeen >= t0) n++; }); return n; }
+function queue(now = Date.now()){
+  const due = [], fresh = [], later = [];
+  S.cards.forEach(c => {
+    if (!inDeck(c)) return;
+    const s = S.states.get(c.id);
+    if (!s || !s.last) fresh.push(c); else if (s.due <= now) due.push(c); else later.push(c);
+  });
+  due.sort((a, b) => priority(b, now) - priority(a, now));
+  fresh.sort(cardOrder);
+  const left = Math.max(0, (S.settings.newPerDay || 0) + S.extraNew - newSeenToday());
+  return {due, fresh: fresh.slice(0, left), freshTotal: fresh.length, later};
+}
+function pickNext(){
+  const now = Date.now(), q = queue(now);
+  const notLast = arr => arr.find(c => c.id !== S.lastId) || arr[0];
+  if (q.due.length && q.fresh.length) return S.sinceNew >= 4 ? q.fresh[0] : notLast(q.due);
+  if (q.due.length || q.fresh.length) return q.due.length ? notLast(q.due) : q.fresh[0];
+  if (S.ahead && q.later.length) {
+    const sorted = q.later.slice().sort((a, b) => priority(b, now) - priority(a, now));
+    return notLast(sorted);
+  }
+  return null;
+}
+
+/* ---------- UI helpers ---------- */
+let toastTimer;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 5000); }
+let modalReturn = null;
+function openModal(title, html, onMount){
+  const m = $('#modal'); modalReturn = document.activeElement;
+  $('#modal-title').textContent = title; const body = $('#modal-body'); body.innerHTML = html; m.hidden = false;
+  if (onMount) onMount(body);
+  $('#modal-close').focus();
+  return body;
+}
+function closeModal(){ $('#modal').hidden = true; $('#modal-body').innerHTML = ''; if (modalReturn && modalReturn.isConnected) modalReturn.focus(); }
+function copyText(txt, what){
+  const done = () => toast((what || 'Text') + ' copied.');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done)); else fallbackCopy(txt, done);
+}
+function fallbackCopy(txt, done){ const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) { toast('Copy failed. Select the text and copy it yourself.'); } ta.remove(); }
+// Inside the Claude artifact viewer, files go through its downloads capability; elsewhere a normal browser download.
+let DL = null;
+(async () => { try { if (window.claude && typeof window.claude.use === 'function') DL = await window.claude.use('downloads'); } catch (e) {} })();
+function download(name, text, type){
+  if (DL) {
+    DL.save({filename: name, data: text}).then(() => toast('Saved ' + name + '.'), e => {
+      const c = e && e.code;
+      if (c === 'declined') return;
+      toast(c === 'rate_limited' ? 'A save is already waiting for your answer.' : 'This view can\u2019t save files. Use the Copy button instead.');
+    });
+    return;
+  }
+  try { const url = URL.createObjectURL(new Blob([text], {type})); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); }
+  catch (e) { toast('This view blocks downloads. Use the Copy button instead.'); }
+  if (framed) toast('If nothing downloaded, this view blocks downloads. Use the Copy button instead.');
+}
+function deckSelect(id, value, withAll = true){
+  return `<select id="${id}">${withAll ? `<option value="all"${value === 'all' ? ' selected' : ''}>All decks</option>` : ''}${deckList().map(d => `<option${d === value ? ' selected' : ''}>${esc(d)}</option>`).join('')}</select>`;
+}
+function setupGuide(){
+  return `<ol class="steps">
+    <li>Create a project at <a href="https://console.firebase.google.com/" target="_blank" rel="noopener">console.firebase.google.com</a>. The free Spark plan is enough.</li>
+    <li><b>Authentication → Sign-in method:</b> enable <b>Google</b>.</li>
+    <li><b>Authentication → Settings → Authorized domains:</b> add your GitHub Pages domain, e.g. <code>yourname.github.io</code>.</li>
+    <li><b>Firestore Database → Create database</b> (production mode, any location).</li>
+    <li><b>Firestore → Rules:</b> replace the rules with the ones below and publish. They let only you read and write your own data.</li>
+    <li><b>Project settings → Your apps → Web app (&lt;/&gt;):</b> register an app and copy its <code>firebaseConfig</code> object. Paste it below, or into <code>FIREBASE_CONFIG</code> near the top of the HTML file so every device has it.</li>
+  </ol>
+  <pre><code>${esc(RULES)}</code></pre>
+  <div class="btnrow"><button type="button" class="btn small" data-copy-rules>Copy rules</button></div>`;
+}
+function configForm(){
+  const cfg = readConfig();
+  return `<label for="cfg-text" class="sr">Firebase config</label>
+    <textarea id="cfg-text" rows="7" spellcheck="false" placeholder='const firebaseConfig = {\n  apiKey: "...",\n  authDomain: "your-project.firebaseapp.com",\n  projectId: "your-project",\n  appId: "..."\n};'${FIREBASE_CONFIG ? ' disabled' : ''}>${cfg ? esc(JSON.stringify(cfg, null, 2)) : ''}</textarea>
+    ${FIREBASE_CONFIG ? '<p class="muted">This config is set in the HTML file (FIREBASE_CONFIG). Edit the file to change it.</p>'
+      : `<div class="btnrow"><button type="button" class="btn primary" id="cfg-save">Save config and reload</button>${cfg ? '<button type="button" class="btn" id="cfg-clear">Remove config</button>' : ''}</div>`}
+    <p id="cfg-err" class="note err" hidden></p>`;
+}
+function wireConfigForm(root){
+  const save = $('#cfg-save', root), clear = $('#cfg-clear', root);
+  if (save) save.onclick = () => {
+    try { const cfg = parseConfigText($('#cfg-text', root).value); lsSet('fc-firebase-config', JSON.stringify(cfg)); lsSet('fc-mode', null); location.reload(); }
+    catch (e) { const er = $('#cfg-err', root); er.textContent = 'That config couldn’t be read: ' + e.message; er.hidden = false; }
+  };
+  if (clear) clear.onclick = () => { lsSet('fc-firebase-config', null); location.reload(); };
+  $$('[data-copy-rules]', root).forEach(b => { b.onclick = () => copyText(RULES, 'Rules'); });
+}
+
+/* ---------- Start screen ---------- */
+function showStart(msg){
+  S.store = null; S.mode = null; $('#nav').hidden = true; $('#who').innerHTML = '';
+  const cfg = readConfig();
+  const v = $('#view');
+  v.innerHTML = `<section class="start">
+    <h1>Practise what you’ve read</h1>
+    <p class="lede">Spaced-repetition flashcards for technical AI safety, with maths, refreshers and your own cards.</p>
+    ${msg ? `<p class="note err">${esc(msg)}</p>` : ''}
+    ${framed ? '<p class="note">You’re viewing this inside another page, such as the Claude preview. Google sign-in and Firebase usually can’t connect from here. Use “this browser only” to try it, or open the HTML from your own site.</p>' : ''}
+    <div class="options">
+      <div class="panel">
+        <h2>Sync with Google</h2>
+        <p class="muted">Cards and progress live in your own free Firebase project and follow you across devices.</p>
+        ${cfg && FB ? '<div class="btnrow"><button type="button" class="btn primary" id="st-google">Sign in with Google</button></div>'
+          : cfg ? '<p class="note">Firebase didn’t load. Check your connection and reload.</p>' : '<p class="note">Connect a Firebase project first (about 5 minutes).</p>'}
+        <details${cfg ? '' : ' open'}><summary>${cfg ? 'Firebase connection' : 'Connect Firebase'}</summary>${setupGuide()}${configForm()}</details>
+      </div>
+      <div class="panel">
+        <h2>Try it in this browser</h2>
+        <p class="muted">No account needed. Cards and progress are saved in this browser only, and you can move them to Firebase later.</p>
+        <div class="btnrow"><button type="button" class="btn" id="st-local">Use this browser only</button></div>
+      </div>
+    </div></section>`;
+  const g = $('#st-google'); if (g) g.onclick = () => { S.wantGoogle = true; signIn(); };
+  $('#st-local').onclick = () => startSession(new LocalStore(), 'local', null);
+  wireConfigForm(v);
+}
+
+/* ---------- Session ---------- */
+async function startSession(store, mode, user){
+  S.store = store; S.mode = mode; S.user = user; lsSet('fc-mode', mode);
+  $('#view').innerHTML = '<p class="loading">Loading your cards…</p>';
+  try {
+    const d = await store.load();
+    S.cards = new Map(d.cards.map(c => [c.id, c]));
+    S.states = new Map(Object.entries(d.states || {}));
+    S.settings = Object.assign({newPerDay: 15}, d.settings || {});
+    S.reviewsToday = (await store.logSince(startOfDay())).length;
+  } catch (e) {
+    showStart('Couldn’t load your data. ' + authMessage(e));
+    return;
+  }
+  S.current = null; S.revealed = false; S.undo = null; S.ahead = false;
+  $('#nav').hidden = false; renderWho();
+  S.deck = lsGet('fc-deck') || 'all'; if (S.deck !== 'all' && !deckList().includes(S.deck)) S.deck = 'all';
+  S.view = lsGet('fc-view') || 'practise';
+  render();
+}
+function renderWho(){
+  const w = $('#who');
+  w.innerHTML = S.mode === 'firebase' ? `<span class="dot"></span><span>${esc(S.user && (S.user.email || S.user.displayName) || 'Signed in')}</span>`
+    : `<span class="dot local"></span><span>This browser only</span>`;
+}
+async function endSession(){
+  if (S.mode === 'firebase' && FB) { try { await FB.auth.signOut(); } catch (e) {} }
+  lsSet('fc-mode', null); S.cards = new Map(); S.states = new Map(); showStart();
+}
+
+/* ---------- Rendering ---------- */
+function go(view){ S.view = view; lsSet('fc-view', view); render(); $('#view').focus({preventScroll: true}); window.scrollTo(0, 0); }
+function render(){
+  clearTimeout(S.timer);
+  $$('#nav button').forEach(b => { if (b.dataset.view === S.view) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  ({practise: renderPractise, cards: renderCards, add: renderAdd, stats: renderStats, settings: renderSettings}[S.view] || renderPractise)();
+}
+
+/* Practise */
+function renderPractise(){
+  const v = $('#view'), now = Date.now();
+  if (!S.cards.size) {
+    v.innerHTML = `<div class="done"><div class="big" aria-hidden="true">\u{1F4DA}</div><h2>No cards yet</h2>
+      <p class="muted">Start with the starter deck (${STARTER.length} cards on architectures, optimisation, scaling, unlearning and gradient routing), or add your own.</p>
+      <div class="btnrow" style="justify-content:center"><button type="button" class="btn primary" id="p-starter">Add the starter deck</button><button type="button" class="btn" id="p-add">Add my own cards</button></div></div>`;
+    $('#p-starter').onclick = addStarter; $('#p-add').onclick = () => go('add');
+    return;
+  }
+  if (S.current && (!S.cards.has(S.current.id) || !inDeck(S.current))) S.current = null;
+  if (!S.current) { S.current = pickNext(); S.revealed = false; }
+  const q = queue(now);
+  const bar = `<div class="prac-bar"><label for="p-deck">Deck ${deckSelect('p-deck', S.deck)}</label>
+    <div class="counts" aria-label="Queue"><span><b>${q.due.length}</b> due</span><span><b>${q.fresh.length}</b> new</span><span><b>${S.reviewsToday}</b> reviewed today</span></div></div>`;
+  const undo = S.undo && S.cards.has(S.undo.id) ? `<p class="undo">Last answer: ${GRADES[S.undo.grade].emoji} next review in ${fmtDays(S.undo.interval)} · <button type="button" class="link" id="p-undo">Undo</button> <kbd>U</kbd></p>` : '';
+  const c = S.current;
+  if (!c) {
+    let next = Infinity; S.cards.forEach(cc => { if (!inDeck(cc)) return; const s = S.states.get(cc.id); if (s && s.last && s.due > now) next = Math.min(next, s.due); });
+    const moreNew = q.freshTotal - q.fresh.length;
+    v.innerHTML = bar + `<div class="done"><div class="big" aria-hidden="true">\u{1F389}</div><h2>All caught up</h2>
+      <p class="muted">${isFinite(next) ? 'Next card is due in ' + fmtDays((next - now) / DAY) + '.' : 'Nothing is scheduled yet.'}${moreNew > 0 ? ` ${moreNew} new card${moreNew > 1 ? 's are' : ' is'} waiting beyond today’s limit.` : ''}</p>
+      <div class="btnrow" style="justify-content:center">${q.later.length ? '<button type="button" class="btn primary" id="p-ahead">Practise ahead</button>' : ''}${moreNew > 0 ? '<button type="button" class="btn" id="p-more">Learn 5 more new cards</button>' : ''}</div>
+      ${q.later.length ? '<p class="muted" style="font-size:.85rem">Practising ahead shows the cards you’re most likely to have forgotten first.</p>' : ''}</div>` + undo;
+    if ($('#p-ahead')) $('#p-ahead').onclick = () => { S.ahead = true; S.current = null; render(); };
+    if ($('#p-more')) $('#p-more').onclick = () => { S.extraNew += 5; S.current = null; render(); };
+    if (isFinite(next) && next - now < 30 * 60000) S.timer = setTimeout(() => { if (S.view === 'practise' && !S.current) { S.current = null; render(); } }, next - now + 500);
+    wirePractise();
+    return;
+  }
+  const s = S.states.get(c.id), isNew = !s || !s.last;
+  const early = s && s.last && s.due > now;
+  const sr = successRate(s), R = recall(s, now);
+  const stats = isNew ? 'New card' : `Seen ${s.n[0] + s.n[1] + s.n[2]}× · success ${pct(sr)} · predicted recall now ${pct(R)} · current interval ${fmtDays(s.interval)}`;
+  const grades = GRADES.map(G => {
+    const ivl = fmtDays(nextState(s, G.g, now, false).interval);
+    return `<button type="button" class="grade ${G.cls}" data-g="${G.g}" aria-label="${G.label}, score ${G.g}, next review in ${ivl}"><kbd>${G.g}</kbd><span class="emo" aria-hidden="true">${G.emoji}</span><span class="gl">${G.label}</span><span class="gi">${ivl}</span></button>`;
+  }).join('');
+  v.innerHTML = bar + `<article class="fc" tabindex="-1">
+    <div class="fc-meta"><span class="chip">${esc(c.deck)}</span>${isNew ? '<span class="chip new">new</span>' : ''}${early ? '<span class="chip">ahead of schedule</span>' : ''}
+      <span class="spacer"></span><button type="button" class="icon-btn" id="p-info" title="Refresher (I)" aria-label="Show refresher">${ICON_INFO}</button></div>
+    <div class="fc-label">Question</div>
+    <div class="fc-q md" id="p-q"></div>
+    ${S.revealed ? `<div class="fc-a"><div class="fc-label">Answer</div><div class="md" id="p-a"></div></div>
+      <div class="grades" role="group" aria-label="How well did you know it?">${grades}</div>`
+      : '<div class="reveal"><button type="button" class="btn primary" id="p-show">Show answer <kbd>Space</kbd></button></div>'}
+    <p class="fc-stats">${stats}</p></article>` + undo;
+  setMD($('#p-q'), c.q);
+  if (S.revealed) setMD($('#p-a'), c.a);
+  wirePractise();
+}
+function wirePractise(){
+  const d = $('#p-deck'); if (d) d.onchange = () => { S.deck = d.value; lsSet('fc-deck', S.deck); S.current = null; S.ahead = false; render(); };
+  const sh = $('#p-show'); if (sh) { sh.onclick = reveal; sh.focus({preventScroll: true}); }
+  const inf = $('#p-info'); if (inf) inf.onclick = () => showRefresher(S.current);
+  $$('.grade').forEach(b => { b.onclick = () => grade(+b.dataset.g); });
+  const u = $('#p-undo'); if (u) u.onclick = undo;
+}
+function reveal(){ if (!S.current || S.revealed) return; S.revealed = true; render(); const f = $('.fc'); if (f) f.focus({preventScroll: true}); }
+function grade(g){
+  const c = S.current; if (!c || !S.revealed) return;
+  const now = Date.now(), prev = S.states.get(c.id) || null;
+  const next = nextState(prev, g, now, true);
+  S.states.set(c.id, next);
+  S.sinceNew = (!prev || !prev.last) ? 0 : S.sinceNew + 1;
+  S.lastId = c.id; S.reviewsToday++;
+  S.store.putState(c.id, next).catch(e => toast('Couldn’t save that review: ' + authMessage(e)));
+  const log = S.store.addLog({card: c.id, grade: g, at: now, prevInterval: prev ? prev.interval : 0, interval: next.interval});
+  log.done.catch(() => {});
+  S.undo = {id: c.id, prev, logId: log.id, grade: g, interval: next.interval};
+  S.current = null; S.revealed = false;
+  if (S.ahead && queue(now).due.length) S.ahead = false;
+  render();
+}
+function undo(){
+  const u = S.undo; if (!u || !S.cards.has(u.id)) return;
+  if (u.prev) S.states.set(u.id, u.prev); else S.states.delete(u.id);
+  S.store.putState(u.id, u.prev).catch(e => toast(authMessage(e)));
+  S.store.removeLog(u.logId).catch(() => {});
+  S.reviewsToday = Math.max(0, S.reviewsToday - 1);
+  S.current = S.cards.get(u.id); S.revealed = true; S.undo = null;
+  if (S.view !== 'practise') go('practise'); else render();
+}
+function showRefresher(c){
+  if (!c) return;
+  openModal('Refresher', `<div class="modal-q md" id="r-q"></div>${c.refresher ? '<div class="md" id="r-body"></div>'
+    : '<p class="muted">This card has no refresher yet. You can add one by editing the card.</p><div class="btnrow"><button type="button" class="btn" id="r-edit">Edit card</button></div>'}`, body => {
+    setMD($('#r-q', body), c.q);
+    if (c.refresher) setMD($('#r-body', body), c.refresher);
+    const e = $('#r-edit', body); if (e) e.onclick = () => editCard(c.id);
+  });
+}
+
+/* Cards */
+function renderCards(){
+  const v = $('#view');
+  v.innerHTML = `<h1>Cards</h1><div class="list-tools">
+    <label for="l-q" class="sr">Search</label><input type="search" id="l-q" placeholder="Search questions, answers and tags" value="${esc(S.listQ || '')}">
+    <label for="l-deck" class="sr">Deck</label>${deckSelect('l-deck', S.listDeck || 'all')}
+    <label for="l-sort" class="sr">Sort</label><select id="l-sort">${[['due', 'Due soonest'], ['weak', 'Lowest success'], ['recall', 'Lowest recall'], ['added', 'Order added'], ['deck', 'Deck']].map(([k, l]) => `<option value="${k}"${(S.listSort || 'due') === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+    <p class="muted" id="l-count"></p><div id="l-list"></div>`;
+  const draw = () => {
+    S.listQ = $('#l-q').value; S.listDeck = $('#l-deck').value; S.listSort = $('#l-sort').value;
+    const needle = S.listQ.trim().toLowerCase(), now = Date.now();
+    let list = [...S.cards.values()].filter(c => (S.listDeck === 'all' || c.deck === S.listDeck) &&
+      (!needle || [c.id, c.q, c.a, c.refresher, (c.tags || []).join(' ')].join(' ').toLowerCase().includes(needle)));
+    const st = c => S.states.get(c.id);
+    const by = {
+      due: (a, b) => ((st(a) && st(a).last ? st(a).due : Infinity) - (st(b) && st(b).last ? st(b).due : Infinity)) || cardOrder(a, b),
+      weak: (a, b) => ((successRate(st(a)) ?? 2) - (successRate(st(b)) ?? 2)) || cardOrder(a, b),
+      recall: (a, b) => ((recall(st(a), now) ?? 2) - (recall(st(b), now) ?? 2)) || cardOrder(a, b),
+      added: cardOrder,
+      deck: (a, b) => a.deck.localeCompare(b.deck) || cardOrder(a, b)
+    }[S.listSort];
+    list.sort(by);
+    $('#l-count').textContent = `${list.length} of ${S.cards.size} card${S.cards.size === 1 ? '' : 's'}`;
+    const box = $('#l-list');
+    box.innerHTML = list.slice(0, 300).map(c => {
+      const s = st(c), lab = dueLabel(s, now);
+      return `<div class="row" role="button" tabindex="0" data-id="${esc(c.id)}"><div class="row-q md" data-q="${esc(c.id)}"></div>
+        <div class="row-meta"><span class="chip">${esc(c.deck)}</span><span class="${lab === 'new' ? 'status-new' : lab === 'due now' ? 'status-due' : ''}">${lab}</span>${s && s.last ? `<span>${pct(successRate(s))} success</span>` : ''}</div></div>`;
+    }).join('') + (list.length > 300 ? '<p class="muted">Showing the first 300. Search or filter to narrow the list.</p>' : '');
+    $$('.row-q', box).forEach(el => setMD(el, S.cards.get(el.dataset.q).q));
+    $$('.row', box).forEach(r => {
+      r.onclick = () => openCard(r.dataset.id);
+      r.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCard(r.dataset.id); } };
+    });
+  };
+  $('#l-q').oninput = draw; $('#l-deck').onchange = draw; $('#l-sort').onchange = draw;
+  draw();
+}
+function openCard(id){
+  const c = S.cards.get(id); if (!c) return;
+  const s = S.states.get(id), now = Date.now();
+  openModal('Card', `<div class="fc-meta"><span class="chip">${esc(c.deck)}</span>${(c.tags || []).map(t => `<span class="chip tag">${esc(t)}</span>`).join('')}<span class="spacer"></span><code>${esc(c.id)}</code></div>
+    <div class="fc-label">Question</div><div class="md" id="d-q"></div>
+    <div class="fc-label">Answer</div><div class="md" id="d-a"></div>
+    ${c.refresher ? '<div class="fc-label">Refresher</div><div class="md" id="d-r"></div>' : ''}
+    <div class="detail-stats">
+      <div><small>Reviews</small><span>${s && s.last ? `\u{1F615} ${s.n[0]} · \u{1F610} ${s.n[1]} · \u{1F642} ${s.n[2]}` : 'none yet'}</span></div>
+      <div><small>Success rate</small><span>${pct(successRate(s))}</span></div>
+      <div><small>Predicted recall now</small><span>${pct(recall(s, now))}</span></div>
+      <div><small>Interval · next review</small><span>${s && s.last ? fmtDays(s.interval) + ' · ' + dueLabel(s, now) : 'new'}</span></div>
+      <div><small>Ease · lapses</small><span>${s ? s.ease.toFixed(2) + ' · ' + (s.lapses || 0) : '–'}</span></div>
+    </div>
+    <div class="btnrow" id="d-actions"><button type="button" class="btn" id="d-edit">Edit</button><button type="button" class="btn" id="d-prac">Practise now</button>
+      ${s ? '<button type="button" class="btn" id="d-reset">Reset progress</button>' : ''}<button type="button" class="btn danger" id="d-del">Delete</button></div>`, body => {
+    setMD($('#d-q', body), c.q); setMD($('#d-a', body), c.a); if (c.refresher) setMD($('#d-r', body), c.refresher);
+    $('#d-edit', body).onclick = () => editCard(id);
+    $('#d-prac', body).onclick = () => { closeModal(); S.current = c; S.revealed = false; if (!inDeck(c)) { S.deck = 'all'; lsSet('fc-deck', 'all'); } go('practise'); };
+    const r = $('#d-reset', body);
+    if (r) r.onclick = () => confirmIn($('#d-actions', body), 'Reset this card’s progress? It will count as new again.', 'Reset progress', async () => {
+      S.states.delete(id); await S.store.putState(id, null).catch(e => toast(authMessage(e))); closeModal(); toast('Progress reset.'); render();
+    });
+    $('#d-del', body).onclick = () => confirmIn($('#d-actions', body), 'Delete this card and its review history?', 'Delete card', async () => {
+      try { await S.store.deleteCard(id); } catch (e) { toast(authMessage(e)); return; }
+      S.cards.delete(id); S.states.delete(id); if (S.current && S.current.id === id) S.current = null; closeModal(); toast('Card deleted.'); render();
+    });
+  });
+}
+function confirmIn(box, msg, okLabel, onOk){
+  box.innerHTML = `<span>${esc(msg)}</span><button type="button" class="btn danger" data-ok>${esc(okLabel)}</button><button type="button" class="btn" data-cancel>Cancel</button>`;
+  $('[data-ok]', box).onclick = onOk; $('[data-cancel]', box).onclick = () => { if (box.closest('#modal')) closeModal(); else render(); };
+  $('[data-cancel]', box).focus();
+}
+function editCard(id){
+  const c = S.cards.get(id); if (!c) return;
+  openModal('Edit card', `<p class="muted">Edit in the card format. Changing the first line (the id) renames the card and keeps its progress.</p>
+    <label for="e-text" class="sr">Card text</label><textarea id="e-text" rows="18" spellcheck="false">${esc(serialiseCard(c))}</textarea>
+    <ul class="errors" id="e-err"></ul>
+    <div class="btnrow"><button type="button" class="btn primary" id="e-save">Save</button><button type="button" class="btn" id="e-cancel">Cancel</button></div>`, body => {
+    $('#e-cancel', body).onclick = () => openCard(id);
+    $('#e-save', body).onclick = async () => {
+      const res = parseCards($('#e-text', body).value), err = $('#e-err', body);
+      if (res.cards.length !== 1 || res.errors.length) { err.innerHTML = (res.errors.length ? res.errors : ['The text must contain exactly one card.']).map(x => `<li>${esc(x)}</li>`).join(''); return; }
+      const n = Object.assign({}, res.cards[0], {added: c.added || Date.now(), updated: Date.now()});
+      if (n.id !== id && S.cards.has(n.id)) { err.innerHTML = `<li>Another card already uses the id “${esc(n.id)}”.</li>`; return; }
+      try {
+        await S.store.putCards([n]);
+        if (n.id !== id) { const st = S.states.get(id); if (st) { await S.store.putStates([[n.id, st]]); S.states.set(n.id, st); } await S.store.deleteCard(id); S.cards.delete(id); S.states.delete(id); }
+      } catch (e) { err.innerHTML = `<li>${esc(authMessage(e))}</li>`; return; }
+      S.cards.set(n.id, n); if (S.current && S.current.id === id) S.current = n;
+      toast('Card saved.'); openCard(n.id); render();
+    };
+  });
+}
+
+/* Add cards */
+const EXAMPLE = `# adam-bias-correction
+deck: Training & optimisation
+tags: optimisers, adam
+
+## Question
+Why does Adam divide its moment estimates by $1-\\beta^t$?
+
+## Answer
+$m$ and $v$ start at zero, so early estimates are biased toward zero. Dividing by $1-\\beta_1^t$ and $1-\\beta_2^t$ removes the bias.
+
+## Refresher
+Optional extra detail, shown when you click the info icon. Markdown, links and maths work:
+$$\\hat m_t = \\frac{m_t}{1-\\beta_1^t}$$`;
+async function importCards(cards, states){
+  const now = Date.now();
+  const merged = cards.map((c, i) => { const old = S.cards.get(c.id); return Object.assign({}, c, {added: old && old.added || c.added || now + i, updated: now}); });
+  await S.store.putCards(merged);
+  merged.forEach(c => S.cards.set(c.id, c));
+  if (states) { const entries = Object.entries(states).filter(([id]) => S.cards.has(id)); if (entries.length) { await S.store.putStates(entries); entries.forEach(([id, s]) => S.states.set(id, s)); } }
+  return merged.length;
+}
+async function addStarter(){
+  const missing = STARTER.filter(c => !S.cards.has(c.id));
+  if (!missing.length) { toast('The starter deck is already in your collection.'); return; }
+  try { const n = await importCards(missing, null); toast(`Added ${n} starter card${n === 1 ? '' : 's'}.`); S.current = null; render(); }
+  catch (e) { toast('Couldn’t add the starter deck: ' + authMessage(e)); }
+}
+function renderAdd(){
+  const v = $('#view');
+  const missing = STARTER.filter(c => !S.cards.has(c.id)).length;
+  v.innerHTML = `<h1>Add cards</h1>
+  <section class="panel"><h2>Add or update cards</h2>
+    <p class="muted">Paste cards in the format below, or choose a <code>.md</code> or <code>.json</code> file (a backup works too). Cards whose id already exists are updated, and your progress on them is kept.</p>
+    <label for="i-text" class="sr">Cards to import</label><textarea id="i-text" rows="12" spellcheck="false" placeholder="# my-card-id&#10;deck: My deck&#10;tags: tag-a, tag-b&#10;&#10;## Question&#10;...&#10;&#10;## Answer&#10;...&#10;&#10;## Refresher&#10;..."></textarea>
+    <div class="btnrow"><span class="btn filebtn">Choose file…<input type="file" id="i-file" accept=".md,.markdown,.txt,.json" aria-label="Choose a card file"></span><button type="button" class="btn primary" id="i-check">Check cards</button></div>
+    <div id="i-result"></div></section>
+  <section class="panel"><h2>Starter deck</h2>
+    <p class="muted">${STARTER.length} cards of transferable knowledge: architectures, training and optimisation, scaling and evaluation, unlearning, and gradient routing.</p>
+    ${missing ? `<div class="btnrow"><button type="button" class="btn" id="i-starter">Add ${missing === STARTER.length ? 'the starter deck' : `${missing} missing starter card${missing === 1 ? '' : 's'}`}</button></div>` : '<p class="ok">All starter cards are in your collection.</p>'}</section>
+  <section class="panel"><h2>Card format</h2>
+    <p>Each card starts with <code># card-id</code>, followed by optional <code>deck:</code> and <code>tags:</code> lines and three sections: <code>## Question</code>, <code>## Answer</code> and an optional <code>## Refresher</code>. Sections use Markdown; maths goes in <code>$…$</code> or <code>$$…$$</code>. Put as many cards in one file as you like. Use <code>###</code> or smaller headings inside a card.</p>
+    <pre><code>${esc(EXAMPLE)}</code></pre>
+    <div class="btnrow"><button type="button" class="btn small" id="i-copyex">Copy example</button></div></section>
+  <section class="panel"><h2>Export and back up</h2>
+    <p class="muted">Download all cards in the card format, or a JSON backup that also contains your progress.</p>
+    <div class="btnrow"><button type="button" class="btn" id="x-md">Download cards (.md)</button><button type="button" class="btn" id="x-json">Download backup (.json)</button><button type="button" class="btn" id="x-copy">Copy cards as Markdown</button></div></section>`;
+  let parsed = null;
+  const check = () => {
+    parsed = parseCards($('#i-text').value);
+    const res = $('#i-result');
+    const rows = parsed.cards.map(c => { const old = S.cards.get(c.id); const st = !old ? 'new' : sameContent(old, c) ? 'unchanged' : 'update'; return {c, st}; });
+    const nNew = rows.filter(r => r.st === 'new').length, nUp = rows.filter(r => r.st === 'update').length, nSame = rows.length - nNew - nUp;
+    const toImport = rows.filter(r => r.st !== 'unchanged').map(r => r.c);
+    res.innerHTML = `${parsed.errors.length ? `<ul class="errors">${parsed.errors.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${rows.length ? `<p>${rows.length} card${rows.length === 1 ? '' : 's'} found: <b>${nNew}</b> new, <b>${nUp}</b> updated, ${nSame} unchanged.</p>
+      <div class="imp-list">${rows.slice(0, 200).map(r => `<div><span class="chip ${r.st === 'new' ? 'new' : ''}">${r.st}</span><code>${esc(r.c.id)}</code><span class="muted">${esc(r.c.deck)}</span></div>`).join('')}</div>
+      ${parsed.states ? '<p><label><input type="checkbox" id="i-states" checked> Also restore progress from this backup</label></p>' : ''}
+      <div class="btnrow"><button type="button" class="btn primary" id="i-go"${toImport.length || parsed.states ? '' : ' disabled'}>Import ${toImport.length} card${toImport.length === 1 ? '' : 's'}</button></div>` : ''}`;
+    const goBtn = $('#i-go');
+    if (goBtn) goBtn.onclick = async () => {
+      goBtn.disabled = true; goBtn.textContent = 'Importing…';
+      try {
+        const keepStates = parsed.states && $('#i-states') && $('#i-states').checked ? parsed.states : null;
+        const n = await importCards(keepStates ? parsed.cards : toImport, keepStates);
+        toast(`Imported ${n} card${n === 1 ? '' : 's'}.`); $('#i-text').value = ''; res.innerHTML = '<p class="ok">Done. The cards are in your collection.</p>'; S.current = null;
+      } catch (e) { goBtn.disabled = false; goBtn.textContent = 'Try again'; toast('Import failed: ' + authMessage(e)); }
+    };
+  };
+  const readFile = f => { if (!f) return; const r = new FileReader(); r.onload = () => { $('#i-text').value = r.result; check(); }; r.readAsText(f); };
+  $('#i-check').onclick = check;
+  $('#i-file').onchange = e => readFile(e.target.files[0]);
+  const ta = $('#i-text');
+  ta.ondragover = e => e.preventDefault();
+  ta.ondrop = e => { if (e.dataTransfer.files.length) { e.preventDefault(); readFile(e.dataTransfer.files[0]); } };
+  const st = $('#i-starter'); if (st) st.onclick = async () => { await addStarter(); render(); };
+  $('#i-copyex').onclick = () => copyText(EXAMPLE, 'Example');
+  const allMd = () => [...S.cards.values()].sort(cardOrder).map(serialiseCard).join('\n');
+  const stamp = new Date().toISOString().slice(0, 10);
+  $('#x-md').onclick = () => download(`flashcards-${stamp}.md`, allMd(), 'text/markdown');
+  $('#x-json').onclick = () => download(`flashcards-backup-${stamp}.json`, JSON.stringify({version: 1, exported: Date.now(), cards: [...S.cards.values()], states: Object.fromEntries(S.states)}, null, 1), 'application/json');
+  $('#x-copy').onclick = () => copyText(allMd(), 'Cards');
+}
+
+/* Stats */
+function bars(values, labels, title, highlight){
+  const W = 640, H = 150, L = 30, R = 6, T = 10, B = 22, n = values.length;
+  const max = Math.max(2, ...values), step = Math.pow(10, Math.floor(Math.log10(max)));
+  let top = Math.ceil(max / step) * step; if (top % 2) top += step; const bw = (W - L - R) / n;
+  const y = v => H - B - v / top * (H - T - B);
+  const grid = [0, top / 2, top].filter(t => Number.isInteger(t)).map(t => `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text x="${L - 5}" y="${y(t) + 4}" text-anchor="end">${Math.round(t)}</text>`).join('');
+  const rects = values.map((v, i) => `<rect class="bar${i === highlight ? ' today' : ''}" x="${L + i * bw + bw * 0.15}" y="${y(v)}" width="${bw * 0.7}" height="${Math.max(0, H - B - y(v))}" rx="2"><title>${esc(labels[i])}: ${v}</title></rect>`).join('');
+  const every = Math.ceil(n / 8);
+  const lab = labels.map((l, i) => ((n - 1 - i) % every === 0) ? `<text x="${L + i * bw + bw / 2}" y="${H - 6}" text-anchor="middle">${esc(l)}</text>` : '').join('');
+  return `<figure class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">${grid}${rects}${lab}</svg><figcaption>${esc(title)}</figcaption></figure>`;
+}
+async function renderStats(){
+  const v = $('#view'), now = Date.now(), t0 = startOfDay(now);
+  const all = [...S.cards.values()];
+  const seen = all.filter(c => { const s = S.states.get(c.id); return s && s.last; });
+  const due = seen.filter(c => S.states.get(c.id).due <= now).length;
+  const mean = xs => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+  const meanSr = mean(seen.map(c => successRate(S.states.get(c.id))));
+  const meanR = mean(seen.map(c => recall(S.states.get(c.id), now)));
+  const fmtDay = t => new Date(t).toLocaleDateString(undefined, {day: 'numeric', month: 'short'});
+  const fc = Array(14).fill(0); seen.forEach(c => { const s = S.states.get(c.id); const d = Math.max(0, Math.floor((startOfDay(s.due) - t0) / DAY)); if (d < 14) fc[d]++; });
+  const fcLab = fc.map((x, i) => i === 0 ? 'today' : new Date(t0 + i * DAY + DAY / 2).toLocaleDateString(undefined, {weekday: 'short'}));
+  const decks = deckList().map(d => {
+    const cs = all.filter(c => c.deck === d), ss = cs.map(c => S.states.get(c.id)).filter(s => s && s.last);
+    return {d, n: cs.length, nNew: cs.length - ss.length, due: ss.filter(s => s.due <= now).length, sr: mean(ss.map(successRate)), R: mean(ss.map(s => recall(s, now)))};
+  });
+  v.innerHTML = `<h1>Stats</h1>
+    <div class="tiles">
+      <div class="tile"><small>Cards</small><b>${all.length}</b></div>
+      <div class="tile"><small>Not yet seen</small><b>${all.length - seen.length}</b></div>
+      <div class="tile"><small>Due now</small><b>${due}</b></div>
+      <div class="tile"><small>Reviewed today</small><b>${S.reviewsToday}</b></div>
+      <div class="tile"><small>Mean success</small><b>${pct(meanSr)}</b></div>
+      <div class="tile"><small>Predicted recall now</small><b>${pct(meanR)}</b></div>
+    </div>
+    <section class="panel" id="s-hist"><p class="muted">Loading review history…</p></section>
+    <section class="panel">${bars(fc, fcLab, 'Cards falling due over the next 14 days (overdue cards count as today)', 0)}</section>
+    <section class="panel"><h2>By deck</h2><div class="tablewrap"><table class="data"><thead><tr><th>Deck</th><th class="n">Cards</th><th class="n">New</th><th class="n">Due</th><th class="n">Success</th><th class="n">Recall now</th></tr></thead>
+      <tbody>${decks.map(r => `<tr><td>${esc(r.d)}</td><td class="n">${r.n}</td><td class="n">${r.nNew}</td><td class="n">${r.due}</td><td class="n">${pct(r.sr)}</td><td class="n">${pct(r.R)}</td></tr>`).join('')}</tbody></table></div></section>`;
+  try {
+    const logs = await S.store.logSince(t0 - 29 * DAY);
+    const counts = Array(30).fill(0); logs.forEach(l => { const i = 29 - Math.floor((t0 - startOfDay(l.at)) / DAY); if (i >= 0 && i < 30) counts[i]++; });
+    const labels = counts.map((x, i) => fmtDay(t0 - (29 - i) * DAY));
+    const box = $('#s-hist'); if (box) box.innerHTML = bars(counts, labels, 'Reviews per day, last 30 days', 29);
+  } catch (e) { const box = $('#s-hist'); if (box) box.innerHTML = `<p class="muted">Couldn’t load review history. ${esc(authMessage(e))}</p>`; }
+}
+
+/* Settings */
+function renderSettings(){
+  const v = $('#view'), local = new LocalStore();
+  const cfg = readConfig();
+  v.innerHTML = `<h1>Settings</h1>
+  <section class="panel"><h2>Account and storage</h2>
+    ${S.mode === 'firebase' ? `<p>Signed in with Google as <b>${esc(S.user && S.user.email || '')}</b>. Cards and progress are stored in your Firebase project <code>${esc(FB && FB.cfg.projectId || '')}</code>.</p>
+      <div class="btnrow"><button type="button" class="btn" id="a-out">Sign out</button></div>
+      ${local.hasData() ? `<h3>Cards in this browser</h3><p class="muted">This browser also has ${Object.keys(local._d().cards).length} cards from “this browser only” mode. Copy them, with their progress, into Firebase. Cards already in Firebase are left as they are.</p>
+      <div class="btnrow"><button type="button" class="btn" id="a-migrate">Copy to Firebase</button></div>` : ''}`
+    : `<p>Using <b>this browser only</b>. Cards and progress are saved in this browser’s storage, aren’t backed up, and disappear if you clear site data.</p>
+      <div class="btnrow">${cfg && FB ? '<button type="button" class="btn primary" id="a-google">Sign in with Google instead</button>' : ''}<button type="button" class="btn" id="a-leave">Back to start screen</button><button type="button" class="btn danger" id="a-erase">Erase this browser’s data</button></div><div class="btnrow" id="a-confirm"></div>`}
+  </section>
+  <section class="panel"><h2>Study</h2>
+    <p><label for="set-new">New cards per day</label> <input type="number" id="set-new" min="0" max="500" step="1" value="${S.settings.newPerDay}" style="width:6rem"></p>
+    <p class="muted">Reviews of cards you’ve already seen are never limited.</p></section>
+  <section class="panel"><h2>Firebase</h2>
+    <p class="muted">${cfg ? `Connected to project <code>${esc(cfg.projectId)}</code>.` : 'Not connected.'} Signing in needs the page to be served from a domain you’ve authorised in Firebase.</p>
+    <details><summary>Setup steps and security rules</summary>${setupGuide()}</details>
+    <details${cfg ? '' : ' open'}><summary>Config</summary>${configForm()}</details></section>
+  <section class="panel"><h2>How scheduling works</h2>
+    <p>Each card has an interval: how long until you see it again. \u{1F615} resets the card and shows it again in about 10 minutes. \u{1F610} grows the interval slowly, and \u{1F642} multiplies it by the card’s ease (starting at 2.5, adjusted by your answers), as in Anki’s SM-2 algorithm. Remembering a card you reviewed late earns credit for the extra time.</p>
+    <p>Predicted recall follows a forgetting curve, \\(R = 0.9^{t/I}\\), so it is 90% when a card falls due and keeps dropping after that. Due cards with the lowest predicted recall and the weakest success rate come first.</p>
+    <p>Your success rate on a card (\u{1F615} counts 0, \u{1F610} ½, \u{1F642} 1) also scales its intervals once you’ve seen it three times: from 0.75× for a card you always miss to 1.25× for one you always know.</p></section>`;
+  mjChain = mjChain.then(() => mjReady).then(() => MathJax.typesetPromise([v])).catch(() => {});
+  const out = $('#a-out'); if (out) out.onclick = endSession;
+  const lv = $('#a-leave'); if (lv) lv.onclick = endSession;
+  const gg = $('#a-google'); if (gg) gg.onclick = () => { S.wantGoogle = true; lsSet('fc-mode', null); if (FB.auth.currentUser) startSession(new FirebaseStore(FB.db, FB.auth.currentUser.uid), 'firebase', FB.auth.currentUser); else signIn(); };
+  const er = $('#a-erase'); if (er) er.onclick = () => confirmIn($('#a-confirm'), 'Erase all cards and progress stored in this browser?', 'Erase', () => { local.erase(); endSession(); toast('This browser’s data was erased.'); });
+  const mg = $('#a-migrate'); if (mg) mg.onclick = async () => {
+    mg.disabled = true; mg.textContent = 'Copying…';
+    try {
+      const d = await local.load();
+      const cards = d.cards.filter(c => !S.cards.has(c.id));
+      const states = Object.entries(d.states).filter(([id, s]) => { const mine = S.states.get(id); return S.cards.has(id) || cards.some(c => c.id === id) ? (!mine || !mine.last || (s.last && s.last > mine.last)) : false; });
+      if (cards.length) await importCards(cards, null);
+      if (states.length) { await S.store.putStates(states); states.forEach(([id, s]) => S.states.set(id, s)); }
+      toast(`Copied ${cards.length} cards and progress for ${states.length}.`); mg.textContent = 'Copied';
+    } catch (e) { mg.disabled = false; mg.textContent = 'Try again'; toast(authMessage(e)); }
+  };
+  $('#set-new').onchange = e => {
+    const n = Math.max(0, Math.min(500, Math.round(+e.target.value || 0)));
+    S.settings.newPerDay = n; e.target.value = n;
+    S.store.putSettings(S.settings).then(() => toast('Saved.'), err => toast(authMessage(err)));
+  };
+  wireConfigForm(v);
+}
+
+/* ---------- Keyboard ---------- */
+document.addEventListener('keydown', e => {
+  const modalOpen = !$('#modal').hidden;
+  if (e.key === 'Escape') { if (modalOpen) { e.preventDefault(); closeModal(); } return; }
+  if (modalOpen || e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target;
+  if (t && (t.closest('input, textarea, select, [contenteditable]'))) return;
+  if (S.view !== 'practise' || !S.store) return;
+  if ((e.key === ' ' || e.key === 'Enter') && !S.revealed && S.current) { if (t.tagName === 'BUTTON' && t.id !== 'p-show') return; e.preventDefault(); reveal(); }
+  else if (S.revealed && ['0', '1', '2'].includes(e.key)) { e.preventDefault(); grade(+e.key); }
+  else if (e.key === 'i' || e.key === 'I') { if (S.current) { e.preventDefault(); showRefresher(S.current); } }
+  else if (e.key === 'u' || e.key === 'U') { if (S.undo) { e.preventDefault(); undo(); } }
+});
+
+/* ---------- Boot ---------- */
+function boot(){
+  if (window.DOMPurify) DOMPurify.addHook('afterSanitizeAttributes', n => { if (n.tagName === 'A' && n.getAttribute('href')) { n.setAttribute('target', '_blank'); n.setAttribute('rel', 'noopener noreferrer'); } });
+  STARTER = parseCards(STARTER_DECK).cards;
+  $('#modal-close').onclick = closeModal;
+  $('#modal').addEventListener('mousedown', e => { if (e.target.id === 'modal') closeModal(); });
+  $$('#nav button').forEach(b => { b.onclick = () => go(b.dataset.view); });
+  FB = initFirebase();
+  const last = lsGet('fc-mode');
+  if (FB) {
+    let known = false;
+    FB.auth.getRedirectResult().catch(e => toast(authMessage(e)));
+    FB.auth.onAuthStateChanged(u => {
+      const firstCall = !known; known = true;
+      if (u) {
+        if (S.mode === 'local' && !S.wantGoogle) return;
+        if (S.mode !== 'firebase' || !S.user || S.user.uid !== u.uid) startSession(new FirebaseStore(FB.db, u.uid), 'firebase', u);
+      } else if (S.mode === 'firebase' || (firstCall && last !== 'local')) showStart();
+    });
+  }
+  if (last === 'local') startSession(new LocalStore(), 'local', null);
+  else if (!FB) showStart();
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+</script>
+</body>
+</html>

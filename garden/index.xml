@@ -6,16 +6,28 @@
       <description>Last 10 notes on Carl’s Digital Garden</description>
       <generator>Quartz -- quartz.jzhao.xyz</generator>
       <item>
-    <title>Great Scots Grand Prix</title>
-    <link>https://cscheffler.github.io/garden/concepts/great-scots-grand-prix</link>
-    <guid>https://cscheffler.github.io/garden/concepts/great-scots-grand-prix</guid>
-    <description><![CDATA[ A suprisingly fun Scotland-themed mini racing game. I did it mostly to test the claim that Claude Opus 5.5 is good with pixel art. ]]></description>
-    <pubDate>Mon, 28 Sep 2026 23:00:00 GMT</pubDate>
-  </item><item>
     <title>Home</title>
     <link>https://cscheffler.github.io/garden/</link>
     <guid>https://cscheffler.github.io/garden/</guid>
     <description><![CDATA[ This is a working, growing garden of notes on mathematics, software, AI safety research, and other projects. ]]></description>
+    <pubDate>Mon, 23 Nov 2026 00:00:00 GMT</pubDate>
+  </item><item>
+    <title>Roland, et al. (2026). Modular Pretraining Enables Access Control.</title>
+    <link>https://cscheffler.github.io/garden/papers/roland-et-al-2026-modular-pretraining-enables-access-control</link>
+    <guid>https://cscheffler.github.io/garden/papers/roland-et-al-2026-modular-pretraining-enables-access-control</guid>
+    <description><![CDATA[ Summary Different modules in a transformer model can be switched on/off at inference time by an administrator. ]]></description>
+    <pubDate>Mon, 23 Nov 2026 00:00:00 GMT</pubDate>
+  </item><item>
+    <title>Reading Technical AI Safety Papers</title>
+    <link>https://cscheffler.github.io/garden/projects/reading-technical-ai-safety-papers</link>
+    <guid>https://cscheffler.github.io/garden/projects/reading-technical-ai-safety-papers</guid>
+    <description><![CDATA[ Log 23 Nov 2026: Roland, et al. (2026). Modular Pretraining Enables Access Control. ]]></description>
+    <pubDate>Mon, 23 Nov 2026 00:00:00 GMT</pubDate>
+  </item><item>
+    <title>Great Scots Grand Prix</title>
+    <link>https://cscheffler.github.io/garden/concepts/great-scots-grand-prix</link>
+    <guid>https://cscheffler.github.io/garden/concepts/great-scots-grand-prix</guid>
+    <description><![CDATA[ A suprisingly fun Scotland-themed mini racing game. I did it mostly to test the claim that Claude Opus 5.5 is good with pixel art. ]]></description>
     <pubDate>Mon, 28 Sep 2026 23:00:00 GMT</pubDate>
   </item><item>
     <title>YotoPix: Drawing 16x16 pixel art</title>
@@ -53,18 +65,6 @@
     <guid>https://cscheffler.github.io/garden/concepts/whorl-toy</guid>
     <description><![CDATA[ Code on GitHub . ]]></description>
     <pubDate>Thu, 18 Jun 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>LLMs Can Reliably Tell You What They Believe — But Size Matters</title>
-    <link>https://cscheffler.github.io/garden/projects/eliciting-llm-beliefs-writeup</link>
-    <guid>https://cscheffler.github.io/garden/projects/eliciting-llm-beliefs-writeup</guid>
-    <description><![CDATA[  In which we show that small models (&lt;3B parameters) are typically too inconsistent in their token probabilities to tell us anything useful about what they believe, but medium to large models (&gt;7B parameters) are fine. ]]></description>
-    <pubDate>Thu, 18 Jun 2026 23:00:00 GMT</pubDate>
-  </item><item>
-    <title>Eliciting LLM Beliefs</title>
-    <link>https://cscheffler.github.io/garden/projects/eliciting-llm-beliefs</link>
-    <guid>https://cscheffler.github.io/garden/projects/eliciting-llm-beliefs</guid>
-    <description><![CDATA[ This project is a derisking step in my larger white-box honesty probes work. tl;dr: To do honesty research, we need to know what models believe. ]]></description>
-    <pubDate>Sun, 07 Jun 2026 23:00:00 GMT</pubDate>
   </item>
     </channel>
   </rss>

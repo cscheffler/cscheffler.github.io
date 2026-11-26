@@ -6,16 +6,16 @@
       <description>Last 10 notes on Carl’s Digital Garden</description>
       <generator>Quartz -- quartz.jzhao.xyz</generator>
       <item>
-    <title>Home</title>
-    <link>https://cscheffler.github.io/garden/</link>
-    <guid>https://cscheffler.github.io/garden/</guid>
-    <description><![CDATA[ This is a working, growing garden of notes on mathematics, software, AI safety research, and other projects. ]]></description>
-    <pubDate>Mon, 23 Nov 2026 00:00:00 GMT</pubDate>
-  </item><item>
     <title>Roland, et al. (2026). Modular Pretraining Enables Access Control.</title>
     <link>https://cscheffler.github.io/garden/papers/roland-et-al-2026-modular-pretraining-enables-access-control</link>
     <guid>https://cscheffler.github.io/garden/papers/roland-et-al-2026-modular-pretraining-enables-access-control</guid>
     <description><![CDATA[ Summary Different modules in a transformer model can be switched on/off at inference time by an administrator. ]]></description>
+    <pubDate>Thu, 26 Nov 2026 00:00:00 GMT</pubDate>
+  </item><item>
+    <title>Home</title>
+    <link>https://cscheffler.github.io/garden/</link>
+    <guid>https://cscheffler.github.io/garden/</guid>
+    <description><![CDATA[ This is a working, growing garden of notes on mathematics, software, AI safety research, and other projects. ]]></description>
     <pubDate>Mon, 23 Nov 2026 00:00:00 GMT</pubDate>
   </item><item>
     <title>Reading Technical AI Safety Papers</title>
